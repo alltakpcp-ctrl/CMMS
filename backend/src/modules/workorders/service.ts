@@ -1,0 +1,326 @@
+import { Prisma, WorkOrder } from "@prisma/client";
+import { prisma } from "../../config/prisma";
+import { AppError } from "../../lib/AppError";
+import { publicUserSelect } from "../../lib/publicUser";
+import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
+import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
+import { AuthPayload } from "../../middlewares/authenticate";
+import { Role, WorkOrderStatus } from "../../domain/enums";
+import {
+  CancelarInput,
+  CreateWorkOrderInput,
+  EncerramentoTecnicoInput,
+  IniciarInput,
+  ListWorkOrdersQuery,
+  PlanejamentoInput,
+  ProgramacaoInput,
+  RegistrarInput,
+  TriagemInput,
+  ValidarInput,
+} from "./schema";
+
+const workOrderInclude = {
+  asset: true,
+  requester: { select: publicUserSelect },
+  assignedTo: { select: publicUserSelect },
+  execution: true,
+  parts: { include: { part: true } },
+} satisfies Prisma.WorkOrderInclude;
+
+export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
+  const asset = await prisma.asset.findUnique({ where: { id: input.assetId } });
+  if (!asset) {
+    throw new AppError(404, "ASSET_NOT_FOUND", "Ativo não encontrado.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const number = await generateWorkOrderNumber(tx);
+
+    const workOrder = await tx.workOrder.create({
+      data: {
+        number,
+        type: input.type,
+        title: input.title,
+        description: input.description,
+        assetId: input.assetId,
+        targetSector: input.targetSector,
+        requesterId: user.userId,
+        status: WorkOrderStatus.ABERTA,
+      },
+      include: workOrderInclude,
+    });
+
+    await tx.statusHistory.create({
+      data: {
+        workOrderId: workOrder.id,
+        fromStatus: null,
+        toStatus: WorkOrderStatus.ABERTA,
+        changedById: user.userId,
+      },
+    });
+
+    return workOrder;
+  });
+}
+
+export async function listWorkOrders(filters: ListWorkOrdersQuery) {
+  const { page = 1, pageSize = 20, ...rest } = filters;
+
+  const where: Prisma.WorkOrderWhereInput = {
+    ...(rest.status && { status: rest.status }),
+    ...(rest.type && { type: rest.type }),
+    ...(rest.targetSector && { targetSector: rest.targetSector }),
+    ...(rest.assetId && { assetId: rest.assetId }),
+    ...(rest.assignedToId && { assignedToId: rest.assignedToId }),
+    ...(rest.requesterId && { requesterId: rest.requesterId }),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.workOrder.findMany({
+      where,
+      include: workOrderInclude,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.workOrder.count({ where }),
+  ]);
+
+  return { items, total, page, pageSize };
+}
+
+export async function getWorkOrderById(id: string) {
+  const workOrder = await prisma.workOrder.findUnique({
+    where: { id },
+    include: {
+      ...workOrderInclude,
+      statusHistory: {
+        orderBy: { changedAt: "asc" },
+        include: { changedBy: { select: publicUserSelect } },
+      },
+    },
+  });
+
+  if (!workOrder) {
+    throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+  }
+
+  return workOrder;
+}
+
+interface ApplyTransitionParams {
+  id: string;
+  to: WorkOrderStatus;
+  role: Role;
+  userId: string;
+  note?: string | null;
+  context?: Partial<TransitionContext>;
+  mutate?: (tx: Prisma.TransactionClient, workOrder: WorkOrder) => Promise<Prisma.WorkOrderUpdateInput | void>;
+}
+
+async function applyTransition({ id, to, role, userId, note, context, mutate }: ApplyTransitionParams) {
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    const result = canTransition({
+      from: workOrder.status as WorkOrderStatus,
+      to,
+      role,
+      context: {
+        userId,
+        assignedToId: workOrder.assignedToId,
+        note,
+        ...context,
+      },
+    });
+
+    if (!result.ok) {
+      const status = result.code === "ROLE_FORBIDDEN" || result.code === "NOT_ASSIGNED" ? 403 : 409;
+      throw new AppError(status, result.code ?? "INVALID_TRANSITION", result.reason ?? "Transição inválida.");
+    }
+
+    const extraData = (await mutate?.(tx, workOrder)) ?? {};
+
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: { ...extraData, status: to },
+      include: workOrderInclude,
+    });
+
+    await tx.statusHistory.create({
+      data: {
+        workOrderId: id,
+        fromStatus: workOrder.status,
+        toStatus: to,
+        changedById: userId,
+        note: note ?? null,
+      },
+    });
+
+    // GANCHO FUTURO (§5.6): ponto natural para disparar notificações (e-mail,
+    // push, etc.) — ex.: avisar o assignedTo ao ser designado (PROGRAMADA),
+    // ou o requester ao ser ENCERRADA. Disparar fora da transação (após o
+    // commit) para não acoplar a confiabilidade da notificação à da escrita.
+    // NÃO implementado no MVP.
+
+    return updated;
+  });
+}
+
+export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.TRIAGEM,
+    role: user.role,
+    userId: user.userId,
+    mutate: async () => ({ priority: input.priority, targetSector: input.targetSector }),
+  });
+}
+
+export function planejamento(id: string, input: PlanejamentoInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.PLANEJADA,
+    role: user.role,
+    userId: user.userId,
+    mutate: async () => ({ plan: input.plan }),
+  });
+}
+
+export function programacao(id: string, input: ProgramacaoInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.PROGRAMADA,
+    role: user.role,
+    userId: user.userId,
+    context: {
+      hasScheduledStart: Boolean(input.scheduledStart),
+      hasScheduledEnd: Boolean(input.scheduledEnd),
+      hasAssignedTechnician: Boolean(input.assignedToId),
+    },
+    mutate: async (tx) => {
+      const tecnico = await tx.user.findUnique({ where: { id: input.assignedToId } });
+      if (!tecnico || tecnico.role !== Role.TECNICO || !tecnico.active) {
+        throw new AppError(
+          422,
+          "INVALID_ASSIGNEE",
+          "O responsável designado deve ser um usuário TECNICO ativo."
+        );
+      }
+      return {
+        scheduledStart: input.scheduledStart,
+        scheduledEnd: input.scheduledEnd,
+        assignedToId: input.assignedToId,
+      };
+    },
+  });
+}
+
+export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.EM_EXECUCAO,
+    role: user.role,
+    userId: user.userId,
+    mutate: async (tx) => {
+      await tx.execution.create({
+        data: { workOrderId: id, riskAnalysis: input.riskAnalysis, startedAt: new Date() },
+      });
+    },
+  });
+}
+
+// Não é uma transição de status (permanece EM_EXECUCAO) — spec 02.8 separa o
+// registro de causa/reparo/peças (aqui) do fechamento técnico (encerramentoTecnico).
+// Por isso não passa pela máquina de estados nem grava StatusHistory.
+export async function registrar(id: string, input: RegistrarInput, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    if (workOrder.status !== WorkOrderStatus.EM_EXECUCAO) {
+      throw new AppError(
+        409,
+        "INVALID_TRANSITION",
+        "Só é possível registrar a execução com a OS em EM_EXECUCAO."
+      );
+    }
+
+    if (user.role !== Role.TECNICO || user.userId !== workOrder.assignedToId) {
+      throw new AppError(403, "NOT_ASSIGNED", "Somente o técnico responsável pela OS pode registrar a execução.");
+    }
+
+    await tx.execution.update({
+      where: { workOrderId: id },
+      data: { rootCause: input.rootCause, repairDescription: input.repairDescription },
+    });
+
+    // GANCHO FUTURO (§5.6): a baixa abaixo é direta e imediata (decisão de MVP,
+    // §2 do CLAUDE.md). Um futuro perfil ALMOXARIFE entraria aqui como uma
+    // etapa intermediária de aprovação — em vez de decrementar `stockQty` na
+    // hora, criaria uma "solicitação de retirada" pendente, e só o almoxarife
+    // aprovando é que executaria o decremento. NÃO implementado no MVP.
+    for (const item of input.parts ?? []) {
+      const part = await tx.part.findUnique({ where: { id: item.partId } });
+      if (!part) {
+        throw new AppError(404, "PART_NOT_FOUND", `Peça ${item.partId} não encontrada.`);
+      }
+      if (part.stockQty < item.quantity) {
+        throw new AppError(422, "INSUFFICIENT_STOCK", `Saldo insuficiente para a peça ${part.description}.`);
+      }
+      await tx.workOrderPart.create({ data: { workOrderId: id, partId: item.partId, quantity: item.quantity } });
+      await tx.part.update({ where: { id: item.partId }, data: { stockQty: { decrement: item.quantity } } });
+    }
+
+    return tx.workOrder.findUniqueOrThrow({ where: { id }, include: workOrderInclude });
+  });
+}
+
+export function encerramentoTecnico(id: string, input: EncerramentoTecnicoInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.AGUARDANDO_VALIDACAO,
+    role: user.role,
+    userId: user.userId,
+    mutate: async (tx) => {
+      await tx.execution.update({
+        where: { workOrderId: id },
+        data: { testNotes: input.testNotes, cleanupDone: input.cleanupDone, finishedAt: new Date() },
+      });
+    },
+  });
+}
+
+export function validar(id: string, input: ValidarInput, user: AuthPayload) {
+  if (input.approve) {
+    return applyTransition({
+      id,
+      to: WorkOrderStatus.ENCERRADA,
+      role: user.role,
+      userId: user.userId,
+    });
+  }
+
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.EM_EXECUCAO,
+    role: user.role,
+    userId: user.userId,
+    note: input.note,
+  });
+}
+
+export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
+  return applyTransition({
+    id,
+    to: WorkOrderStatus.CANCELADA,
+    role: user.role,
+    userId: user.userId,
+    note: input.note,
+  });
+}

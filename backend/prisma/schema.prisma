@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums nativos do Postgres não são usados de propósito (decisão de produção,
+// §2 do CLAUDE.md): os valores permitidos (Role, Sector, WorkOrderType,
+// WorkOrderStatus, Priority) continuam validados na aplicação via
+// src/domain/enums.ts e src/modules/*/schema.ts (zod), para manter o schema
+// idêntico entre dev e produção e a lógica de validação centralizada.
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  workOrdersRequested WorkOrder[]     @relation("WorkOrderRequester")
+  workOrdersAssigned  WorkOrder[]     @relation("WorkOrderAssignee")
+  statusChanges       StatusHistory[]
+}
+
+model Asset {
+  id                         String   @id @default(cuid())
+  code                       String   @unique
+  name                       String
+  sector                     String
+  location                   String
+  criticality                Int
+  // GANCHO FUTURO (§5.6): campo já existe para uma futura geração automática
+  // de OS PREVENTIVA — um job agendado (cron) verificaria, por ativo, se
+  // `hoje - data da última preventiva encerrada >= preventivePeriodicityDays`
+  // e chamaria a mesma lógica de `workorders/service.ts#createWorkOrder`.
+  // NÃO implementado no MVP (abertura de preventiva é sempre manual).
+  preventivePeriodicityDays  Int?
+  active                     Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+
+  workOrders WorkOrder[]
+}
+
+model Part {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  unit        String
+  stockQty    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workOrderParts WorkOrderPart[]
+}
+
+model WorkOrder {
+  id             String    @id @default(cuid())
+  number         String    @unique
+  type           String
+  status         String    @default("ABERTA")
+  priority       String?
+  title          String
+  description    String
+  requesterId    String
+  requester      User      @relation("WorkOrderRequester", fields: [requesterId], references: [id])
+  assetId        String
+  asset          Asset     @relation(fields: [assetId], references: [id])
+  targetSector   String?
+  plan           String?
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  assignedToId   String?
+  assignedTo     User?     @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  execution      Execution?
+  parts          WorkOrderPart[]
+  statusHistory  StatusHistory[]
+}
+
+model Execution {
+  id                String    @id @default(cuid())
+  workOrderId       String    @unique
+  workOrder         WorkOrder @relation(fields: [workOrderId], references: [id])
+  riskAnalysis      String?
+  rootCause         String?
+  repairDescription String?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  testNotes         String?
+  cleanupDone       Boolean   @default(false)
+}
+
+model WorkOrderPart {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  partId      String
+  part        Part      @relation(fields: [partId], references: [id])
+  quantity    Int
+}
+
+model StatusHistory {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  fromStatus  String?
+  toStatus    String
+  changedById String
+  changedBy   User      @relation(fields: [changedById], references: [id])
+  note        String?
+  changedAt   DateTime  @default(now())
+}
