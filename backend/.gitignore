@@ -5,3 +5,5 @@ dev.db-journal
 prisma/test.db
 prisma/test.db-journal
 .env
+CREDENCIAL-ADMIN.local.txt
+*.local.txt

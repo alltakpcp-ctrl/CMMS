@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "start:prod": "prisma migrate deploy && npm run start",
     "seed:prod": "ts-node prisma/seed-prod.ts",
+    "create-admin": "ts-node scripts/create-admin.ts",
     "test": "vitest run"
   },
   "dependencies": {
