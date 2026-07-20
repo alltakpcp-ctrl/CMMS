@@ -7,6 +7,7 @@ import { assetsRoutes } from "./modules/assets/routes";
 import { partsRoutes } from "./modules/parts/routes";
 import { workOrdersRoutes } from "./modules/workorders/routes";
 import { indicatorsRoutes } from "./modules/indicators/routes";
+import { sectorsRoutes } from "./modules/sectors/routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 export const app = express();
@@ -24,5 +25,6 @@ app.use("/assets", assetsRoutes);
 app.use("/parts", partsRoutes);
 app.use("/workorders", workOrdersRoutes);
 app.use("/indicators", indicatorsRoutes);
+app.use("/sectors", sectorsRoutes);
 
 app.use(errorHandler);

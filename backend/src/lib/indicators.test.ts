@@ -6,7 +6,7 @@ import {
   calculateMttr,
   WorkOrderForIndicators,
 } from "./indicators";
-import { Priority, Sector, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators {
   return {
@@ -14,7 +14,7 @@ function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators 
     assetId: "asset-1",
     type: WorkOrderType.CORRETIVA,
     status: WorkOrderStatus.ENCERRADA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: "sector-mecanica",
     priority: Priority.MEDIA,
     scheduledStart: null,
     execution: null,
@@ -116,16 +116,16 @@ describe("calculateAdherence", () => {
 describe("calculateBacklog", () => {
   it("conta apenas status até PROGRAMADA, agrupando por setor e prioridade", () => {
     const workOrders = [
-      wo({ status: WorkOrderStatus.ABERTA, targetSector: null, priority: null }),
-      wo({ status: WorkOrderStatus.TRIAGEM, targetSector: Sector.ELETRICA, priority: Priority.ALTA }),
-      wo({ status: WorkOrderStatus.PROGRAMADA, targetSector: Sector.ELETRICA, priority: Priority.ALTA }),
+      wo({ status: WorkOrderStatus.ABERTA, targetSectorId: null, priority: null }),
+      wo({ status: WorkOrderStatus.TRIAGEM, targetSectorId: "sector-eletrica", priority: Priority.ALTA }),
+      wo({ status: WorkOrderStatus.PROGRAMADA, targetSectorId: "sector-eletrica", priority: Priority.ALTA }),
       wo({ status: WorkOrderStatus.EM_EXECUCAO }),
       wo({ status: WorkOrderStatus.ENCERRADA }),
     ];
     const result = calculateBacklog(workOrders);
     expect(result.total).toBe(3);
     const eletricaAlta = result.bySectorAndPriority.find(
-      (g) => g.targetSector === Sector.ELETRICA && g.priority === Priority.ALTA
+      (g) => g.targetSectorId === "sector-eletrica" && g.priority === Priority.ALTA
     );
     expect(eletricaAlta?.count).toBe(2);
   });

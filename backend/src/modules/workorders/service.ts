@@ -4,6 +4,7 @@ import { AppError } from "../../lib/AppError";
 import { publicUserSelect } from "../../lib/publicUser";
 import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
+import { assertActiveSector } from "../../lib/sectors";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
@@ -21,6 +22,7 @@ import {
 
 const workOrderInclude = {
   asset: true,
+  targetSector: true,
   requester: { select: publicUserSelect },
   assignedTo: { select: publicUserSelect },
   execution: true,
@@ -31,6 +33,9 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
   const asset = await prisma.asset.findUnique({ where: { id: input.assetId } });
   if (!asset) {
     throw new AppError(404, "ASSET_NOT_FOUND", "Ativo não encontrado.");
+  }
+  if (input.targetSectorId) {
+    await assertActiveSector(prisma, input.targetSectorId);
   }
 
   return prisma.$transaction(async (tx) => {
@@ -43,7 +48,7 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         title: input.title,
         description: input.description,
         assetId: input.assetId,
-        targetSector: input.targetSector,
+        targetSectorId: input.targetSectorId,
         requesterId: user.userId,
         status: WorkOrderStatus.ABERTA,
       },
@@ -69,7 +74,7 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery) {
   const where: Prisma.WorkOrderWhereInput = {
     ...(rest.status && { status: rest.status }),
     ...(rest.type && { type: rest.type }),
-    ...(rest.targetSector && { targetSector: rest.targetSector }),
+    ...(rest.targetSectorId && { targetSectorId: rest.targetSectorId }),
     ...(rest.assetId && { assetId: rest.assetId }),
     ...(rest.assignedToId && { assignedToId: rest.assignedToId }),
     ...(rest.requesterId && { requesterId: rest.requesterId }),
@@ -176,7 +181,10 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
     to: WorkOrderStatus.TRIAGEM,
     role: user.role,
     userId: user.userId,
-    mutate: async () => ({ priority: input.priority, targetSector: input.targetSector }),
+    mutate: async (tx) => {
+      await assertActiveSector(tx, input.targetSectorId);
+      return { priority: input.priority, targetSectorId: input.targetSectorId };
+    },
   });
 }
 

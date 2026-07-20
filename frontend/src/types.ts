@@ -1,4 +1,5 @@
-import { Priority, Role, Sector, WorkOrderStatus, WorkOrderType } from "./domain/enums";
+import { Priority, Role, WorkOrderStatus, WorkOrderType } from "./domain/enums";
+import { Sector } from "./api/sectors";
 
 export interface PublicUser {
   id: string;
@@ -13,7 +14,8 @@ export interface Asset {
   id: string;
   code: string;
   name: string;
-  sector: Sector;
+  sectorId: string;
+  sector?: Sector;
   location: string;
   criticality: number;
   preventivePeriodicityDays: number | null;
@@ -73,7 +75,8 @@ export interface WorkOrder {
   requester: PublicUser;
   assetId: string;
   asset: Asset;
-  targetSector: Sector | null;
+  targetSectorId: string | null;
+  targetSector?: Sector | null;
   plan: string | null;
   scheduledStart: string | null;
   scheduledEnd: string | null;

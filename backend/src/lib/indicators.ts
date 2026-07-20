@@ -1,4 +1,4 @@
-import { Priority, Sector, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 // Formato mínimo de OS necessário para os cálculos — mantém as funções puras
 // e testáveis sem depender do Prisma (§4.1 da spec 04).
@@ -7,7 +7,7 @@ export interface WorkOrderForIndicators {
   assetId: string;
   type: WorkOrderType;
   status: WorkOrderStatus;
-  targetSector: Sector | null;
+  targetSectorId: string | null;
   priority: Priority | null;
   scheduledStart: Date | null;
   execution: { startedAt: Date | null; finishedAt: Date | null } | null;
@@ -171,7 +171,7 @@ const BACKLOG_STATUSES: WorkOrderStatus[] = [
 ];
 
 export interface BacklogGroup {
-  targetSector: Sector | null;
+  targetSectorId: string | null;
   priority: Priority | null;
   count: number;
 }
@@ -184,12 +184,12 @@ export function calculateBacklog(workOrders: WorkOrderForIndicators[]): {
 
   const groups = new Map<string, BacklogGroup>();
   for (const wo of backlog) {
-    const key = `${wo.targetSector ?? "—"}::${wo.priority ?? "—"}`;
+    const key = `${wo.targetSectorId ?? "—"}::${wo.priority ?? "—"}`;
     const existing = groups.get(key);
     if (existing) {
       existing.count += 1;
     } else {
-      groups.set(key, { targetSector: wo.targetSector, priority: wo.priority, count: 1 });
+      groups.set(key, { targetSectorId: wo.targetSectorId, priority: wo.priority, count: 1 });
     }
   }
 

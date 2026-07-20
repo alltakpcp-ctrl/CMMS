@@ -1,6 +1,7 @@
-import { Priority, Sector } from "../../domain/enums";
-import { PRIORITY_LABELS, SECTOR_LABELS } from "../../domain/labels";
+import { Priority } from "../../domain/enums";
+import { PRIORITY_LABELS } from "../../domain/labels";
 import { BacklogGroup } from "../../api/indicators";
+import { Sector } from "../../api/sectors";
 
 // Ordem categórica fixa (paleta validada — ver skill de dataviz): não ciclar.
 const PRIORITY_ORDER: Priority[] = [Priority.BAIXA, Priority.MEDIA, Priority.ALTA, Priority.URGENTE];
@@ -12,16 +13,19 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 };
 const NO_PRIORITY_COLOR = "#c3c2b7"; // cinza neutro — bucket "Sem prioridade", fora da paleta categórica
 
-const SECTOR_ORDER: Sector[] = [Sector.MECANICA, Sector.ELETRICA, Sector.PREDIAL];
-
 interface Props {
   groups: BacklogGroup[];
+  sectors: Sector[];
 }
 
-export function BacklogChart({ groups }: Props) {
+export function BacklogChart({ groups, sectors }: Props) {
+  // Ordena pelos setores presentes no backlog, alfabeticamente por name (a
+  // tabela Sector substitui a ordem fixa que existia para o enum antigo).
+  const sectorOrder = [...sectors].sort((a, b) => a.name.localeCompare(b.name));
+
   const sectorsPresent = [
-    ...SECTOR_ORDER.filter((s) => groups.some((g) => g.targetSector === s)),
-    ...(groups.some((g) => g.targetSector === null) ? ["SEM_SETOR" as const] : []),
+    ...sectorOrder.filter((s) => groups.some((g) => g.targetSectorId === s.id)).map((s) => s.id),
+    ...(groups.some((g) => g.targetSectorId === null) ? ["SEM_SETOR" as const] : []),
   ];
 
   if (sectorsPresent.length === 0) {
@@ -30,10 +34,17 @@ export function BacklogChart({ groups }: Props) {
 
   const maxCount = Math.max(1, ...groups.map((g) => g.count));
 
-  function countFor(sector: Sector | "SEM_SETOR", priority: Priority | null) {
+  function countFor(sectorId: string | "SEM_SETOR", priority: Priority | null) {
     return groups.find(
-      (g) => (sector === "SEM_SETOR" ? g.targetSector === null : g.targetSector === sector) && g.priority === priority
+      (g) =>
+        (sectorId === "SEM_SETOR" ? g.targetSectorId === null : g.targetSectorId === sectorId) &&
+        g.priority === priority
     )?.count ?? 0;
+  }
+
+  function labelFor(sectorId: string | "SEM_SETOR") {
+    if (sectorId === "SEM_SETOR") return "Sem setor";
+    return sectors.find((s) => s.id === sectorId)?.name ?? "—";
   }
 
   const seriesKeys: Array<Priority | null> = [
@@ -58,11 +69,11 @@ export function BacklogChart({ groups }: Props) {
 
       {/* gráfico */}
       <div className="flex items-end gap-8 border-b border-slate-200 pb-1" style={{ height: 180 }}>
-        {sectorsPresent.map((sector) => (
-          <div key={sector} className="flex h-full flex-1 flex-col justify-end">
+        {sectorsPresent.map((sectorId) => (
+          <div key={sectorId} className="flex h-full flex-1 flex-col justify-end">
             <div className="flex h-full items-end justify-center gap-1">
               {seriesKeys.map((priority) => {
-                const count = countFor(sector, priority);
+                const count = countFor(sectorId, priority);
                 const heightPct = (count / maxCount) * 100;
                 return (
                   <div key={priority ?? "none"} className="flex flex-col items-center justify-end" style={{ height: "100%" }}>
@@ -83,9 +94,9 @@ export function BacklogChart({ groups }: Props) {
         ))}
       </div>
       <div className="mt-2 flex gap-8">
-        {sectorsPresent.map((sector) => (
-          <p key={sector} className="flex-1 text-center text-xs font-medium text-slate-700">
-            {sector === "SEM_SETOR" ? "Sem setor" : SECTOR_LABELS[sector]}
+        {sectorsPresent.map((sectorId) => (
+          <p key={sectorId} className="flex-1 text-center text-xs font-medium text-slate-700">
+            {labelFor(sectorId)}
           </p>
         ))}
       </div>

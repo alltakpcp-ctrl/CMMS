@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { Sector } from "../domain/enums";
-import { SECTOR_LABELS } from "../domain/labels";
+import { useSectors } from "../hooks/useSectors";
 import * as indicatorsApi from "../api/indicators";
 import { AssetIndicator, BacklogResult, Overview } from "../api/indicators";
 import { Card } from "../components/Card";
@@ -27,10 +26,11 @@ function formatPercentage(value: number | null): string {
 export default function Indicadores() {
   const { token } = useAuth();
   const { showError } = useToast();
+  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [targetSector, setTargetSector] = useState<Sector | "">("");
+  const [targetSectorId, setTargetSectorId] = useState("");
 
   const [overview, setOverview] = useState<Overview | null>(null);
   const [byAsset, setByAsset] = useState<AssetIndicator[]>([]);
@@ -46,7 +46,7 @@ export default function Indicadores() {
     const filters: indicatorsApi.IndicatorsFilters = {
       ...(from && { from: new Date(from).toISOString() }),
       ...(to && { to: new Date(to).toISOString() }),
-      ...(targetSector && { targetSector }),
+      ...(targetSectorId && { targetSectorId }),
     };
 
     Promise.all([
@@ -61,7 +61,7 @@ export default function Indicadores() {
       })
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [token, from, to, targetSector, showError]);
+  }, [token, from, to, targetSectorId, showError]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -98,11 +98,16 @@ export default function Indicadores() {
           <Input label="Até" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <div className="w-44">
-          <Select label="Setor" value={targetSector} onChange={(e) => setTargetSector(e.target.value as Sector | "")}>
-            <option value="">Todos</option>
-            {Object.values(Sector).map((value) => (
-              <option key={value} value={value}>
-                {SECTOR_LABELS[value]}
+          <Select
+            label="Setor"
+            value={targetSectorId}
+            onChange={(e) => setTargetSectorId(e.target.value)}
+            disabled={loadingSectors}
+          >
+            <option value="">{loadingSectors ? "Carregando setores..." : "Todos"}</option>
+            {sectors.map((sector) => (
+              <option key={sector.id} value={sector.id}>
+                {sector.name}
               </option>
             ))}
           </Select>
@@ -138,7 +143,7 @@ export default function Indicadores() {
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Backlog por setor e prioridade</h2>
           {backlog && backlog.total > 0 ? (
-            <BacklogChart groups={backlog.bySectorAndPriority} />
+            <BacklogChart groups={backlog.bySectorAndPriority} sectors={sectors} />
           ) : (
             <EmptyState title="Sem backlog" description="Não há OS pendentes de execução no período/setor filtrado." />
           )}

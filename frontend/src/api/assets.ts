@@ -1,11 +1,10 @@
 import { apiRequest } from "./client";
 import { Asset } from "../types";
-import { Sector } from "../domain/enums";
 
 export interface AssetInput {
   code: string;
   name: string;
-  sector: Sector;
+  sectorId: string;
   location: string;
   criticality: number;
   preventivePeriodicityDays?: number;

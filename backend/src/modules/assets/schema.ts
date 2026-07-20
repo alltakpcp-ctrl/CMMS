@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { Sector } from "../../domain/enums";
 
 export const createAssetSchema = z.object({
   code: z.string().min(1, "Código é obrigatório."),
   name: z.string().min(1, "Nome é obrigatório."),
-  sector: z.nativeEnum(Sector),
+  sectorId: z.string().min(1, "Setor é obrigatório."),
   location: z.string().min(1, "Localização é obrigatória."),
   criticality: z.number().int().min(1).max(5),
   preventivePeriodicityDays: z.number().int().positive().optional(),

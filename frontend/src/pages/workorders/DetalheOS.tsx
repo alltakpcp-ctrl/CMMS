@@ -5,7 +5,6 @@ import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
   PRIORITY_COLORS,
   PRIORITY_LABELS,
-  SECTOR_LABELS,
   STATUS_COLORS,
   STATUS_LABELS,
   TYPE_LABELS,
@@ -156,9 +155,7 @@ export default function DetalheOS() {
                 {workOrder.asset.code} — {workOrder.asset.name}
               </dd>
               <dt className="text-slate-500">Setor destino</dt>
-              <dd className="text-slate-900">
-                {workOrder.targetSector ? SECTOR_LABELS[workOrder.targetSector] : "—"}
-              </dd>
+              <dd className="text-slate-900">{workOrder.targetSector?.name ?? "—"}</dd>
               <dt className="text-slate-500">Solicitante</dt>
               <dd className="text-slate-900">{workOrder.requester.name}</dd>
               <dt className="text-slate-500">Responsável</dt>

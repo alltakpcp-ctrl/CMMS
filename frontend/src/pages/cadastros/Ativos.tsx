@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { Sector } from "../../domain/enums";
-import { SECTOR_LABELS } from "../../domain/labels";
+import { useSectors } from "../../hooks/useSectors";
 import * as assetsApi from "../../api/assets";
 import { Asset } from "../../types";
 import { Table } from "../../components/Table";
@@ -16,7 +15,7 @@ import { useToast } from "../../components/ToastProvider";
 interface AssetFormState {
   code: string;
   name: string;
-  sector: Sector;
+  sectorId: string;
   location: string;
   criticality: number;
   preventivePeriodicityDays: string;
@@ -25,7 +24,7 @@ interface AssetFormState {
 const emptyForm: AssetFormState = {
   code: "",
   name: "",
-  sector: Sector.MECANICA,
+  sectorId: "",
   location: "",
   criticality: 3,
   preventivePeriodicityDays: "",
@@ -34,6 +33,7 @@ const emptyForm: AssetFormState = {
 export default function Ativos() {
   const { token } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,7 @@ export default function Ativos() {
     setForm({
       code: asset.code,
       name: asset.name,
-      sector: asset.sector,
+      sectorId: asset.sectorId,
       location: asset.location,
       criticality: asset.criticality,
       preventivePeriodicityDays: asset.preventivePeriodicityDays?.toString() ?? "",
@@ -75,13 +75,13 @@ export default function Ativos() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !form.sectorId) return;
     setSubmitting(true);
     try {
       const payload = {
         code: form.code,
         name: form.name,
-        sector: form.sector,
+        sectorId: form.sectorId,
         location: form.location,
         criticality: Number(form.criticality),
         preventivePeriodicityDays: form.preventivePeriodicityDays
@@ -137,7 +137,7 @@ export default function Ativos() {
           columns={[
             { header: "Código", cell: (a) => a.code },
             { header: "Nome", cell: (a) => a.name },
-            { header: "Setor", cell: (a) => SECTOR_LABELS[a.sector] },
+            { header: "Setor", cell: (a) => a.sector?.name ?? "—" },
             { header: "Local", cell: (a) => a.location },
             { header: "Criticidade", cell: (a) => a.criticality },
             {
@@ -164,13 +164,17 @@ export default function Ativos() {
             <Input label="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Select
               label="Setor"
-              value={form.sector}
-              onChange={(e) => setForm({ ...form, sector: e.target.value as Sector })}
+              value={form.sectorId}
+              onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
+              disabled={loadingSectors}
               required
             >
-              {Object.values(Sector).map((value) => (
-                <option key={value} value={value}>
-                  {SECTOR_LABELS[value]}
+              <option value="" disabled>
+                {loadingSectors ? "Carregando setores..." : "Selecione um setor"}
+              </option>
+              {sectors.map((sector) => (
+                <option key={sector.id} value={sector.id}>
+                  {sector.name}
                 </option>
               ))}
             </Select>

@@ -7,12 +7,12 @@ import {
   calculateMttr,
   WorkOrderForIndicators,
 } from "../../lib/indicators";
-import { WorkOrderStatus, WorkOrderType, Priority, Sector } from "../../domain/enums";
+import { WorkOrderStatus, WorkOrderType, Priority } from "../../domain/enums";
 import { IndicatorsQuery } from "./schema";
 
 async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<WorkOrderForIndicators[]> {
   const where: Prisma.WorkOrderWhereInput = {
-    ...(filters.targetSector && { targetSector: filters.targetSector }),
+    ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
     ...((filters.from || filters.to) && {
       createdAt: {
         ...(filters.from && { gte: filters.from }),
@@ -28,7 +28,7 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
       assetId: true,
       type: true,
       status: true,
-      targetSector: true,
+      targetSectorId: true,
       priority: true,
       scheduledStart: true,
       execution: { select: { startedAt: true, finishedAt: true } },
@@ -40,7 +40,7 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
     assetId: wo.assetId,
     type: wo.type as WorkOrderType,
     status: wo.status as WorkOrderStatus,
-    targetSector: wo.targetSector as Sector | null,
+    targetSectorId: wo.targetSectorId,
     priority: wo.priority as Priority | null,
     scheduledStart: wo.scheduledStart,
     execution: wo.execution,

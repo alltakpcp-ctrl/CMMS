@@ -1,19 +1,19 @@
 import { apiRequest } from "./client";
 import { Paginated, WorkOrder } from "../types";
-import { Priority, Sector, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export interface CreateWorkOrderInput {
   type: WorkOrderType;
   title: string;
   description: string;
   assetId: string;
-  targetSector?: Sector;
+  targetSectorId?: string;
 }
 
 export interface ListWorkOrdersFilters {
   status?: WorkOrderStatus;
   type?: WorkOrderType;
-  targetSector?: Sector;
+  targetSectorId?: string;
   assetId?: string;
   assignedToId?: string;
   requesterId?: string;
@@ -23,7 +23,7 @@ export interface ListWorkOrdersFilters {
 
 export interface TriagemInput {
   priority: Priority;
-  targetSector: Sector;
+  targetSectorId: string;
 }
 
 export interface PlanejamentoInput {

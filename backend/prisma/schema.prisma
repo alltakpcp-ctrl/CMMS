@@ -27,11 +27,22 @@ model User {
   statusChanges       StatusHistory[]
 }
 
+model Sector {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  assets     Asset[]
+  workOrders WorkOrder[]
+}
+
 model Asset {
   id                         String   @id @default(cuid())
   code                       String   @unique
   name                       String
-  sector                     String
+  sectorId                   String
+  sector                     Sector   @relation(fields: [sectorId], references: [id], onDelete: Restrict)
   location                   String
   criticality                Int
   // GANCHO FUTURO (§5.6): campo já existe para uma futura geração automática
@@ -69,7 +80,8 @@ model WorkOrder {
   requester      User      @relation("WorkOrderRequester", fields: [requesterId], references: [id])
   assetId        String
   asset          Asset     @relation(fields: [assetId], references: [id])
-  targetSector   String?
+  targetSectorId String?
+  targetSector   Sector?   @relation(fields: [targetSectorId], references: [id], onDelete: Restrict)
   plan           String?
   scheduledStart DateTime?
   scheduledEnd   DateTime?

@@ -1,10 +1,10 @@
 import { apiRequest } from "./client";
-import { Priority, Sector } from "../domain/enums";
+import { Priority } from "../domain/enums";
 
 export interface IndicatorsFilters {
   from?: string;
   to?: string;
-  targetSector?: Sector;
+  targetSectorId?: string;
 }
 
 export interface Overview {
@@ -24,7 +24,7 @@ export interface AssetIndicator {
 }
 
 export interface BacklogGroup {
-  targetSector: Sector | null;
+  targetSectorId: string | null;
   priority: Priority | null;
   count: number;
 }

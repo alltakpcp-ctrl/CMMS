@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Sector, WorkOrderType } from "../domain/enums";
-import { SECTOR_LABELS, TYPE_LABELS } from "../domain/labels";
+import { useSectors } from "../hooks/useSectors";
+import { WorkOrderType } from "../domain/enums";
+import { TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
 import { Asset } from "../types";
@@ -18,13 +19,14 @@ export default function NovaSolicitacao() {
   const { token } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
+  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [type, setType] = useState<WorkOrderType>(WorkOrderType.CORRETIVA);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assetId, setAssetId] = useState("");
-  const [targetSector, setTargetSector] = useState<Sector | "">("");
+  const [targetSectorId, setTargetSectorId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 
@@ -47,14 +49,14 @@ export default function NovaSolicitacao() {
         title,
         description,
         assetId,
-        targetSector: targetSector || undefined,
+        targetSectorId: targetSectorId || undefined,
       });
       setCreatedNumber(workOrder.number);
       showSuccess(`Solicitação ${workOrder.number} aberta com sucesso.`);
       setTitle("");
       setDescription("");
       setAssetId("");
-      setTargetSector("");
+      setTargetSectorId("");
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -110,13 +112,14 @@ export default function NovaSolicitacao() {
 
           <Select
             label="Setor destino (opcional)"
-            value={targetSector}
-            onChange={(e) => setTargetSector(e.target.value as Sector | "")}
+            value={targetSectorId}
+            onChange={(e) => setTargetSectorId(e.target.value)}
+            disabled={loadingSectors}
           >
-            <option value="">Não definido</option>
-            {Object.values(Sector).map((value) => (
-              <option key={value} value={value}>
-                {SECTOR_LABELS[value]}
+            <option value="">{loadingSectors ? "Carregando setores..." : "Não definido"}</option>
+            {sectors.map((sector) => (
+              <option key={sector.id} value={sector.id}>
+                {sector.name}
               </option>
             ))}
           </Select>

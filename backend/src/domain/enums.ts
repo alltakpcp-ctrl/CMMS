@@ -8,12 +8,8 @@ export const Role = {
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
-export const Sector = {
-  MECANICA: "MECANICA",
-  ELETRICA: "ELETRICA",
-  PREDIAL: "PREDIAL",
-} as const;
-export type Sector = (typeof Sector)[keyof typeof Sector];
+// Setor deixou de ser um enum fixo — os valores agora vêm da tabela Sector
+// (ver model Sector em schema.prisma e GET /sectors).
 
 export const WorkOrderType = {
   CORRETIVA: "CORRETIVA",

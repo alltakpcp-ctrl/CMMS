@@ -14,7 +14,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { Priority, Role, Sector, WorkOrderStatus, WorkOrderType } from "../src/domain/enums";
+import { Priority, Role, WorkOrderStatus, WorkOrderType } from "../src/domain/enums";
 
 const prisma = new PrismaClient();
 
@@ -60,17 +60,27 @@ async function main() {
     }),
   ]);
 
+  const sectorNames = ["Mecânica", "Elétrica", "Predial"] as const;
+  const sectorsByName = new Map<string, Awaited<ReturnType<typeof prisma.sector.upsert>>>();
+  for (const name of sectorNames) {
+    const sector = await prisma.sector.upsert({ where: { name }, update: {}, create: { name } });
+    sectorsByName.set(name, sector);
+  }
+  const mecanica = sectorsByName.get("Mecânica")!.id;
+  const eletrica = sectorsByName.get("Elétrica")!.id;
+  const predial = sectorsByName.get("Predial")!.id;
+
   const assetDefs = [
-    { code: "AT-001", name: "Compressor de Ar 01", sector: Sector.MECANICA, location: "Sala de Máquinas", criticality: 5 },
-    { code: "AT-002", name: "Painel Elétrico Principal", sector: Sector.ELETRICA, location: "Subestação", criticality: 5 },
-    { code: "AT-003", name: "Esteira Transportadora 03", sector: Sector.MECANICA, location: "Linha 3", criticality: 3 },
-    { code: "AT-004", name: "Sistema de Climatização", sector: Sector.PREDIAL, location: "Bloco Administrativo", criticality: 2 },
-    { code: "AT-005", name: "Motor de Indução 15cv", sector: Sector.ELETRICA, location: "Linha 1", criticality: 4 },
-    { code: "AT-006", name: "Portão Automático", sector: Sector.PREDIAL, location: "Entrada Principal", criticality: 1 },
-    { code: "AT-007", name: "Bomba Hidráulica 02", sector: Sector.MECANICA, location: "Linha 2", criticality: 4 },
-    { code: "AT-008", name: "Quadro de Distribuição Secundário", sector: Sector.ELETRICA, location: "Bloco B", criticality: 3 },
-    { code: "AT-009", name: "Elevador de Carga", sector: Sector.PREDIAL, location: "Galpão 2", criticality: 3 },
-    { code: "AT-010", name: "Torre de Resfriamento", sector: Sector.MECANICA, location: "Área Externa", criticality: 4 },
+    { code: "AT-001", name: "Compressor de Ar 01", sectorId: mecanica, location: "Sala de Máquinas", criticality: 5 },
+    { code: "AT-002", name: "Painel Elétrico Principal", sectorId: eletrica, location: "Subestação", criticality: 5 },
+    { code: "AT-003", name: "Esteira Transportadora 03", sectorId: mecanica, location: "Linha 3", criticality: 3 },
+    { code: "AT-004", name: "Sistema de Climatização", sectorId: predial, location: "Bloco Administrativo", criticality: 2 },
+    { code: "AT-005", name: "Motor de Indução 15cv", sectorId: eletrica, location: "Linha 1", criticality: 4 },
+    { code: "AT-006", name: "Portão Automático", sectorId: predial, location: "Entrada Principal", criticality: 1 },
+    { code: "AT-007", name: "Bomba Hidráulica 02", sectorId: mecanica, location: "Linha 2", criticality: 4 },
+    { code: "AT-008", name: "Quadro de Distribuição Secundário", sectorId: eletrica, location: "Bloco B", criticality: 3 },
+    { code: "AT-009", name: "Elevador de Carga", sectorId: predial, location: "Galpão 2", criticality: 3 },
+    { code: "AT-010", name: "Torre de Resfriamento", sectorId: mecanica, location: "Área Externa", criticality: 4 },
   ];
 
   const assetsByCode = new Map<string, Awaited<ReturnType<typeof prisma.asset.upsert>>>();
@@ -154,7 +164,7 @@ async function main() {
     createdAt: Date;
     finalStatus: WorkOrderStatus;
     priority?: Priority;
-    targetSector?: Sector;
+    targetSectorId?: string;
     plan?: string;
     scheduledStart?: Date;
     scheduledEnd?: Date;
@@ -186,7 +196,7 @@ async function main() {
         assetId: asset.id,
         requesterId: operador.id,
         priority: spec.priority,
-        targetSector: spec.targetSector,
+        targetSectorId: spec.targetSectorId,
         plan: spec.plan,
         scheduledStart: spec.scheduledStart,
         scheduledEnd: spec.scheduledEnd,
@@ -265,7 +275,7 @@ async function main() {
     createdAt: daysAgo(4),
     finalStatus: WorkOrderStatus.TRIAGEM,
     priority: Priority.BAIXA,
-    targetSector: Sector.PREDIAL,
+    targetSectorId: predial,
     history: linearHistory(WorkOrderStatus.TRIAGEM, daysAgo(4), 3),
   });
   specs.push({
@@ -276,7 +286,7 @@ async function main() {
     createdAt: daysAgo(3),
     finalStatus: WorkOrderStatus.TRIAGEM,
     priority: Priority.ALTA,
-    targetSector: Sector.ELETRICA,
+    targetSectorId: eletrica,
     history: linearHistory(WorkOrderStatus.TRIAGEM, daysAgo(3), 2),
   });
 
@@ -289,7 +299,7 @@ async function main() {
     createdAt: daysAgo(6),
     finalStatus: WorkOrderStatus.PLANEJADA,
     priority: Priority.MEDIA,
-    targetSector: Sector.ELETRICA,
+    targetSectorId: eletrica,
     plan: "Análise de vibração e balanceamento do rotor.",
     history: linearHistory(WorkOrderStatus.PLANEJADA, daysAgo(6), 6),
   });
@@ -301,7 +311,7 @@ async function main() {
     createdAt: daysAgo(5),
     finalStatus: WorkOrderStatus.PLANEJADA,
     priority: Priority.ALTA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Trocar vedação e verificar mangueiras de pressão.",
     history: linearHistory(WorkOrderStatus.PLANEJADA, daysAgo(5), 4),
   });
@@ -315,7 +325,7 @@ async function main() {
     createdAt: daysAgo(8),
     finalStatus: WorkOrderStatus.PROGRAMADA,
     priority: Priority.URGENTE,
-    targetSector: Sector.ELETRICA,
+    targetSectorId: eletrica,
     plan: "Desenergizar e inspecionar conexões e barramentos.",
     scheduledStart: plus(now, 24),
     scheduledEnd: plus(now, 28),
@@ -330,7 +340,7 @@ async function main() {
     createdAt: daysAgo(7),
     finalStatus: WorkOrderStatus.PROGRAMADA,
     priority: Priority.BAIXA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Limpeza de bandejas, troca de água e inspeção do motor do ventilador.",
     scheduledStart: plus(now, 48),
     scheduledEnd: plus(now, 51),
@@ -347,7 +357,7 @@ async function main() {
     createdAt: daysAgo(5),
     finalStatus: WorkOrderStatus.EM_EXECUCAO,
     priority: Priority.ALTA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Isolar trecho e trocar conexão da linha.",
     scheduledStart: plus(daysAgo(1), 8),
     scheduledEnd: plus(daysAgo(1), 12),
@@ -363,7 +373,7 @@ async function main() {
     createdAt: daysAgo(4),
     finalStatus: WorkOrderStatus.EM_EXECUCAO,
     priority: Priority.MEDIA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Verificar motor de acionamento e tensão das correias.",
     scheduledStart: plus(daysAgo(0), 7),
     scheduledEnd: plus(daysAgo(0), 11),
@@ -381,7 +391,7 @@ async function main() {
     createdAt: daysAgo(9),
     finalStatus: WorkOrderStatus.AGUARDANDO_VALIDACAO,
     priority: Priority.ALTA,
-    targetSector: Sector.ELETRICA,
+    targetSectorId: eletrica,
     plan: "Verificar ventilação e rolamentos do motor.",
     scheduledStart: plus(daysAgo(2), 8),
     scheduledEnd: plus(daysAgo(2), 12),
@@ -406,7 +416,7 @@ async function main() {
     createdAt: daysAgo(7),
     finalStatus: WorkOrderStatus.AGUARDANDO_VALIDACAO,
     priority: Priority.MEDIA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Inspeção e troca preventiva do selo mecânico.",
     scheduledStart: plus(daysAgo(1), 9),
     scheduledEnd: plus(daysAgo(1), 12),
@@ -433,7 +443,7 @@ async function main() {
     createdAt: daysAgo(75),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.URGENTE,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Substituir válvula de segurança.",
     scheduledStart: plus(daysAgo(74), 8),
     scheduledEnd: plus(daysAgo(74), 12),
@@ -458,7 +468,7 @@ async function main() {
     createdAt: daysAgo(45),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.ALTA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Inspecionar rolamentos e fixação do motor.",
     scheduledStart: plus(daysAgo(44), 8),
     scheduledEnd: plus(daysAgo(44), 11),
@@ -483,7 +493,7 @@ async function main() {
     createdAt: daysAgo(12),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.ALTA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Verificar regulador de pressão e filtros.",
     scheduledStart: plus(daysAgo(11), 8),
     scheduledEnd: plus(daysAgo(11), 12),
@@ -510,7 +520,7 @@ async function main() {
     createdAt: daysAgo(60),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.URGENTE,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Substituir corrente e verificar alinhamento das engrenagens.",
     scheduledStart: plus(daysAgo(59), 8),
     scheduledEnd: plus(daysAgo(59), 14),
@@ -535,7 +545,7 @@ async function main() {
     createdAt: daysAgo(25),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.MEDIA,
-    targetSector: Sector.MECANICA,
+    targetSectorId: mecanica,
     plan: "Substituir sensor de posição.",
     scheduledStart: plus(daysAgo(24), 8),
     scheduledEnd: plus(daysAgo(24), 10),
@@ -561,7 +571,7 @@ async function main() {
     createdAt: daysAgo(15),
     finalStatus: WorkOrderStatus.ENCERRADA,
     priority: Priority.BAIXA,
-    targetSector: Sector.PREDIAL,
+    targetSectorId: predial,
     plan: "Limpeza de filtros, verificação de gás e dreno.",
     scheduledStart: plus(daysAgo(14), 8),
     scheduledEnd: plus(daysAgo(14), 10),
@@ -596,7 +606,7 @@ async function main() {
       createdAt: start,
       finalStatus: WorkOrderStatus.CANCELADA,
       priority: Priority.BAIXA,
-      targetSector: Sector.PREDIAL,
+      targetSectorId: predial,
       history,
     });
   }
@@ -617,7 +627,7 @@ async function main() {
       createdAt: start,
       finalStatus: WorkOrderStatus.CANCELADA,
       priority: Priority.MEDIA,
-      targetSector: Sector.ELETRICA,
+      targetSectorId: eletrica,
       plan: "Desenergizar painel e revisar barramentos.",
       scheduledStart: plus(daysAgo(25), 8),
       scheduledEnd: plus(daysAgo(25), 14),

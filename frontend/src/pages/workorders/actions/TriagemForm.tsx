@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../../../auth/AuthContext";
-import { Priority, Sector } from "../../../domain/enums";
-import { PRIORITY_LABELS, SECTOR_LABELS } from "../../../domain/labels";
+import { useSectors } from "../../../hooks/useSectors";
+import { Priority } from "../../../domain/enums";
+import { PRIORITY_LABELS } from "../../../domain/labels";
 import * as workOrdersApi from "../../../api/workorders";
 import { Select } from "../../../components/Select";
 import { Button } from "../../../components/Button";
@@ -10,18 +11,19 @@ import { ActionFormProps } from "./types";
 
 export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
   const { token } = useAuth();
+  const { sectors, loading: loadingSectors } = useSectors(token);
   const [priority, setPriority] = useState<Priority>(Priority.MEDIA);
-  const [targetSector, setTargetSector] = useState<Sector>(workOrder.asset.sector);
+  const [targetSectorId, setTargetSectorId] = useState(workOrder.asset.sectorId);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !targetSectorId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await workOrdersApi.triagem(token, workOrder.id, { priority, targetSector });
+      const updated = await workOrdersApi.triagem(token, workOrder.id, { priority, targetSectorId });
       onSuccess(updated);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -42,13 +44,17 @@ export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
 
       <Select
         label="Setor destino"
-        value={targetSector}
-        onChange={(e) => setTargetSector(e.target.value as Sector)}
+        value={targetSectorId}
+        onChange={(e) => setTargetSectorId(e.target.value)}
+        disabled={loadingSectors}
         required
       >
-        {Object.values(Sector).map((value) => (
-          <option key={value} value={value}>
-            {SECTOR_LABELS[value]}
+        <option value="" disabled>
+          {loadingSectors ? "Carregando setores..." : "Selecione um setor"}
+        </option>
+        {sectors.map((sector) => (
+          <option key={sector.id} value={sector.id}>
+            {sector.name}
           </option>
         ))}
       </Select>

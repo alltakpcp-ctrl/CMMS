@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { Role, Sector } from "../src/domain/enums";
+import { Role } from "../src/domain/enums";
 
 const prisma = new PrismaClient();
 
@@ -21,26 +21,33 @@ async function main() {
     });
   }
 
+  const sectorNames = ["Mecânica", "Elétrica", "Predial"];
+  const sectorsByName = new Map<string, Awaited<ReturnType<typeof prisma.sector.upsert>>>();
+  for (const name of sectorNames) {
+    const sector = await prisma.sector.upsert({ where: { name }, update: {}, create: { name } });
+    sectorsByName.set(name, sector);
+  }
+
   const assets: Array<{
     code: string;
     name: string;
-    sector: Sector;
+    sectorName: string;
     location: string;
     criticality: number;
   }> = [
-    { code: "AT-001", name: "Compressor de Ar 01", sector: Sector.MECANICA, location: "Sala de Máquinas", criticality: 5 },
-    { code: "AT-002", name: "Painel Elétrico Principal", sector: Sector.ELETRICA, location: "Subestação", criticality: 5 },
-    { code: "AT-003", name: "Esteira Transportadora 03", sector: Sector.MECANICA, location: "Linha 3", criticality: 3 },
-    { code: "AT-004", name: "Sistema de Climatização", sector: Sector.PREDIAL, location: "Bloco Administrativo", criticality: 2 },
-    { code: "AT-005", name: "Motor de Indução 15cv", sector: Sector.ELETRICA, location: "Linha 1", criticality: 4 },
-    { code: "AT-006", name: "Portão Automático", sector: Sector.PREDIAL, location: "Entrada Principal", criticality: 1 },
+    { code: "AT-001", name: "Compressor de Ar 01", sectorName: "Mecânica", location: "Sala de Máquinas", criticality: 5 },
+    { code: "AT-002", name: "Painel Elétrico Principal", sectorName: "Elétrica", location: "Subestação", criticality: 5 },
+    { code: "AT-003", name: "Esteira Transportadora 03", sectorName: "Mecânica", location: "Linha 3", criticality: 3 },
+    { code: "AT-004", name: "Sistema de Climatização", sectorName: "Predial", location: "Bloco Administrativo", criticality: 2 },
+    { code: "AT-005", name: "Motor de Indução 15cv", sectorName: "Elétrica", location: "Linha 1", criticality: 4 },
+    { code: "AT-006", name: "Portão Automático", sectorName: "Predial", location: "Entrada Principal", criticality: 1 },
   ];
 
-  for (const asset of assets) {
+  for (const { sectorName, ...asset } of assets) {
     await prisma.asset.upsert({
       where: { code: asset.code },
       update: {},
-      create: asset,
+      create: { ...asset, sectorId: sectorsByName.get(sectorName)!.id },
     });
   }
 

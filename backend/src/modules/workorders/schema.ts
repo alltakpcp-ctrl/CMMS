@@ -1,18 +1,18 @@
 import { z } from "zod";
-import { Priority, Sector, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import { Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 
 export const createWorkOrderSchema = z.object({
   type: z.nativeEnum(WorkOrderType),
   title: z.string().min(1, "Título é obrigatório."),
   description: z.string().min(1, "Descrição é obrigatória."),
   assetId: z.string().min(1, "Ativo é obrigatório."),
-  targetSector: z.nativeEnum(Sector).optional(),
+  targetSectorId: z.string().min(1).optional(),
 });
 
 export const listWorkOrdersQuerySchema = z.object({
   status: z.nativeEnum(WorkOrderStatus).optional(),
   type: z.nativeEnum(WorkOrderType).optional(),
-  targetSector: z.nativeEnum(Sector).optional(),
+  targetSectorId: z.string().optional(),
   assetId: z.string().optional(),
   assignedToId: z.string().optional(),
   requesterId: z.string().optional(),
@@ -22,7 +22,7 @@ export const listWorkOrdersQuerySchema = z.object({
 
 export const triagemSchema = z.object({
   priority: z.nativeEnum(Priority),
-  targetSector: z.nativeEnum(Sector),
+  targetSectorId: z.string().min(1, "Setor é obrigatório."),
 });
 
 export const planejamentoSchema = z.object({

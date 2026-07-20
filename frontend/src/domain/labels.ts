@@ -1,15 +1,9 @@
-import { Priority, Role, Sector, WorkOrderStatus, WorkOrderType } from "./enums";
+import { Priority, Role, WorkOrderStatus, WorkOrderType } from "./enums";
 
 export const ROLE_LABELS: Record<Role, string> = {
   OPERADOR: "Operador",
   TECNICO: "Técnico",
   SUPERVISOR: "Supervisor",
-};
-
-export const SECTOR_LABELS: Record<Sector, string> = {
-  MECANICA: "Mecânica",
-  ELETRICA: "Elétrica",
-  PREDIAL: "Predial",
 };
 
 export const TYPE_LABELS: Record<WorkOrderType, string> = {

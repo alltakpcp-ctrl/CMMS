@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Sector, WorkOrderStatus, WorkOrderType } from "../domain/enums";
-import { PRIORITY_COLORS, PRIORITY_LABELS, SECTOR_LABELS, STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
+import { useSectors } from "../hooks/useSectors";
+import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
 import * as workOrdersApi from "../api/workorders";
 import { WorkOrder } from "../types";
 import { Select } from "../components/Select";
@@ -18,12 +19,13 @@ export default function ListaOS() {
   const { token, user } = useAuth();
   const { showError } = useToast();
   const navigate = useNavigate();
+  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<WorkOrderStatus | "">("");
   const [type, setType] = useState<WorkOrderType | "">("");
-  const [targetSector, setTargetSector] = useState<Sector | "">("");
+  const [targetSectorId, setTargetSectorId] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function ListaOS() {
       pageSize: 100,
       ...(status && { status }),
       ...(type && { type }),
-      ...(targetSector && { targetSector }),
+      ...(targetSectorId && { targetSectorId }),
     };
 
     if (onlyMine) {
@@ -47,7 +49,7 @@ export default function ListaOS() {
       .then((result) => setItems(result.items))
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [token, user, status, type, targetSector, onlyMine, showError]);
+  }, [token, user, status, type, targetSectorId, onlyMine, showError]);
 
   return (
     <div className="space-y-4">
@@ -86,13 +88,14 @@ export default function ListaOS() {
         <div className="w-40">
           <Select
             label="Setor"
-            value={targetSector}
-            onChange={(e) => setTargetSector(e.target.value as Sector | "")}
+            value={targetSectorId}
+            onChange={(e) => setTargetSectorId(e.target.value)}
+            disabled={loadingSectors}
           >
-            <option value="">Todos</option>
-            {Object.values(Sector).map((value) => (
-              <option key={value} value={value}>
-                {SECTOR_LABELS[value]}
+            <option value="">{loadingSectors ? "Carregando setores..." : "Todos"}</option>
+            {sectors.map((sector) => (
+              <option key={sector.id} value={sector.id}>
+                {sector.name}
               </option>
             ))}
           </Select>
@@ -127,7 +130,7 @@ export default function ListaOS() {
               cell: (wo) =>
                 wo.priority ? <Badge color={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge> : "—",
             },
-            { header: "Setor", cell: (wo) => (wo.targetSector ? SECTOR_LABELS[wo.targetSector] : "—") },
+            { header: "Setor", cell: (wo) => wo.targetSector?.name ?? "—" },
             { header: "Responsável", cell: (wo) => wo.assignedTo?.name ?? "—" },
             { header: "Data", cell: (wo) => formatDate(wo.createdAt) },
           ]}

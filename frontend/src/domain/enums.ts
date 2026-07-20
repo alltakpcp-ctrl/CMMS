@@ -8,12 +8,8 @@ export const Role = {
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
-export const Sector = {
-  MECANICA: "MECANICA",
-  ELETRICA: "ELETRICA",
-  PREDIAL: "PREDIAL",
-} as const;
-export type Sector = (typeof Sector)[keyof typeof Sector];
+// Setor deixou de ser um enum fixo — os valores agora vêm da tabela Sector
+// (ver api/sectors.ts e hooks/useSectors.ts).
 
 export const WorkOrderType = {
   CORRETIVA: "CORRETIVA",

@@ -3,7 +3,7 @@ import request from "supertest";
 import bcrypt from "bcrypt";
 import { app } from "../app";
 import { prisma } from "../config/prisma";
-import { Role, Sector, WorkOrderType } from "../domain/enums";
+import { Role, WorkOrderType } from "../domain/enums";
 
 let operadorToken: string;
 let tecnicoToken: string;
@@ -11,6 +11,7 @@ let supervisorToken: string;
 let assetId: string;
 let partId: string;
 let tecnicoId: string;
+let sectorId: string;
 
 async function login(email: string): Promise<string> {
   const res = await request(app).post("/auth/login").send({ email, password: "senha123" });
@@ -33,8 +34,11 @@ beforeAll(async () => {
   ]);
   tecnicoId = tecnico.id;
 
+  const sector = await prisma.sector.create({ data: { name: "Setor de Teste" } });
+  sectorId = sector.id;
+
   const asset = await prisma.asset.create({
-    data: { code: "TEST-AT-01", name: "Ativo de Teste", sector: Sector.MECANICA, location: "Bancada de testes", criticality: 3 },
+    data: { code: "TEST-AT-01", name: "Ativo de Teste", sectorId, location: "Bancada de testes", criticality: 3 },
   });
   assetId = asset.id;
 
@@ -66,7 +70,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
     const triagem = await request(app)
       .post(`/workorders/${id}/triagem`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ priority: "ALTA", targetSector: "MECANICA" });
+      .send({ priority: "ALTA", targetSectorId: sectorId });
     expect(triagem.status).toBe(200);
     expect(triagem.body.status).toBe("TRIAGEM");
 
@@ -137,7 +141,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
     const afterClose = await request(app)
       .post(`/workorders/${id}/triagem`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ priority: "BAIXA", targetSector: "MECANICA" });
+      .send({ priority: "BAIXA", targetSectorId: sectorId });
     expect(afterClose.status).toBe(409);
   });
 });
@@ -153,7 +157,7 @@ describe("caminhos de erro", () => {
     const res = await request(app)
       .post(`/workorders/${id}/triagem`)
       .set("Authorization", `Bearer ${operadorToken}`) // OPERADOR não pode triar
-      .send({ priority: "ALTA", targetSector: "MECANICA" });
+      .send({ priority: "ALTA", targetSectorId: sectorId });
 
     // Bloqueado pelo middleware authorize() da rota (RBAC de perfil), antes
     // mesmo de chegar na máquina de estados — por isso o código é o genérico
@@ -193,7 +197,7 @@ describe("caminhos de erro", () => {
     await request(app)
       .post(`/workorders/${id}/triagem`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ priority: "ALTA", targetSector: "MECANICA" });
+      .send({ priority: "ALTA", targetSectorId: sectorId });
     await request(app)
       .post(`/workorders/${id}/planejamento`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
