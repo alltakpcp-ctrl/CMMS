@@ -88,6 +88,10 @@ model WorkOrder {
   targetSectorId String?
   targetSector   Sector?   @relation(fields: [targetSectorId], references: [id], onDelete: Restrict)
   plan           String?
+  numMaintainers   Int?
+  estimatedMinutes Int?
+  safetyEquipment  String?
+  plannedParts     Json?
   scheduledStart DateTime?
   scheduledEnd   DateTime?
   assignedToId   String?

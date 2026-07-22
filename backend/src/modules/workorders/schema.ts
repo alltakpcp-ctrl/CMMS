@@ -26,8 +26,18 @@ export const triagemSchema = z.object({
   targetSectorId: z.string().min(1, "Setor é obrigatório."),
 });
 
+export const plannedPartSchema = z.object({
+  code: z.string().min(1, "Código da peça é obrigatório."),
+  description: z.string().min(1, "Descrição da peça é obrigatória."),
+  quantity: z.number().int().positive("Quantidade deve ser maior que zero."),
+});
+
 export const planejamentoSchema = z.object({
   plan: z.string().min(1, "Plano é obrigatório."),
+  numMaintainers: z.number().int().positive().optional(),
+  estimatedMinutes: z.number().int().positive().optional(),
+  safetyEquipment: z.string().min(1).optional(),
+  plannedParts: z.array(plannedPartSchema).optional(),
 });
 
 export const programacaoSchema = z.object({

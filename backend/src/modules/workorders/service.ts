@@ -237,7 +237,13 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
     to: WorkOrderStatus.PLANEJADA,
     role: user.role,
     userId: user.userId,
-    mutate: async () => ({ plan: input.plan }),
+    mutate: async () => ({
+      plan: input.plan,
+      numMaintainers: input.numMaintainers,
+      estimatedMinutes: input.estimatedMinutes,
+      safetyEquipment: input.safetyEquipment,
+      plannedParts: input.plannedParts,
+    }),
   });
 }
 
