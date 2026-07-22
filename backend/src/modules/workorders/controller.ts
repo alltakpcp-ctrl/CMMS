@@ -29,11 +29,11 @@ export async function createWorkOrderController(req: Request, res: Response) {
 
 export async function listWorkOrdersController(req: Request, res: Response) {
   const query = listWorkOrdersQuerySchema.parse(req.query);
-  res.json(await workOrdersService.listWorkOrders(query));
+  res.json(await workOrdersService.listWorkOrders(query, requireUser(req)));
 }
 
 export async function getWorkOrderController(req: Request, res: Response) {
-  res.json(await workOrdersService.getWorkOrderById(req.params.id));
+  res.json(await workOrdersService.getWorkOrderById(req.params.id, requireUser(req)));
 }
 
 export async function triagemController(req: Request, res: Response) {

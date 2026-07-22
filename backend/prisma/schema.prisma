@@ -19,6 +19,9 @@ model User {
   email        String   @unique
   passwordHash String
   role         String
+  sectorId     String?
+  sector       Sector?  @relation(fields: [sectorId], references: [id])
+  canReceivePartRequests Boolean @default(false)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
@@ -35,6 +38,7 @@ model Sector {
 
   assets     Asset[]
   workOrders WorkOrder[]
+  users      User[]
 }
 
 model Asset {

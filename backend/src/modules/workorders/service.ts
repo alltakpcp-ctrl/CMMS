@@ -68,8 +68,28 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
   });
 }
 
-export async function listWorkOrders(filters: ListWorkOrdersQuery) {
+// Fase 3.A: OPERADOR só enxerga OS de ativos do seu próprio setor
+// (asset.sectorId, não targetSectorId — este último fica null até a triagem).
+// TECNICO e SUPERVISOR são isentos e veem todos os setores. Sem sectorId
+// cadastrado, o operador não vê nada (fail-closed), nunca erro.
+async function operadorSectorFilter(user: AuthPayload): Promise<{ blocked: true } | { blocked: false; sectorId: string | null }> {
+  if (user.role !== Role.OPERADOR) {
+    return { blocked: false, sectorId: null };
+  }
+  const operador = await prisma.user.findUnique({ where: { id: user.userId }, select: { sectorId: true } });
+  if (!operador?.sectorId) {
+    return { blocked: true };
+  }
+  return { blocked: false, sectorId: operador.sectorId };
+}
+
+export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPayload) {
   const { page = 1, pageSize = 20, ...rest } = filters;
+
+  const sectorFilter = await operadorSectorFilter(user);
+  if (sectorFilter.blocked) {
+    return { items: [], total: 0, page, pageSize };
+  }
 
   const where: Prisma.WorkOrderWhereInput = {
     ...(rest.status && { status: rest.status }),
@@ -78,6 +98,7 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery) {
     ...(rest.assetId && { assetId: rest.assetId }),
     ...(rest.assignedToId && { assignedToId: rest.assignedToId }),
     ...(rest.requesterId && { requesterId: rest.requesterId }),
+    ...(sectorFilter.sectorId && { asset: { sectorId: sectorFilter.sectorId } }),
   };
 
   const [items, total] = await Promise.all([
@@ -94,7 +115,7 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery) {
   return { items, total, page, pageSize };
 }
 
-export async function getWorkOrderById(id: string) {
+export async function getWorkOrderById(id: string, user: AuthPayload) {
   const workOrder = await prisma.workOrder.findUnique({
     where: { id },
     include: {
@@ -107,6 +128,15 @@ export async function getWorkOrderById(id: string) {
   });
 
   if (!workOrder) {
+    throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+  }
+
+  const sectorFilter = await operadorSectorFilter(user);
+  if (sectorFilter.blocked) {
+    throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+  }
+  // 404 (não 403): não revela a operador a existência de OS de outro setor.
+  if (sectorFilter.sectorId && sectorFilter.sectorId !== workOrder.asset.sectorId) {
     throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
   }
 

@@ -1,13 +1,17 @@
 import { Router } from "express";
+import { Role } from "../../domain/enums";
 import { authenticate } from "../../middlewares/authenticate";
+import { authorize } from "../../middlewares/authorize";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { backlogController, byAssetController, overviewController } from "./controller";
 
 export const indicatorsRoutes = Router();
 
-// Leitura liberada a todos os perfis autenticados (§4 do CLAUDE.md — OPERADOR e
-// TECNICO têm acesso de leitura; não há ação de escrita nesta área).
+// Fase 3.A: indicadores exigem visão cross-setor (agregam todos os ativos),
+// por isso OPERADOR — restrito ao próprio setor — fica de fora. TECNICO e
+// SUPERVISOR mantêm acesso de leitura (§4 do CLAUDE.md).
 indicatorsRoutes.use(authenticate);
+indicatorsRoutes.use(authorize(Role.TECNICO, Role.SUPERVISOR));
 
 indicatorsRoutes.get("/overview", asyncHandler(overviewController));
 indicatorsRoutes.get("/by-asset", asyncHandler(byAssetController));
