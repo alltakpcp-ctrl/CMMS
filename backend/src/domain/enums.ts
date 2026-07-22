@@ -37,3 +37,24 @@ export const Priority = {
   URGENTE: "URGENTE",
 } as const;
 export type Priority = (typeof Priority)[keyof typeof Priority];
+
+export const PartRequestItemType = {
+  PECA: "PECA",
+  FERRAMENTA: "FERRAMENTA",
+} as const;
+export type PartRequestItemType = (typeof PartRequestItemType)[keyof typeof PartRequestItemType];
+
+export const PartRequestStatus = {
+  PENDENTE: "PENDENTE",
+  INCLUIDA: "INCLUIDA",
+  REJEITADA: "REJEITADA",
+  DEVOLVIDA: "DEVOLVIDA",
+} as const;
+export type PartRequestStatus = (typeof PartRequestStatus)[keyof typeof PartRequestStatus];
+
+export const PurchaseOrderStatus = {
+  ENVIADO: "ENVIADO",
+  APROVADO: "APROVADO",
+  REJEITADO: "REJEITADO",
+} as const;
+export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];

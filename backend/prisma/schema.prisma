@@ -29,6 +29,9 @@ model User {
   workOrdersAssigned  WorkOrder[]     @relation("WorkOrderAssignee")
   workOrdersPriorityAdjusted WorkOrder[] @relation("WorkOrderPriorityAdjustedBy")
   statusChanges       StatusHistory[]
+  partRequestsCreated   PartRequest[]   @relation("partRequestsCreated")
+  purchaseOrdersCreated PurchaseOrder[] @relation("purchaseOrdersCreated")
+  purchaseOrdersReviewed PurchaseOrder[] @relation("purchaseOrdersReviewed")
 }
 
 model Sector {
@@ -71,6 +74,7 @@ model Part {
   createdAt   DateTime @default(now())
 
   workOrderParts WorkOrderPart[]
+  partRequests   PartRequest[]
 }
 
 model WorkOrder {
@@ -107,6 +111,7 @@ model WorkOrder {
   execution      Execution?
   parts          WorkOrderPart[]
   statusHistory  StatusHistory[]
+  partRequests   PartRequest[]
 }
 
 model Execution {
@@ -141,4 +146,41 @@ model StatusHistory {
   changedBy   User      @relation(fields: [changedById], references: [id])
   note        String?
   changedAt   DateTime  @default(now())
+}
+
+// itemType e status são String validados via zod (não enum nativo), mesma
+// decisão de §2 do CLAUDE.md aplicada aos demais campos do schema.
+model PartRequest {
+  id              String         @id @default(cuid())
+  itemType        String         // "PECA" | "FERRAMENTA"
+  partId          String?
+  part            Part?          @relation(fields: [partId], references: [id])
+  description     String
+  quantity        Int
+  notes           String?
+  status          String         @default("PENDENTE") // PENDENTE | INCLUIDA | REJEITADA
+  osId            String?
+  workOrder       WorkOrder?     @relation(fields: [osId], references: [id])
+  requestedById   String
+  requestedBy     User           @relation("partRequestsCreated", fields: [requestedById], references: [id])
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  rejectedReason  String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  number       String    @unique
+  status       String    @default("ENVIADO") // ENVIADO | APROVADO | REJEITADO
+  createdById  String
+  createdBy    User      @relation("purchaseOrdersCreated", fields: [createdById], references: [id])
+  reviewedById String?
+  reviewedBy   User?     @relation("purchaseOrdersReviewed", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  reviewNotes  String?
+  items        PartRequest[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
