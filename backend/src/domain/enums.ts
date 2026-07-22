@@ -49,6 +49,7 @@ export const PartRequestStatus = {
   INCLUIDA: "INCLUIDA",
   REJEITADA: "REJEITADA",
   DEVOLVIDA: "DEVOLVIDA",
+  ATENDIDA: "ATENDIDA",
 } as const;
 export type PartRequestStatus = (typeof PartRequestStatus)[keyof typeof PartRequestStatus];
 

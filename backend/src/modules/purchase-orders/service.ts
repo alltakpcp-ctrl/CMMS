@@ -116,6 +116,13 @@ export async function reviewPurchaseOrder(id: string, input: ReviewPurchaseOrder
         where: { purchaseOrderId: id },
         data: { status: PartRequestStatus.DEVOLVIDA },
       });
+    } else {
+      // ATENDIDA é terminal: mantém o purchaseOrderId, mas não volta pra fila
+      // nem pode entrar em novo pedido (ver listPending/create).
+      await tx.partRequest.updateMany({
+        where: { purchaseOrderId: id },
+        data: { status: PartRequestStatus.ATENDIDA },
+      });
     }
 
     await tx.purchaseOrder.update({
