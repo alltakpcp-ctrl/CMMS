@@ -21,8 +21,12 @@ export const workOrdersRoutes = Router();
 
 workOrdersRoutes.use(authenticate);
 
-// Etapa 1 — Abertura: qualquer perfil autenticado.
-workOrdersRoutes.post("/", asyncHandler(createWorkOrderController));
+// Etapa 1 — Abertura: OPERADOR e SUPERVISOR. TECNICO não abre OS.
+workOrdersRoutes.post(
+  "/",
+  authorize(Role.OPERADOR, Role.SUPERVISOR),
+  asyncHandler(createWorkOrderController)
+);
 workOrdersRoutes.get("/", asyncHandler(listWorkOrdersController));
 workOrdersRoutes.get("/:id", asyncHandler(getWorkOrderController));
 
