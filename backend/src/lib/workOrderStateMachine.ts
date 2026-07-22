@@ -1,11 +1,12 @@
-import { Role, WorkOrderStatus } from "../domain/enums";
+import { Priority, Role, WorkOrderStatus } from "../domain/enums";
 
 export type TransitionErrorCode =
   | "ROLE_FORBIDDEN"
   | "NOT_ASSIGNED"
   | "INVALID_TRANSITION"
   | "MISSING_CONTEXT"
-  | "NOTE_REQUIRED";
+  | "NOTE_REQUIRED"
+  | "PRIORITY_NOT_URGENT";
 
 export interface CanTransitionResult {
   ok: boolean;
@@ -20,6 +21,7 @@ export interface TransitionContext {
   hasScheduledStart?: boolean;
   hasScheduledEnd?: boolean;
   hasAssignedTechnician?: boolean;
+  priority?: string | null;
 }
 
 interface TransitionRule {
@@ -29,6 +31,9 @@ interface TransitionRule {
   requireAssignedTechnician?: boolean;
   requireNote?: boolean;
   requiredContextFlags?: Array<keyof TransitionContext>;
+  guard?: (context: TransitionContext) => boolean;
+  guardErrorCode?: TransitionErrorCode;
+  guardErrorMessage?: string;
 }
 
 // Tabela de transições — §6 do CLAUDE.md.
@@ -46,6 +51,16 @@ const TRANSITIONS: TransitionRule[] = [
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
     requireAssignedTechnician: true,
+  },
+  // Prioridade final URGENTE (definida na triagem) libera o próprio técnico
+  // a iniciar direto, sem passar pela programação do supervisor.
+  {
+    from: WorkOrderStatus.TRIAGEM,
+    to: WorkOrderStatus.EM_EXECUCAO,
+    roles: [Role.TECNICO],
+    guard: (context) => context.priority === Priority.URGENTE,
+    guardErrorCode: "PRIORITY_NOT_URGENT",
+    guardErrorMessage: "Só é possível iniciar direto da triagem quando a prioridade final for URGENTE.",
   },
   {
     from: WorkOrderStatus.EM_EXECUCAO,
@@ -104,6 +119,14 @@ export function canTransition(params: {
 
   if (!rule.roles.includes(role)) {
     return { ok: false, code: "ROLE_FORBIDDEN", reason: `Perfil ${role} não pode executar esta transição.` };
+  }
+
+  if (rule.guard && !rule.guard(context)) {
+    return {
+      ok: false,
+      code: rule.guardErrorCode ?? "INVALID_TRANSITION",
+      reason: rule.guardErrorMessage ?? `Transição de ${from} para ${to} não é permitida.`,
+    };
   }
 
   if (rule.requireAssignedTechnician && context.userId !== context.assignedToId) {

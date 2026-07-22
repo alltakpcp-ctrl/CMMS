@@ -62,9 +62,11 @@ export default function Dashboard() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Link to="/solicitacoes/nova">
-          <Button>Nova solicitação</Button>
-        </Link>
+        {(user?.role === Role.OPERADOR || user?.role === Role.SUPERVISOR) && (
+          <Link to="/solicitacoes/nova">
+            <Button>Nova solicitação</Button>
+          </Link>
+        )}
         <Link to="/ordens">
           <Button variant="secondary">Ver todas as OS</Button>
         </Link>

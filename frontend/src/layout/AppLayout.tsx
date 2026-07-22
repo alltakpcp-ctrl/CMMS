@@ -12,7 +12,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", end: true },
-  { to: "/solicitacoes/nova", label: "Nova solicitação" },
+  { to: "/solicitacoes/nova", label: "Nova solicitação", roles: [Role.OPERADOR, Role.SUPERVISOR] },
   { to: "/ordens", label: "Ordens de serviço" },
   { to: "/indicadores", label: "Indicadores" },
   { to: "/fila", label: "Fila de triagem", roles: [Role.TECNICO, Role.SUPERVISOR] },

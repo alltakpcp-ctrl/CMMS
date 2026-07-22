@@ -110,7 +110,7 @@ Três perfis. Enum: `OPERADOR`, `TECNICO`, `SUPERVISOR`.
 
 | Ação / Etapa | OPERADOR | TECNICO | SUPERVISOR |
 |---|:--:|:--:|:--:|
-| (1) Abrir solicitação | ✅ | ✅ | ✅ |
+| (1) Abrir solicitação | ✅ | ❌ | ✅ |
 | (2) Triagem / priorização | ❌ | ✅ | ✅ |
 | (2) Planejamento (peças, ferramentas, procedimentos) | ❌ | ✅ | ✅ |
 | (3) Programação / agendamento | ❌ | ❌ | ✅ |
@@ -123,6 +123,11 @@ Três perfis. Enum: `OPERADOR`, `TECNICO`, `SUPERVISOR`.
 - 👁️ = pode visualizar dashboard, mas sem exportar/gerir.
 - O middleware de RBAC deve bloquear no backend **independentemente** do que o
   frontend exibe. Frontend apenas oculta o que o usuário não pode fazer.
+- TECNICO **não abre** solicitação — apenas responde a partir da triagem (etapa 2).
+- Se a prioridade **final** definida pela TECNICO na triagem for `URGENTE`, a OS
+  pode ir direto de `TRIAGEM` para `EM_EXECUCAO` pelo próprio técnico (auto-atribuído),
+  sem passar pela programação do SUPERVISOR. Qualquer outra prioridade final segue o
+  fluxo normal `TRIAGEM → PLANEJADA → PROGRAMADA` (ver §6 e `workOrderStateMachine.ts`).
 
 ---
 

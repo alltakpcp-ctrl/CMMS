@@ -169,6 +169,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         userId,
         assignedToId: workOrder.assignedToId,
         note,
+        priority: workOrder.priority,
         ...context,
       },
     });
@@ -282,10 +283,17 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
     to: WorkOrderStatus.EM_EXECUCAO,
     role: user.role,
     userId: user.userId,
-    mutate: async (tx) => {
+    mutate: async (tx, workOrder) => {
       await tx.execution.create({
         data: { workOrderId: id, riskAnalysis: input.riskAnalysis, startedAt: new Date() },
       });
+
+      // Início direto da TRIAGEM (prioridade URGENTE, ver workOrderStateMachine):
+      // o técnico que fez a triagem ainda não é o assignedTo — auto-atribui.
+      if (workOrder.status === WorkOrderStatus.TRIAGEM && !workOrder.assignedToId) {
+        return { assignedTo: { connect: { id: user.userId } } };
+      }
+      return {};
     },
   });
 }
