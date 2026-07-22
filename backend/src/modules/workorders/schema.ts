@@ -7,7 +7,6 @@ export const createWorkOrderSchema = z.object({
   title: z.string().min(1, "Título é obrigatório."),
   description: z.string().min(1, "Descrição é obrigatória."),
   assetId: z.string().min(1, "Ativo é obrigatório."),
-  targetSectorId: z.string().min(1).optional(),
 });
 
 export const listWorkOrdersQuerySchema = z.object({

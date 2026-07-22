@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { useSectors } from "../hooks/useSectors";
-import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Role, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
+import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
-import { WorkOrder } from "../types";
+import { Asset, WorkOrder } from "../types";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -19,14 +19,25 @@ export default function ListaOS() {
   const { token, user } = useAuth();
   const { showError } = useToast();
   const navigate = useNavigate();
-  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const [items, setItems] = useState<WorkOrder[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<WorkOrderStatus | "">("");
   const [type, setType] = useState<WorkOrderType | "">("");
-  const [targetSectorId, setTargetSectorId] = useState("");
+  const [assetId, setAssetId] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    assetsApi
+      .listAssets(token)
+      .then(setAssets)
+      .catch((err) => showError(getErrorMessage(err)));
+  }, [token, showError]);
+
+  const visibleAssets =
+    user?.role === Role.OPERADOR ? assets.filter((asset) => asset.sectorId === user.sectorId) : assets;
 
   useEffect(() => {
     if (!token || !user) return;
@@ -36,7 +47,7 @@ export default function ListaOS() {
       pageSize: 100,
       ...(status && { status }),
       ...(type && { type }),
-      ...(targetSectorId && { targetSectorId }),
+      ...(assetId && { assetId }),
     };
 
     if (onlyMine) {
@@ -49,7 +60,7 @@ export default function ListaOS() {
       .then((result) => setItems(result.items))
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [token, user, status, type, targetSectorId, onlyMine, showError]);
+  }, [token, user, status, type, assetId, onlyMine, showError]);
 
   return (
     <div className="space-y-4">
@@ -85,17 +96,12 @@ export default function ListaOS() {
           </Select>
         </div>
 
-        <div className="w-40">
-          <Select
-            label="Setor"
-            value={targetSectorId}
-            onChange={(e) => setTargetSectorId(e.target.value)}
-            disabled={loadingSectors}
-          >
-            <option value="">{loadingSectors ? "Carregando setores..." : "Todos"}</option>
-            {sectors.map((sector) => (
-              <option key={sector.id} value={sector.id}>
-                {sector.name}
+        <div className="w-48">
+          <Select label="Ativo" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+            <option value="">Todos</option>
+            {visibleAssets.map((asset) => (
+              <option key={asset.id} value={asset.id}>
+                {asset.code} — {asset.name}
               </option>
             ))}
           </Select>

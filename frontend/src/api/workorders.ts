@@ -7,7 +7,6 @@ export interface CreateWorkOrderInput {
   title: string;
   description: string;
   assetId: string;
-  targetSectorId?: string;
 }
 
 export interface ListWorkOrdersFilters {

@@ -34,10 +34,6 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
   if (!asset) {
     throw new AppError(404, "ASSET_NOT_FOUND", "Ativo não encontrado.");
   }
-  if (input.targetSectorId) {
-    await assertActiveSector(prisma, input.targetSectorId);
-  }
-
   // Operador só abre OS para ativos do próprio setor (asset.sectorId).
   // SUPERVISOR não tem essa restrição.
   if (user.role === Role.OPERADOR) {
@@ -61,7 +57,6 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         title: input.title,
         description: input.description,
         assetId: input.assetId,
-        targetSectorId: input.targetSectorId,
         requesterId: user.userId,
         status: WorkOrderStatus.ABERTA,
       },
@@ -104,10 +99,14 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
     return { items: [], total: 0, page, pageSize };
   }
 
+  // Operador não pode filtrar por targetSectorId via query manual — o setor
+  // dele já é aplicado abaixo via asset.sectorId (sectorFilter.sectorId).
+  const targetSectorId = user.role === Role.OPERADOR ? undefined : rest.targetSectorId;
+
   const where: Prisma.WorkOrderWhereInput = {
     ...(rest.status && { status: rest.status }),
     ...(rest.type && { type: rest.type }),
-    ...(rest.targetSectorId && { targetSectorId: rest.targetSectorId }),
+    ...(targetSectorId && { targetSectorId }),
     ...(rest.assetId && { assetId: rest.assetId }),
     ...(rest.assignedToId && { assignedToId: rest.assignedToId }),
     ...(rest.requesterId && { requesterId: rest.requesterId }),

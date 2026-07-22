@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { useSectors } from "../hooks/useSectors";
 import { Role, WorkOrderType } from "../domain/enums";
 import { TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
@@ -19,7 +18,6 @@ export default function NovaSolicitacao() {
   const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
-  const { sectors, loading: loadingSectors } = useSectors(token);
 
   const isOperadorSemSetor = user?.role === Role.OPERADOR && !user.sectorId;
 
@@ -28,7 +26,6 @@ export default function NovaSolicitacao() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assetId, setAssetId] = useState("");
-  const [targetSectorId, setTargetSectorId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 
@@ -54,14 +51,12 @@ export default function NovaSolicitacao() {
         title,
         description,
         assetId,
-        targetSectorId: targetSectorId || undefined,
       });
       setCreatedNumber(workOrder.number);
       showSuccess(`Solicitação ${workOrder.number} aberta com sucesso.`);
       setTitle("");
       setDescription("");
       setAssetId("");
-      setTargetSectorId("");
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -120,20 +115,6 @@ export default function NovaSolicitacao() {
             {visibleAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
                 {asset.code} — {asset.name}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            label="Setor destino (opcional)"
-            value={targetSectorId}
-            onChange={(e) => setTargetSectorId(e.target.value)}
-            disabled={loadingSectors}
-          >
-            <option value="">{loadingSectors ? "Carregando setores..." : "Não definido"}</option>
-            {sectors.map((sector) => (
-              <option key={sector.id} value={sector.id}>
-                {sector.name}
               </option>
             ))}
           </Select>
