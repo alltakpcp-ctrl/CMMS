@@ -45,6 +45,7 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
       data: {
         number,
         type: input.type,
+        priority: input.priority,
         title: input.title,
         description: input.description,
         assetId: input.assetId,
@@ -211,9 +212,21 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
     to: WorkOrderStatus.TRIAGEM,
     role: user.role,
     userId: user.userId,
-    mutate: async (tx) => {
+    mutate: async (tx, workOrder) => {
       await assertActiveSector(tx, input.targetSectorId);
-      return { priority: input.priority, targetSectorId: input.targetSectorId };
+
+      if (input.priority === workOrder.priority) {
+        return { priority: input.priority, targetSectorId: input.targetSectorId };
+      }
+
+      return {
+        priority: input.priority,
+        targetSectorId: input.targetSectorId,
+        priorityAdjustedByTech: true,
+        priorityOriginal: workOrder.priority,
+        priorityAdjustedById: user.userId,
+        priorityAdjustedAt: new Date(),
+      };
     },
   });
 }

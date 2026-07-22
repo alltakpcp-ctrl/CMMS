@@ -27,6 +27,7 @@ model User {
 
   workOrdersRequested WorkOrder[]     @relation("WorkOrderRequester")
   workOrdersAssigned  WorkOrder[]     @relation("WorkOrderAssignee")
+  workOrdersPriorityAdjusted WorkOrder[] @relation("WorkOrderPriorityAdjustedBy")
   statusChanges       StatusHistory[]
 }
 
@@ -77,7 +78,7 @@ model WorkOrder {
   number         String    @unique
   type           String
   status         String    @default("ABERTA")
-  priority       String?
+  priority       String
   title          String
   description    String
   requesterId    String
@@ -91,6 +92,11 @@ model WorkOrder {
   scheduledEnd   DateTime?
   assignedToId   String?
   assignedTo     User?     @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  priorityAdjustedByTech Boolean   @default(false)
+  priorityOriginal       String?
+  priorityAdjustedAt     DateTime?
+  priorityAdjustedById   String?
+  priorityAdjustedBy     User?     @relation("WorkOrderPriorityAdjustedBy", fields: [priorityAdjustedById], references: [id])
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
