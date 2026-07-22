@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { publicUserSelect } from "../../lib/publicUser";
 import { assertActiveSector } from "../../lib/sectors";
+import { Role } from "../../domain/enums";
 import { CreateUserInput, UpdateUserInput } from "./schema";
 
 export async function listUsers() {
@@ -15,10 +16,19 @@ export async function createUser(input: CreateUserInput) {
     throw new AppError(409, "EMAIL_IN_USE", "Já existe um usuário com este e-mail.");
   }
 
+  if (input.role === Role.OPERADOR && !input.sectorId) {
+    throw new AppError(400, "OPERATOR_REQUIRES_SECTOR", "Setor é obrigatório para operador.");
+  }
+
+  const sectorId = input.role === Role.OPERADOR ? input.sectorId! : null;
+  if (sectorId) {
+    await assertActiveSector(prisma, sectorId);
+  }
+
   const passwordHash = await bcrypt.hash(input.password, 10);
 
   return prisma.user.create({
-    data: { name: input.name, email: input.email, role: input.role, passwordHash },
+    data: { name: input.name, email: input.email, role: input.role, passwordHash, sectorId },
     select: publicUserSelect,
   });
 }
@@ -37,8 +47,16 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUserI
     throw new AppError(403, "CANNOT_DEACTIVATE_SELF", "Você não pode desativar o próprio usuário.");
   }
 
-  if (input.sectorId) {
-    await assertActiveSector(prisma, input.sectorId);
+  const resultingRole = input.role ?? existing.role;
+  let sectorId: string | null;
+  if (resultingRole === Role.OPERADOR) {
+    sectorId = input.sectorId !== undefined ? input.sectorId : existing.sectorId;
+    if (!sectorId) {
+      throw new AppError(400, "OPERATOR_REQUIRES_SECTOR", "Setor é obrigatório para operador.");
+    }
+    await assertActiveSector(prisma, sectorId);
+  } else {
+    sectorId = null;
   }
 
   return prisma.user.update({
@@ -47,7 +65,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUserI
       name: input.name,
       role: input.role,
       active: input.active,
-      sectorId: input.sectorId,
+      sectorId,
       canReceivePartRequests: input.canReceivePartRequests,
     },
     select: publicUserSelect,

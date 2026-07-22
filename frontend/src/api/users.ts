@@ -7,6 +7,7 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: Role;
+  sectorId?: string | null;
 }
 
 export interface UpdateUserInput {

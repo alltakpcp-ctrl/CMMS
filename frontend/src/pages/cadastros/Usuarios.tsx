@@ -21,6 +21,7 @@ interface CreateFormState {
   email: string;
   password: string;
   role: Role;
+  sectorId: string | null;
 }
 
 interface EditFormState {
@@ -31,7 +32,13 @@ interface EditFormState {
   canReceivePartRequests: boolean;
 }
 
-const emptyCreateForm: CreateFormState = { name: "", email: "", password: "", role: Role.OPERADOR };
+const emptyCreateForm: CreateFormState = {
+  name: "",
+  email: "",
+  password: "",
+  role: Role.OPERADOR,
+  sectorId: null,
+};
 
 function validatePasswordRule(value: string): string | null {
   if (value.length < 8) return "Senha deve ter ao menos 8 caracteres.";
@@ -83,9 +90,11 @@ export default function Usuarios() {
     setShowCreateForm(true);
   }
 
+  const createSectorMissing = createForm.role === Role.OPERADOR && !createForm.sectorId;
+
   async function handleCreateSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
+    if (!token || createSectorMissing) return;
     setSubmitting(true);
     try {
       await usersApi.createUser(token, createForm);
@@ -110,9 +119,11 @@ export default function Usuarios() {
     });
   }
 
+  const editSectorMissing = editForm.role === Role.OPERADOR && !editForm.sectorId;
+
   async function handleEditSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token || !editing) return;
+    if (!token || !editing || editSectorMissing) return;
     setSubmitting(true);
     try {
       await usersApi.updateUser(token, editing.id, editForm);
@@ -222,7 +233,10 @@ export default function Usuarios() {
             <Select
               label="Perfil"
               value={createForm.role}
-              onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as Role })}
+              onChange={(e) => {
+                const role = e.target.value as Role;
+                setCreateForm({ ...createForm, role, sectorId: role === Role.OPERADOR ? createForm.sectorId : null });
+              }}
               required
             >
               {Object.values(Role).map((value) => (
@@ -232,11 +246,29 @@ export default function Usuarios() {
               ))}
             </Select>
 
+            {createForm.role === Role.OPERADOR && (
+              <Select
+                label="Setor"
+                value={createForm.sectorId ?? ""}
+                onChange={(e) => setCreateForm({ ...createForm, sectorId: e.target.value || null })}
+                required
+              >
+                <option value="" disabled>
+                  Selecione um setor
+                </option>
+                {sectors.map((sector) => (
+                  <option key={sector.id} value={sector.id}>
+                    {sector.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setShowCreateForm(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || createSectorMissing}>
                 {submitting ? "Salvando…" : "Criar usuário"}
               </Button>
             </div>
@@ -278,8 +310,11 @@ export default function Usuarios() {
                 label="Setor"
                 value={editForm.sectorId ?? ""}
                 onChange={(e) => setEditForm({ ...editForm, sectorId: e.target.value || null })}
+                required
               >
-                <option value="">Nenhum</option>
+                <option value="" disabled>
+                  Selecione um setor
+                </option>
                 {sectors.map((sector) => (
                   <option key={sector.id} value={sector.id}>
                     {sector.name}
@@ -311,7 +346,7 @@ export default function Usuarios() {
               <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || editSectorMissing}>
                 {submitting ? "Salvando…" : "Salvar"}
               </Button>
             </div>
