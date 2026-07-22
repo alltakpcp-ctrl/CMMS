@@ -8,6 +8,8 @@ export interface PublicUser {
   role: Role;
   active: boolean;
   createdAt: string;
+  sector: { id: string; name: string } | null;
+  canReceivePartRequests: boolean;
 }
 
 export interface Asset {

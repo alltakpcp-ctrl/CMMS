@@ -4,11 +4,13 @@ import { Role } from "../../domain/enums";
 import { ROLE_LABELS } from "../../domain/labels";
 import * as usersApi from "../../api/users";
 import { PublicUser } from "../../types";
+import { useSectors } from "../../hooks/useSectors";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
 import { Select } from "../../components/Select";
+import { Checkbox } from "../../components/Checkbox";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { getErrorMessage } from "../../lib/errors";
@@ -24,13 +26,25 @@ interface CreateFormState {
 interface EditFormState {
   name: string;
   role: Role;
+  active: boolean;
+  sectorId: string | null;
+  canReceivePartRequests: boolean;
 }
 
 const emptyCreateForm: CreateFormState = { name: "", email: "", password: "", role: Role.OPERADOR };
 
+function validatePasswordRule(value: string): string | null {
+  if (value.length < 8) return "Senha deve ter ao menos 8 caracteres.";
+  if (!/[A-Z]/.test(value)) return "Senha deve conter ao menos uma letra maiúscula.";
+  if (!/[0-9]/.test(value)) return "Senha deve conter ao menos um número.";
+  if (!/[^A-Za-z0-9]/.test(value)) return "Senha deve conter ao menos um caractere especial.";
+  return null;
+}
+
 export default function Usuarios() {
   const { token, user: currentUser } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { sectors } = useSectors(token);
 
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +53,18 @@ export default function Usuarios() {
   const [submitting, setSubmitting] = useState(false);
 
   const [editing, setEditing] = useState<PublicUser | null>(null);
-  const [editForm, setEditForm] = useState<EditFormState>({ name: "", role: Role.OPERADOR });
+  const [editForm, setEditForm] = useState<EditFormState>({
+    name: "",
+    role: Role.OPERADOR,
+    active: true,
+    sectorId: null,
+    canReceivePartRequests: false,
+  });
+
+  const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [passwordFieldError, setPasswordFieldError] = useState<string | null>(null);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   function reload() {
     if (!token) return;
@@ -76,7 +101,13 @@ export default function Usuarios() {
 
   function openEdit(user: PublicUser) {
     setEditing(user);
-    setEditForm({ name: user.name, role: user.role });
+    setEditForm({
+      name: user.name,
+      role: user.role,
+      active: user.active,
+      sectorId: user.sector?.id ?? null,
+      canReceivePartRequests: user.canReceivePartRequests,
+    });
   }
 
   async function handleEditSubmit(e: FormEvent) {
@@ -95,16 +126,30 @@ export default function Usuarios() {
     }
   }
 
-  async function toggleActive(user: PublicUser) {
-    if (!token) return;
-    const nextActive = !user.active;
-    if (!confirm(`${nextActive ? "Reativar" : "Desativar"} o usuário ${user.name}?`)) return;
+  function openPasswordModal(user: PublicUser) {
+    setPasswordTarget(user);
+    setPasswordValue("");
+    setPasswordFieldError(null);
+  }
+
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!token || !passwordTarget) return;
+    const validationError = validatePasswordRule(passwordValue);
+    if (validationError) {
+      setPasswordFieldError(validationError);
+      return;
+    }
+    setPasswordSubmitting(true);
     try {
-      await usersApi.updateUser(token, user.id, { active: nextActive });
-      showSuccess(nextActive ? "Usuário reativado." : "Usuário desativado.");
-      reload();
+      await usersApi.changeUserPassword(token, passwordTarget.id, passwordValue);
+      showSuccess("Senha redefinida.");
+      setPasswordTarget(null);
+      setPasswordValue("");
     } catch (err) {
       showError(getErrorMessage(err));
+    } finally {
+      setPasswordSubmitting(false);
     }
   }
 
@@ -140,13 +185,8 @@ export default function Usuarios() {
                   <Button variant="secondary" onClick={() => openEdit(u)}>
                     Editar
                   </Button>
-                  <Button
-                    variant={u.active ? "danger" : "secondary"}
-                    onClick={() => toggleActive(u)}
-                    disabled={u.id === currentUser?.id}
-                    title={u.id === currentUser?.id ? "Você não pode desativar seu próprio usuário" : undefined}
-                  >
-                    {u.active ? "Desativar" : "Reativar"}
+                  <Button variant="secondary" onClick={() => openPasswordModal(u)}>
+                    Redefinir senha
                   </Button>
                 </div>
               ),
@@ -216,7 +256,11 @@ export default function Usuarios() {
             <Select
               label="Perfil"
               value={editForm.role}
-              onChange={(e) => setEditForm({ ...editForm, role: e.target.value as Role })}
+              onChange={(e) => {
+                const role = e.target.value as Role;
+                setEditForm({ ...editForm, role, sectorId: role === Role.OPERADOR ? editForm.sectorId : null });
+              }}
+              disabled={editing.id === currentUser?.id}
               required
             >
               {Object.values(Role).map((value) => (
@@ -225,8 +269,42 @@ export default function Usuarios() {
                 </option>
               ))}
             </Select>
+            {editing.id === currentUser?.id && (
+              <p className="text-xs text-amber-600">Você não pode alterar seu próprio perfil.</p>
+            )}
+
+            {editForm.role === Role.OPERADOR && (
+              <Select
+                label="Setor"
+                value={editForm.sectorId ?? ""}
+                onChange={(e) => setEditForm({ ...editForm, sectorId: e.target.value || null })}
+              >
+                <option value="">Nenhum</option>
+                {sectors.map((sector) => (
+                  <option key={sector.id} value={sector.id}>
+                    {sector.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            <Checkbox
+              label="Ativo"
+              checked={editForm.active}
+              onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
+              disabled={editing.id === currentUser?.id}
+            />
+            {editing.id === currentUser?.id && (
+              <p className="text-xs text-amber-600">Você não pode desativar seu próprio usuário.</p>
+            )}
+            <Checkbox
+              label="Pode receber pedidos de peças"
+              checked={editForm.canReceivePartRequests}
+              onChange={(e) => setEditForm({ ...editForm, canReceivePartRequests: e.target.checked })}
+            />
+
             <p className="text-xs text-slate-500">
-              E-mail e senha não são editáveis por aqui. Use o botão Desativar/Reativar na lista para controlar o acesso.
+              E-mail e senha não são editáveis por aqui. Use o botão "Redefinir senha" na lista para trocar a senha.
             </p>
 
             <div className="flex justify-end gap-2">
@@ -235,6 +313,36 @@ export default function Usuarios() {
               </Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {passwordTarget && (
+        <Modal title={`Redefinir senha de ${passwordTarget.name}`} onClose={() => setPasswordTarget(null)}>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <Input
+              label="Nova senha"
+              type="password"
+              value={passwordValue}
+              onChange={(e) => {
+                setPasswordValue(e.target.value);
+                setPasswordFieldError(null);
+              }}
+              error={passwordFieldError ?? undefined}
+              required
+            />
+            <p className="text-xs text-slate-500">
+              Mínimo 8 caracteres, com ao menos 1 letra maiúscula, 1 número e 1 caractere especial.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setPasswordTarget(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={passwordSubmitting}>
+                {passwordSubmitting ? "Salvando…" : "Redefinir"}
               </Button>
             </div>
           </form>

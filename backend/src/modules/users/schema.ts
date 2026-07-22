@@ -15,7 +15,19 @@ export const updateUserSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório.").optional(),
   role: z.nativeEnum(Role).optional(),
   active: z.boolean().optional(),
+  sectorId: z.string().nullable().optional(),
+  canReceivePartRequests: z.boolean().optional(),
+});
+
+export const changePasswordSchema = z.object({
+  password: z
+    .string()
+    .min(8, "Senha deve ter ao menos 8 caracteres.")
+    .regex(/[A-Z]/, "Senha deve conter ao menos uma letra maiúscula.")
+    .regex(/[0-9]/, "Senha deve conter ao menos um número.")
+    .regex(/[^A-Za-z0-9]/, "Senha deve conter ao menos um caractere especial."),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

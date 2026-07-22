@@ -13,6 +13,8 @@ export interface UpdateUserInput {
   name?: string;
   role?: Role;
   active?: boolean;
+  sectorId?: string | null;
+  canReceivePartRequests?: boolean;
 }
 
 export function listUsers(token: string) {
@@ -25,4 +27,8 @@ export function createUser(token: string, input: CreateUserInput) {
 
 export function updateUser(token: string, id: string, input: UpdateUserInput) {
   return apiRequest<PublicUser>(`/users/${id}`, { method: "PUT", token, body: input });
+}
+
+export function changeUserPassword(token: string, id: string, password: string) {
+  return apiRequest<PublicUser>(`/users/${id}/senha`, { method: "POST", token, body: { password } });
 }

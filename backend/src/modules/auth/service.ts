@@ -5,8 +5,24 @@ import { env } from "../../config/env";
 import { AppError } from "../../lib/AppError";
 import { LoginInput } from "./schema";
 
-function toPublicUser(user: { id: string; name: string; email: string; role: string; active: boolean }) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active };
+function toPublicUser(user: {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  sectorId: string | null;
+  canReceivePartRequests: boolean;
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    active: user.active,
+    sectorId: user.sectorId,
+    canReceivePartRequests: user.canReceivePartRequests,
+  };
 }
 
 export async function login({ email, password }: LoginInput) {
