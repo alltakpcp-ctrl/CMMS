@@ -42,6 +42,9 @@ beforeAll(async () => {
   });
   assetId = asset.id;
 
+  // Operador só abre OS para ativos do próprio setor — mantém o ativo acima no mesmo setor.
+  await prisma.user.update({ where: { id: operador.id }, data: { sectorId } });
+
   const part = await prisma.part.create({
     data: { code: "TEST-PC-01", description: "Peça de teste", unit: "un", stockQty: 2 },
   });

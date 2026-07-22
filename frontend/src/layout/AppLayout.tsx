@@ -26,7 +26,11 @@ const NAV_ITEMS: NavItem[] = [
 export function AppLayout() {
   const { user, logout } = useAuth();
 
-  const items = NAV_ITEMS.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.roles && (!user || !item.roles.includes(user.role))) return false;
+    if (item.to === "/solicitacoes/nova" && user?.role === Role.OPERADOR && !user.sectorId) return false;
+    return true;
+  });
 
   return (
     <div className="flex min-h-screen bg-slate-100">

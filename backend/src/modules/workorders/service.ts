@@ -38,6 +38,18 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
     await assertActiveSector(prisma, input.targetSectorId);
   }
 
+  // Operador só abre OS para ativos do próprio setor (asset.sectorId).
+  // SUPERVISOR não tem essa restrição.
+  if (user.role === Role.OPERADOR) {
+    const operador = await prisma.user.findUnique({ where: { id: user.userId }, select: { sectorId: true } });
+    if (!operador?.sectorId) {
+      throw new AppError(403, "OPERATOR_WITHOUT_SECTOR", "Operador sem setor não pode abrir solicitação.");
+    }
+    if (asset.sectorId !== operador.sectorId) {
+      throw new AppError(403, "ASSET_OUT_OF_SECTOR", "Ativo fora do setor do operador.");
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const number = await generateWorkOrderNumber(tx);
 

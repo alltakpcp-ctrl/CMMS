@@ -8,6 +8,8 @@ export interface AuthUser {
   email: string;
   role: Role;
   active: boolean;
+  sectorId: string | null;
+  canReceivePartRequests: boolean;
 }
 
 interface AuthContextValue {

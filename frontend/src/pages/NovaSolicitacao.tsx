@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useSectors } from "../hooks/useSectors";
-import { WorkOrderType } from "../domain/enums";
+import { Role, WorkOrderType } from "../domain/enums";
 import { TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
@@ -16,10 +16,12 @@ import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
 
 export default function NovaSolicitacao() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
   const { sectors, loading: loadingSectors } = useSectors(token);
+
+  const isOperadorSemSetor = user?.role === Role.OPERADOR && !user.sectorId;
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [type, setType] = useState<WorkOrderType>(WorkOrderType.CORRETIVA);
@@ -37,6 +39,9 @@ export default function NovaSolicitacao() {
       .then(setAssets)
       .catch((err) => showError(getErrorMessage(err)));
   }, [token, showError]);
+
+  const visibleAssets =
+    user?.role === Role.OPERADOR ? assets.filter((asset) => asset.sectorId === user.sectorId) : assets;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -79,6 +84,15 @@ export default function NovaSolicitacao() {
         </Card>
       )}
 
+      {isOperadorSemSetor && (
+        <Card className="border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-800">
+            Seu usuário não tem um setor atrelado. Fale com o supervisor para configurar seu setor antes de abrir
+            solicitações.
+          </p>
+        </Card>
+      )}
+
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value as WorkOrderType)} required>
@@ -103,7 +117,7 @@ export default function NovaSolicitacao() {
             <option value="" disabled>
               Selecione um ativo
             </option>
-            {assets.map((asset) => (
+            {visibleAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
                 {asset.code} — {asset.name}
               </option>
@@ -124,7 +138,7 @@ export default function NovaSolicitacao() {
             ))}
           </Select>
 
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || isOperadorSemSetor}>
             {submitting ? "Enviando…" : "Abrir solicitação"}
           </Button>
         </form>
