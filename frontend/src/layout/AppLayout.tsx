@@ -1,12 +1,15 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import { AuthUser, useAuth } from "../auth/AuthContext";
 import { Role } from "../domain/enums";
 import { ROLE_LABELS } from "../domain/labels";
+
+type BooleanFlagKey = { [K in keyof AuthUser]: AuthUser[K] extends boolean ? K : never }[keyof AuthUser];
 
 interface NavItem {
   to: string;
   label: string;
   roles?: Role[];
+  requiresFlag?: BooleanFlagKey;
   end?: boolean;
 }
 
@@ -18,8 +21,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/fila", label: "Fila de triagem", roles: [Role.TECNICO, Role.SUPERVISOR] },
   { to: "/agenda", label: "Agenda", roles: [Role.SUPERVISOR] },
   { to: "/minhas-os", label: "Minhas OS", roles: [Role.TECNICO] },
+  { to: "/pedidos/montar", label: "Montar Pedido", requiresFlag: "canReceivePartRequests" },
+  { to: "/pedidos/revisao", label: "Revisão de Pedidos", roles: [Role.SUPERVISOR] },
   { to: "/cadastros/ativos", label: "Ativos", roles: [Role.SUPERVISOR] },
   { to: "/cadastros/pecas", label: "Peças", roles: [Role.SUPERVISOR] },
+  { to: "/cadastros/pecas", label: "Indicar falta", roles: [Role.TECNICO] },
   { to: "/cadastros/usuarios", label: "Usuários", roles: [Role.SUPERVISOR] },
 ];
 
@@ -28,6 +34,7 @@ export function AppLayout() {
 
   const items = NAV_ITEMS.filter((item) => {
     if (item.roles && (!user || !item.roles.includes(user.role))) return false;
+    if (item.requiresFlag && !user?.[item.requiresFlag]) return false;
     if (item.to === "/solicitacoes/nova" && user?.role === Role.OPERADOR && !user.sectorId) return false;
     return true;
   });

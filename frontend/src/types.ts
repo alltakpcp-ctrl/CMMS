@@ -1,4 +1,12 @@
-import { Priority, Role, WorkOrderStatus, WorkOrderType } from "./domain/enums";
+import {
+  PartRequestItemType,
+  PartRequestStatus,
+  Priority,
+  PurchaseOrderStatus,
+  Role,
+  WorkOrderStatus,
+  WorkOrderType,
+} from "./domain/enums";
 import { Sector } from "./api/sectors";
 
 export interface PublicUser {
@@ -96,4 +104,38 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface PartRequest {
+  id: string;
+  itemType: PartRequestItemType;
+  partId: string | null;
+  part: Part | null;
+  description: string;
+  quantity: number;
+  notes: string | null;
+  status: PartRequestStatus;
+  osId: string | null;
+  workOrder: { id: string; number: string } | null;
+  requestedById: string;
+  requestedBy: PublicUser;
+  purchaseOrderId: string | null;
+  rejectedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  number: string;
+  status: PurchaseOrderStatus;
+  createdById: string;
+  createdBy: PublicUser;
+  reviewedById: string | null;
+  reviewedBy: PublicUser | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  items: PartRequest[];
+  createdAt: string;
+  updatedAt: string;
 }

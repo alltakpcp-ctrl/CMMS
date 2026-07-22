@@ -1,20 +1,43 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as partsApi from "../../api/parts";
-import { Part } from "../../types";
+import * as partRequestsApi from "../../api/partRequests";
+import { Part, PartRequest } from "../../types";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
+import { Select } from "../../components/Select";
+import { Textarea } from "../../components/Textarea";
+import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
+import { formatDateTime } from "../../lib/format";
+import { PartRequestItemType, Role } from "../../domain/enums";
+import {
+  PART_REQUEST_ITEM_TYPE_LABELS,
+  PART_REQUEST_STATUS_COLORS,
+  PART_REQUEST_STATUS_LABELS,
+} from "../../domain/labels";
 
 const emptyForm = { code: "", description: "", unit: "", stockQty: 0 };
 
+const emptyIndicateForm = {
+  itemType: PartRequestItemType.PECA as PartRequestItemType,
+  partId: "",
+  description: "",
+  quantity: 1,
+  notes: "",
+  osId: "",
+};
+
 export default function Pecas() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const canManageCadastro = user?.role === Role.SUPERVISOR;
+
+  const [tab, setTab] = useState<"cadastro" | "indicar">(() => (canManageCadastro ? "cadastro" : "indicar"));
 
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +45,12 @@ export default function Pecas() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+
+  const [myRequests, setMyRequests] = useState<PartRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [showIndicateForm, setShowIndicateForm] = useState(false);
+  const [indicateForm, setIndicateForm] = useState(emptyIndicateForm);
+  const [submittingIndicate, setSubmittingIndicate] = useState(false);
 
   function reload() {
     if (!token) return;
@@ -34,6 +63,49 @@ export default function Pecas() {
   }
 
   useEffect(reload, [token]);
+
+  function reloadRequests() {
+    if (!token) return;
+    setLoadingRequests(true);
+    partRequestsApi
+      .listMyPartRequests(token)
+      .then(setMyRequests)
+      .catch((err) => showError(getErrorMessage(err)))
+      .finally(() => setLoadingRequests(false));
+  }
+
+  useEffect(reloadRequests, [token]);
+
+  function openIndicateForm() {
+    setIndicateForm(emptyIndicateForm);
+    setShowIndicateForm(true);
+  }
+
+  async function handleIndicateSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    setSubmittingIndicate(true);
+    try {
+      await partRequestsApi.createPartRequest(token, {
+        itemType: indicateForm.itemType,
+        description: indicateForm.description,
+        quantity: Number(indicateForm.quantity),
+        partId:
+          indicateForm.itemType === PartRequestItemType.PECA && indicateForm.partId
+            ? indicateForm.partId
+            : undefined,
+        notes: indicateForm.notes || undefined,
+        osId: indicateForm.osId || undefined,
+      });
+      showSuccess("Indicação registrada.");
+      setShowIndicateForm(false);
+      reloadRequests();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setSubmittingIndicate(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -83,79 +155,218 @@ export default function Pecas() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Peças</h1>
-          <p className="text-sm text-slate-500">Cadastro de itens do almoxarifado.</p>
-        </div>
-        <Button onClick={openCreate}>Nova peça</Button>
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">Peças</h1>
+        <p className="text-sm text-slate-500">Cadastro de itens do almoxarifado.</p>
       </div>
 
-      {loading && <p className="text-sm text-slate-500">Carregando…</p>}
+      <div className="flex gap-1 border-b border-slate-200">
+        {canManageCadastro && (
+          <button
+            onClick={() => setTab("cadastro")}
+            className={`px-4 py-2 text-sm font-medium ${
+              tab === "cadastro" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Cadastro
+          </button>
+        )}
+        <button
+          onClick={() => setTab("indicar")}
+          className={`px-4 py-2 text-sm font-medium ${
+            tab === "indicar" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Indicar falta
+        </button>
+      </div>
 
-      {!loading && parts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
+      {tab === "cadastro" && canManageCadastro && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={openCreate}>Nova peça</Button>
+          </div>
 
-      {!loading && parts.length > 0 && (
-        <Table
-          rows={parts}
-          rowKey={(p) => p.id}
-          columns={[
-            { header: "Código", cell: (p) => p.code },
-            { header: "Descrição", cell: (p) => p.description },
-            { header: "Unidade", cell: (p) => p.unit },
-            { header: "Saldo", cell: (p) => p.stockQty },
-            {
-              header: "Ações",
-              cell: (p) => (
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => openEdit(p)}>
-                    Editar
+          {loading && <p className="text-sm text-slate-500">Carregando…</p>}
+
+          {!loading && parts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
+
+          {!loading && parts.length > 0 && (
+            <Table
+              rows={parts}
+              rowKey={(p) => p.id}
+              columns={[
+                { header: "Código", cell: (p) => p.code },
+                { header: "Descrição", cell: (p) => p.description },
+                { header: "Unidade", cell: (p) => p.unit },
+                { header: "Saldo", cell: (p) => p.stockQty },
+                {
+                  header: "Ações",
+                  cell: (p) => (
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onClick={() => openEdit(p)}>
+                        Editar
+                      </Button>
+                      <Button variant="danger" onClick={() => handleDelete(p)}>
+                        Remover
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )}
+
+          {showForm && (
+            <Modal title={editing ? "Editar peça" : "Nova peça"} onClose={() => setShowForm(false)}>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Input
+                  label="Código"
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Descrição"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Unidade (un, m, L…)"
+                  value={form.unit}
+                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Saldo em estoque"
+                  type="number"
+                  min={0}
+                  value={form.stockQty}
+                  onChange={(e) => setForm({ ...form, stockQty: Number(e.target.value) })}
+                  required
+                />
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                    Cancelar
                   </Button>
-                  <Button variant="danger" onClick={() => handleDelete(p)}>
-                    Remover
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Salvando…" : "Salvar"}
                   </Button>
                 </div>
-              ),
-            },
-          ]}
-        />
+              </form>
+            </Modal>
+          )}
+        </div>
       )}
 
-      {showForm && (
-        <Modal title={editing ? "Editar peça" : "Nova peça"} onClose={() => setShowForm(false)}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
-            <Input
-              label="Descrição"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              required
-            />
-            <Input
-              label="Unidade (un, m, L…)"
-              value={form.unit}
-              onChange={(e) => setForm({ ...form, unit: e.target.value })}
-              required
-            />
-            <Input
-              label="Saldo em estoque"
-              type="number"
-              min={0}
-              value={form.stockQty}
-              onChange={(e) => setForm({ ...form, stockQty: Number(e.target.value) })}
-              required
-            />
+      {tab === "indicar" && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={openIndicateForm}>Indicar peça/ferramenta em falta</Button>
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
-          </form>
-        </Modal>
+          {loadingRequests && <p className="text-sm text-slate-500">Carregando…</p>}
+
+          {!loadingRequests && myRequests.length === 0 && (
+            <EmptyState title="Nenhuma indicação registrada" />
+          )}
+
+          {!loadingRequests && myRequests.length > 0 && (
+            <Table
+              rows={myRequests}
+              rowKey={(r) => r.id}
+              columns={[
+                { header: "Item", cell: (r) => PART_REQUEST_ITEM_TYPE_LABELS[r.itemType] },
+                { header: "Descrição", cell: (r) => r.description },
+                { header: "Qtd", cell: (r) => r.quantity },
+                {
+                  header: "Status",
+                  cell: (r) => (
+                    <Badge color={PART_REQUEST_STATUS_COLORS[r.status]}>
+                      {PART_REQUEST_STATUS_LABELS[r.status]}
+                    </Badge>
+                  ),
+                },
+                { header: "Data", cell: (r) => formatDateTime(r.createdAt) },
+              ]}
+            />
+          )}
+
+          {showIndicateForm && (
+            <Modal title="Indicar peça/ferramenta em falta" onClose={() => setShowIndicateForm(false)}>
+              <form onSubmit={handleIndicateSubmit} className="space-y-4">
+                <Select
+                  label="Tipo"
+                  value={indicateForm.itemType}
+                  onChange={(e) =>
+                    setIndicateForm({
+                      ...indicateForm,
+                      itemType: e.target.value as PartRequestItemType,
+                      partId: "",
+                    })
+                  }
+                >
+                  {Object.values(PartRequestItemType).map((value) => (
+                    <option key={value} value={value}>
+                      {PART_REQUEST_ITEM_TYPE_LABELS[value]}
+                    </option>
+                  ))}
+                </Select>
+
+                {indicateForm.itemType === PartRequestItemType.PECA && (
+                  <Select
+                    label="Peça já cadastrada (opcional)"
+                    value={indicateForm.partId}
+                    onChange={(e) => setIndicateForm({ ...indicateForm, partId: e.target.value })}
+                  >
+                    <option value="">Não cadastrada</option>
+                    {parts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code} — {p.description}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+
+                <Input
+                  label="Descrição"
+                  value={indicateForm.description}
+                  onChange={(e) => setIndicateForm({ ...indicateForm, description: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Quantidade"
+                  type="number"
+                  min={1}
+                  value={indicateForm.quantity}
+                  onChange={(e) => setIndicateForm({ ...indicateForm, quantity: Number(e.target.value) })}
+                  required
+                />
+                <Textarea
+                  label="Observações (opcional)"
+                  value={indicateForm.notes}
+                  onChange={(e) => setIndicateForm({ ...indicateForm, notes: e.target.value })}
+                />
+                <Input
+                  label="OS vinculada (opcional)"
+                  value={indicateForm.osId}
+                  onChange={(e) => setIndicateForm({ ...indicateForm, osId: e.target.value })}
+                />
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="secondary" onClick={() => setShowIndicateForm(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={submittingIndicate}>
+                    {submittingIndicate ? "Enviando…" : "Enviar indicação"}
+                  </Button>
+                </div>
+              </form>
+            </Modal>
+          )}
+        </div>
       )}
     </div>
   );

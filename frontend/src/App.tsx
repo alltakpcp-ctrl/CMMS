@@ -11,8 +11,11 @@ import MinhasOS from "./pages/MinhasOS";
 import Ativos from "./pages/cadastros/Ativos";
 import Pecas from "./pages/cadastros/Pecas";
 import Usuarios from "./pages/cadastros/Usuarios";
+import MontarPedido from "./pages/pedidos/MontarPedido";
+import RevisaoPedidos from "./pages/pedidos/RevisaoPedidos";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireRole } from "./auth/RequireRole";
+import { RequireFlag } from "./auth/RequireFlag";
 import { AppLayout } from "./layout/AppLayout";
 import { Role } from "./domain/enums";
 
@@ -59,6 +62,22 @@ export default function App() {
           }
         />
         <Route
+          path="/pedidos/montar"
+          element={
+            <RequireFlag flag="canReceivePartRequests">
+              <MontarPedido />
+            </RequireFlag>
+          }
+        />
+        <Route
+          path="/pedidos/revisao"
+          element={
+            <RequireRole roles={[Role.SUPERVISOR]}>
+              <RevisaoPedidos />
+            </RequireRole>
+          }
+        />
+        <Route
           path="/cadastros/ativos"
           element={
             <RequireRole roles={[Role.SUPERVISOR]}>
@@ -69,7 +88,7 @@ export default function App() {
         <Route
           path="/cadastros/pecas"
           element={
-            <RequireRole roles={[Role.SUPERVISOR]}>
+            <RequireRole roles={[Role.TECNICO, Role.SUPERVISOR]}>
               <Pecas />
             </RequireRole>
           }

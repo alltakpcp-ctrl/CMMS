@@ -1,4 +1,12 @@
-import { Priority, Role, WorkOrderStatus, WorkOrderType } from "./enums";
+import {
+  PartRequestItemType,
+  PartRequestStatus,
+  Priority,
+  PurchaseOrderStatus,
+  Role,
+  WorkOrderStatus,
+  WorkOrderType,
+} from "./enums";
 
 export const ROLE_LABELS: Record<Role, string> = {
   OPERADOR: "Operador",
@@ -47,4 +55,37 @@ export const PRIORITY_COLORS: Record<Priority, "slate" | "blue" | "amber" | "red
   MEDIA: "blue",
   ALTA: "amber",
   URGENTE: "red",
+};
+
+export const PART_REQUEST_ITEM_TYPE_LABELS: Record<PartRequestItemType, string> = {
+  PECA: "Peça",
+  FERRAMENTA: "Ferramenta",
+};
+
+export const PART_REQUEST_STATUS_LABELS: Record<PartRequestStatus, string> = {
+  PENDENTE: "Pendente",
+  INCLUIDA: "Incluída em pedido",
+  REJEITADA: "Rejeitada",
+  DEVOLVIDA: "Devolvida",
+  ATENDIDA: "Atendida",
+};
+
+export const PART_REQUEST_STATUS_COLORS: Record<PartRequestStatus, "slate" | "blue" | "amber" | "green" | "red"> = {
+  PENDENTE: "slate",
+  INCLUIDA: "slate",
+  REJEITADA: "red",
+  DEVOLVIDA: "amber",
+  ATENDIDA: "green",
+};
+
+export const PURCHASE_ORDER_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
+  ENVIADO: "Enviado",
+  APROVADO: "Aprovado",
+  REJEITADO: "Rejeitado",
+};
+
+export const PURCHASE_ORDER_STATUS_COLORS: Record<PurchaseOrderStatus, "slate" | "blue" | "amber" | "green" | "red"> = {
+  ENVIADO: "amber",
+  APROVADO: "green",
+  REJEITADO: "red",
 };
