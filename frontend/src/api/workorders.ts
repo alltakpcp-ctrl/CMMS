@@ -4,6 +4,7 @@ import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export interface CreateWorkOrderInput {
   type: WorkOrderType;
+  priority: Priority;
   title: string;
   description: string;
   assetId: string;

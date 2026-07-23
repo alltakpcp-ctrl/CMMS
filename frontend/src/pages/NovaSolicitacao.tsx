@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Role, WorkOrderType } from "../domain/enums";
-import { TYPE_LABELS } from "../domain/labels";
+import { Priority, Role, WorkOrderType } from "../domain/enums";
+import { PRIORITY_LABELS, TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
 import { Asset } from "../types";
@@ -23,6 +23,7 @@ export default function NovaSolicitacao() {
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [type, setType] = useState<WorkOrderType>(WorkOrderType.CORRETIVA);
+  const [priority, setPriority] = useState<Priority>(Priority.MEDIA);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assetId, setAssetId] = useState("");
@@ -48,6 +49,7 @@ export default function NovaSolicitacao() {
     try {
       const workOrder = await workOrdersApi.createWorkOrder(token, {
         type,
+        priority,
         title,
         description,
         assetId,
@@ -94,6 +96,19 @@ export default function NovaSolicitacao() {
             {Object.values(WorkOrderType).map((value) => (
               <option key={value} value={value}>
                 {TYPE_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Prioridade"
+            value={priority}
+            onChange={(e) => setPriority(e.target.value as Priority)}
+            required
+          >
+            {Object.values(Priority).map((value) => (
+              <option key={value} value={value}>
+                {PRIORITY_LABELS[value]}
               </option>
             ))}
           </Select>
