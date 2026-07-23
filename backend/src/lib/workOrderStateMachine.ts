@@ -16,6 +16,7 @@ export interface CanTransitionResult {
 
 export interface TransitionContext {
   userId: string;
+  role?: Role;
   assignedToId?: string | null;
   note?: string | null;
   hasScheduledStart?: boolean;
@@ -43,8 +44,13 @@ const TRANSITIONS: TransitionRule[] = [
   {
     from: WorkOrderStatus.PLANEJADA,
     to: WorkOrderStatus.PROGRAMADA,
-    roles: [Role.SUPERVISOR],
+    roles: [Role.SUPERVISOR, Role.TECNICO],
     requiredContextFlags: ["hasScheduledStart", "hasScheduledEnd", "hasAssignedTechnician"],
+    // Acréscimo: TECNICO só pode se auto-programar quando a prioridade final for
+    // URGENTE. SUPERVISOR continua sem essa restrição (guard ignora quando role !== TECNICO).
+    guard: (context) => context.role !== Role.TECNICO || context.priority === Priority.URGENTE,
+    guardErrorCode: "PRIORITY_NOT_URGENT",
+    guardErrorMessage: "Técnico só pode dar sequência quando a prioridade for URGENTE.",
   },
   {
     from: WorkOrderStatus.PROGRAMADA,

@@ -179,6 +179,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       role,
       context: {
         userId,
+        role,
         assignedToId: workOrder.assignedToId,
         note,
         priority: workOrder.priority,

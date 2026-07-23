@@ -43,7 +43,11 @@ workOrdersRoutes.post(
 );
 
 // Etapa 3 — Programação.
-workOrdersRoutes.post("/:id/programacao", authorize(Role.SUPERVISOR), asyncHandler(programacaoController));
+workOrdersRoutes.post(
+  "/:id/programacao",
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(programacaoController)
+);
 
 // Etapa 4 — Execução (o service confere que o TECNICO é o assignedTo).
 workOrdersRoutes.post("/:id/iniciar", authorize(Role.TECNICO), asyncHandler(iniciarController));
