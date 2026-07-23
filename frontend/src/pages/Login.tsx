@@ -106,14 +106,14 @@ export default function Login() {
     >
       <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/30" />
 
-      <div className="relative z-10 flex min-h-screen flex-col gap-8 px-6 py-8 md:flex-row md:items-stretch md:px-12 lg:px-20">
+      <div className="relative z-10 flex min-h-screen flex-col gap-8 px-6 py-8 md:flex-row md:items-stretch md:justify-between md:px-12 lg:px-20">
         {/* Board à esquerda, sobre a imagem */}
         <div className="order-2 flex min-h-0 flex-1 flex-col md:order-1 md:max-w-2xl md:py-4">
           <NovasSolicitacoesBoard />
         </div>
 
-        {/* Card de login glass à direita */}
-        <div className="order-1 flex items-center justify-center md:order-2 md:w-[380px] md:shrink-0">
+        {/* Card de login glass sobre a caveira, à direita */}
+        <div className="order-1 flex items-center justify-center md:order-2 md:w-[380px] md:shrink-0 md:justify-end">
           <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
             <h1 className="mb-1 text-2xl font-bold text-white">CMMS</h1>
             <p className="mb-6 text-sm text-white/70">Gestão de Ordens de Serviço</p>
