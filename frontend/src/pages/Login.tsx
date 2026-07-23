@@ -37,7 +37,7 @@ function NovasSolicitacoesBoard() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <h2 className="mb-1 text-lg font-semibold text-white">Novas Solicitações</h2>
+      <h2 className="mb-1 text-2xl font-bold text-white drop-shadow">Novas Solicitações</h2>
       <p className="mb-4 text-sm text-white/80">Ordens de serviço em aberto</p>
 
       {loading ? (
@@ -100,57 +100,66 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden md:flex-row">
-      <div className="order-2 flex flex-col bg-[linear-gradient(135deg,#0011FF_0%,#2B6675_40%,#379DB6_75%,#B1CBD3_100%)] p-6 md:order-1 md:h-screen md:w-[62%] md:shrink-0 md:p-10">
-        <NovasSolicitacoesBoard />
-      </div>
+    <div
+      className="relative min-h-screen w-full overflow-hidden bg-slate-950 bg-cover bg-center"
+      style={{ backgroundImage: "url('/login-bg.png')" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/30" />
 
-      <div className="order-1 flex items-center justify-center bg-white p-8 md:order-2 md:h-screen md:w-[38%] md:shrink-0">
-        <div className="w-full max-w-sm py-8">
-          <h1 className="mb-1 text-xl font-semibold text-slate-900">CMMS</h1>
-          <p className="mb-6 text-sm text-slate-500">Gestão de Ordens de Serviço</p>
+      <div className="relative z-10 flex min-h-screen flex-col gap-8 px-6 py-8 md:flex-row md:items-stretch md:px-12 lg:px-20">
+        {/* Board à esquerda, sobre a imagem */}
+        <div className="order-2 flex min-h-0 flex-1 flex-col md:order-1 md:max-w-2xl md:py-4">
+          <NovasSolicitacoesBoard />
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-                E-mail
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                placeholder="supervisor@cmms.local"
-              />
-            </div>
+        {/* Card de login glass à direita */}
+        <div className="order-1 flex items-center justify-center md:order-2 md:w-[380px] md:shrink-0">
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
+            <h1 className="mb-1 text-2xl font-bold text-white">CMMS</h1>
+            <p className="mb-6 text-sm text-white/70">Gestão de Ordens de Serviço</p>
 
-            <div>
-              <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                placeholder="••••••••"
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/90">
+                  E-mail
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-white/20 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                  placeholder="supervisor@cmms.local"
+                />
+              </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+              <div>
+                <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-white/90">
+                  Senha
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-lg border border-white/20 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                  placeholder="••••••••"
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {submitting ? "Entrando…" : "Entrar"}
-            </button>
-          </form>
+              {error && <p className="text-sm text-red-300">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-lg bg-slate-900/90 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {submitting ? "Entrando…" : "Entrar"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
