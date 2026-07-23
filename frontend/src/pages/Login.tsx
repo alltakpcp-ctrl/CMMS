@@ -101,7 +101,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden md:flex-row">
-      <div className="order-2 flex flex-col bg-[linear-gradient(135deg,#1e3a8a_0%,#6d28d9_45%,#ec4899_80%,#f97316_100%)] p-6 md:order-1 md:h-screen md:w-[62%] md:shrink-0 md:p-10">
+      <div className="order-2 flex flex-col bg-[linear-gradient(135deg,#0011FF_0%,#2B6675_40%,#379DB6_75%,#B1CBD3_100%)] p-6 md:order-1 md:h-screen md:w-[62%] md:shrink-0 md:p-10">
         <NovasSolicitacoesBoard />
       </div>
 
