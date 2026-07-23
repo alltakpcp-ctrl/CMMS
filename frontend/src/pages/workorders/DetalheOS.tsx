@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
-import { Role, WorkOrderStatus } from "../../domain/enums";
+import { Priority, Role, WorkOrderStatus } from "../../domain/enums";
 import {
   PRIORITY_COLORS,
   PRIORITY_LABELS,
@@ -58,7 +58,15 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
   if (wo.status === WorkOrderStatus.TRIAGEM && (role === Role.TECNICO || role === Role.SUPERVISOR)) {
     actions.push("planejamento");
   }
-  if (wo.status === WorkOrderStatus.PLANEJADA && role === Role.SUPERVISOR) {
+  // Prioridade final URGENTE libera o próprio TECNICO a iniciar direto da
+  // triagem, sem passar pela programação do SUPERVISOR (ver workOrderStateMachine.ts).
+  if (wo.status === WorkOrderStatus.TRIAGEM && role === Role.TECNICO && wo.priority === Priority.URGENTE) {
+    actions.push("iniciar");
+  }
+  if (
+    wo.status === WorkOrderStatus.PLANEJADA &&
+    (role === Role.SUPERVISOR || (role === Role.TECNICO && wo.priority === Priority.URGENTE))
+  ) {
     actions.push("programacao");
   }
   if (wo.status === WorkOrderStatus.PROGRAMADA && isAssignedTech) {
