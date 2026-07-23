@@ -59,14 +59,16 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
     actions.push("planejamento");
   }
   // Prioridade final URGENTE libera o próprio TECNICO a iniciar direto da
-  // triagem, sem passar pela programação do SUPERVISOR (ver workOrderStateMachine.ts).
-  if (wo.status === WorkOrderStatus.TRIAGEM && role === Role.TECNICO && wo.priority === Priority.URGENTE) {
+  // triagem ou do planejamento, sem passar pela programação do SUPERVISOR
+  // (ver workOrderStateMachine.ts).
+  if (
+    (wo.status === WorkOrderStatus.TRIAGEM || wo.status === WorkOrderStatus.PLANEJADA) &&
+    role === Role.TECNICO &&
+    wo.priority === Priority.URGENTE
+  ) {
     actions.push("iniciar");
   }
-  if (
-    wo.status === WorkOrderStatus.PLANEJADA &&
-    (role === Role.SUPERVISOR || (role === Role.TECNICO && wo.priority === Priority.URGENTE))
-  ) {
+  if (wo.status === WorkOrderStatus.PLANEJADA && role === Role.SUPERVISOR) {
     actions.push("programacao");
   }
   if (wo.status === WorkOrderStatus.PROGRAMADA && isAssignedTech) {

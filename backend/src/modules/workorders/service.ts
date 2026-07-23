@@ -324,9 +324,12 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
         data: { workOrderId: id, riskAnalysis: input.riskAnalysis, startedAt: new Date() },
       });
 
-      // Início direto da TRIAGEM (prioridade URGENTE, ver workOrderStateMachine):
-      // o técnico que fez a triagem ainda não é o assignedTo — auto-atribui.
-      if (workOrder.status === WorkOrderStatus.TRIAGEM && !workOrder.assignedToId) {
+      // Início direto da TRIAGEM ou PLANEJADA (prioridade URGENTE, ver
+      // workOrderStateMachine): o técnico ainda não é o assignedTo — auto-atribui.
+      if (
+        (workOrder.status === WorkOrderStatus.TRIAGEM || workOrder.status === WorkOrderStatus.PLANEJADA) &&
+        !workOrder.assignedToId
+      ) {
         return { assignedTo: { connect: { id: user.userId } } };
       }
       return {};

@@ -44,13 +44,8 @@ const TRANSITIONS: TransitionRule[] = [
   {
     from: WorkOrderStatus.PLANEJADA,
     to: WorkOrderStatus.PROGRAMADA,
-    roles: [Role.SUPERVISOR, Role.TECNICO],
+    roles: [Role.SUPERVISOR],
     requiredContextFlags: ["hasScheduledStart", "hasScheduledEnd", "hasAssignedTechnician"],
-    // Acréscimo: TECNICO só pode se auto-programar quando a prioridade final for
-    // URGENTE. SUPERVISOR continua sem essa restrição (guard ignora quando role !== TECNICO).
-    guard: (context) => context.role !== Role.TECNICO || context.priority === Priority.URGENTE,
-    guardErrorCode: "PRIORITY_NOT_URGENT",
-    guardErrorMessage: "Técnico só pode dar sequência quando a prioridade for URGENTE.",
   },
   {
     from: WorkOrderStatus.PROGRAMADA,
@@ -67,6 +62,16 @@ const TRANSITIONS: TransitionRule[] = [
     guard: (context) => context.priority === Priority.URGENTE,
     guardErrorCode: "PRIORITY_NOT_URGENT",
     guardErrorMessage: "Só é possível iniciar direto da triagem quando a prioridade final for URGENTE.",
+  },
+  // Mesma lógica, mas quando o planejamento já foi feito antes de a prioridade
+  // final ser reavaliada como URGENTE — pula a programação do supervisor.
+  {
+    from: WorkOrderStatus.PLANEJADA,
+    to: WorkOrderStatus.EM_EXECUCAO,
+    roles: [Role.TECNICO],
+    guard: (context) => context.priority === Priority.URGENTE,
+    guardErrorCode: "PRIORITY_NOT_URGENT",
+    guardErrorMessage: "Só é possível iniciar direto quando a prioridade for URGENTE.",
   },
   {
     from: WorkOrderStatus.EM_EXECUCAO,
