@@ -62,6 +62,14 @@ export interface WorkOrderPart {
   part: Part;
 }
 
+export interface WorkOrderPlannedPart {
+  id: string;
+  workOrderId: string;
+  partId: string;
+  quantity: number;
+  part: Part;
+}
+
 export interface StatusHistoryEntry {
   id: string;
   workOrderId: string;
@@ -88,6 +96,10 @@ export interface WorkOrder {
   targetSectorId: string | null;
   targetSector?: Sector | null;
   plan: string | null;
+  numMaintainers: number | null;
+  estimatedMinutes: number | null;
+  tools: string[] | null;
+  ppe: string[] | null;
   scheduledStart: string | null;
   scheduledEnd: string | null;
   assignedToId: string | null;
@@ -96,6 +108,7 @@ export interface WorkOrder {
   updatedAt: string;
   execution: Execution | null;
   parts: WorkOrderPart[];
+  plannedPartItems: WorkOrderPlannedPart[];
   statusHistory?: StatusHistoryEntry[];
 }
 

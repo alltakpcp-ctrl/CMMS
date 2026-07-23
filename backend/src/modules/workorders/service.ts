@@ -27,6 +27,7 @@ const workOrderInclude = {
   assignedTo: { select: publicUserSelect },
   execution: true,
   parts: { include: { part: true } },
+  plannedPartItems: { include: { part: true } },
 } satisfies Prisma.WorkOrderInclude;
 
 export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
@@ -249,13 +250,36 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
     to: WorkOrderStatus.PLANEJADA,
     role: user.role,
     userId: user.userId,
-    mutate: async () => ({
-      plan: input.plan,
-      numMaintainers: input.numMaintainers,
-      estimatedMinutes: input.estimatedMinutes,
-      safetyEquipment: input.safetyEquipment,
-      plannedParts: input.plannedParts,
-    }),
+    mutate: async (tx) => {
+      const plannedParts = input.plannedParts ?? [];
+
+      if (plannedParts.length > 0) {
+        const found = await tx.part.findMany({
+          where: { id: { in: plannedParts.map((p) => p.partId) } },
+          select: { id: true },
+        });
+        const foundIds = new Set(found.map((p) => p.id));
+        const missing = plannedParts.filter((p) => !foundIds.has(p.partId));
+        if (missing.length > 0) {
+          throw new AppError(
+            400,
+            "PART_NOT_FOUND",
+            `Peça(s) não encontrada(s): ${missing.map((p) => p.partId).join(", ")}.`
+          );
+        }
+      }
+
+      return {
+        plan: input.plan,
+        numMaintainers: input.numMaintainers,
+        estimatedMinutes: input.estimatedMinutes,
+        tools: input.tools,
+        ppe: input.ppe,
+        plannedPartItems: {
+          create: plannedParts.map((p) => ({ partId: p.partId, quantity: p.quantity })),
+        },
+      };
+    },
   });
 }
 

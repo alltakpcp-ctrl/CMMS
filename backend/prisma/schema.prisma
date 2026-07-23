@@ -75,6 +75,7 @@ model Part {
 
   workOrderParts WorkOrderPart[]
   partRequests   PartRequest[]
+  plannedPartItems WorkOrderPlannedPart[]
 }
 
 model WorkOrder {
@@ -94,8 +95,10 @@ model WorkOrder {
   plan           String?
   numMaintainers   Int?
   estimatedMinutes Int?
-  safetyEquipment  String?
-  plannedParts     Json?
+  safetyEquipment  String?   // @deprecated usar ppe
+  plannedParts     Json?     // @deprecated usar plannedPartItems
+  tools            Json?
+  ppe              Json?
   scheduledStart DateTime?
   scheduledEnd   DateTime?
   assignedToId   String?
@@ -112,6 +115,7 @@ model WorkOrder {
   parts          WorkOrderPart[]
   statusHistory  StatusHistory[]
   partRequests   PartRequest[]
+  plannedPartItems WorkOrderPlannedPart[]
 }
 
 model Execution {
@@ -134,6 +138,16 @@ model WorkOrderPart {
   partId      String
   part        Part      @relation(fields: [partId], references: [id])
   quantity    Int
+}
+
+model WorkOrderPlannedPart {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  partId      String
+  part        Part      @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity    Int
+  createdAt   DateTime  @default(now())
 }
 
 model StatusHistory {
