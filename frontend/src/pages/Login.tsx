@@ -4,7 +4,6 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api/client";
 import { getPublicOpenWorkOrders, PublicOpenWorkOrder } from "../api/publicWorkorders";
 import { Badge } from "../components/Badge";
-import { Card } from "../components/Card";
 import { PRIORITY_COLORS, PRIORITY_LABELS } from "../domain/labels";
 import { formatDateTime } from "../lib/format";
 
@@ -37,18 +36,21 @@ function NovasSolicitacoesBoard() {
   }, []);
 
   return (
-    <div className="w-full max-w-md">
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">Novas solicitações</h2>
-      <p className="mb-4 text-sm text-slate-500">Ordens de serviço em aberto</p>
+    <div className="flex h-full w-full flex-col">
+      <h2 className="mb-1 text-lg font-semibold text-white">Novas Solicitações</h2>
+      <p className="mb-4 text-sm text-white/80">Ordens de serviço em aberto</p>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Carregando…</p>
+        <p className="text-sm text-white/90">Carregando…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-slate-500">Nenhuma solicitação em aberto.</p>
+        <p className="text-sm text-white/90">Nenhuma solicitação em aberto.</p>
       ) : (
-        <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {items.map((wo) => (
-            <Card key={wo.number}>
+            <div
+              key={wo.number}
+              className="rounded-xl border border-white/40 bg-white/85 p-4 shadow-md backdrop-blur-sm"
+            >
               <div className="mb-1 flex items-start justify-between gap-2">
                 <span className="text-sm font-semibold text-slate-900">{wo.number}</span>
                 <Badge color={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge>
@@ -60,7 +62,7 @@ function NovasSolicitacoesBoard() {
                 <span>{wo.requester.name}</span>
                 <span>{formatDateTime(wo.createdAt)}</span>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
@@ -98,55 +100,59 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center gap-8 bg-slate-100 p-8">
-      <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">CMMS</h1>
-        <p className="mb-6 text-sm text-slate-500">Gestão de Ordens de Serviço</p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-              E-mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              placeholder="supervisor@cmms.local"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {submitting ? "Entrando…" : "Entrar"}
-          </button>
-        </form>
+    <div className="flex min-h-screen flex-col overflow-x-hidden md:flex-row">
+      <div className="order-2 flex flex-col bg-[linear-gradient(135deg,#1e3a8a_0%,#6d28d9_45%,#ec4899_80%,#f97316_100%)] p-6 md:order-1 md:h-screen md:w-[62%] md:shrink-0 md:p-10">
+        <NovasSolicitacoesBoard />
       </div>
 
-      <NovasSolicitacoesBoard />
+      <div className="order-1 flex items-center justify-center bg-white p-8 md:order-2 md:h-screen md:w-[38%] md:shrink-0">
+        <div className="w-full max-w-sm py-8">
+          <h1 className="mb-1 text-xl font-semibold text-slate-900">CMMS</h1>
+          <p className="mb-6 text-sm text-slate-500">Gestão de Ordens de Serviço</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+                E-mail
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                placeholder="supervisor@cmms.local"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {submitting ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
