@@ -17,7 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/solicitacoes/nova", label: "Nova solicitação", roles: [Role.OPERADOR, Role.SUPERVISOR] },
   { to: "/ordens", label: "Ordens de serviço" },
-  { to: "/indicadores", label: "Indicadores" },
+  { to: "/indicadores", label: "Indicadores", roles: [Role.TECNICO, Role.SUPERVISOR] },
   { to: "/fila", label: "Fila de triagem", roles: [Role.TECNICO, Role.SUPERVISOR] },
   { to: "/agenda", label: "Agenda", roles: [Role.SUPERVISOR] },
   { to: "/minhas-os", label: "Minhas OS", roles: [Role.TECNICO] },

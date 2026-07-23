@@ -35,7 +35,14 @@ export default function App() {
         <Route path="/solicitacoes/nova" element={<NovaSolicitacao />} />
         <Route path="/ordens" element={<ListaOS />} />
         <Route path="/ordens/:id" element={<DetalheOS />} />
-        <Route path="/indicadores" element={<Indicadores />} />
+        <Route
+          path="/indicadores"
+          element={
+            <RequireRole roles={[Role.TECNICO, Role.SUPERVISOR]}>
+              <Indicadores />
+            </RequireRole>
+          }
+        />
 
         <Route
           path="/fila"
