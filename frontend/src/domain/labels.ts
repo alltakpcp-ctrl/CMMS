@@ -50,10 +50,10 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   URGENTE: "Urgente",
 };
 
-export const PRIORITY_COLORS: Record<Priority, "slate" | "blue" | "amber" | "red"> = {
-  BAIXA: "slate",
-  MEDIA: "blue",
-  ALTA: "amber",
+export const PRIORITY_COLORS: Record<Priority, "sky" | "yellow" | "orange" | "red"> = {
+  BAIXA: "sky",
+  MEDIA: "yellow",
+  ALTA: "orange",
   URGENTE: "red",
 };
 

@@ -1,9 +1,12 @@
-type Color = "slate" | "blue" | "amber" | "green" | "red";
+type Color = "slate" | "blue" | "sky" | "amber" | "yellow" | "orange" | "green" | "red";
 
 const COLOR_CLASSES: Record<Color, string> = {
   slate: "bg-slate-100 text-slate-700",
   blue: "bg-blue-100 text-blue-700",
+  sky: "bg-sky-100 text-sky-700",
   amber: "bg-amber-100 text-amber-800",
+  yellow: "bg-yellow-100 text-yellow-800",
+  orange: "bg-orange-100 text-orange-800",
   green: "bg-green-100 text-green-700",
   red: "bg-red-100 text-red-700",
 };

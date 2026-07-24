@@ -12,10 +12,10 @@ const POLL_INTERVAL_MS = 30000;
 const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
 
 const PRIORITY_BG: Record<Priority, string> = {
-  BAIXA: "#dbeafe", // azul bebê (blue-100)
-  MEDIA: "#fef9c3", // amarelo (yellow-100)
-  ALTA: "#ffedd5", // laranja (orange-100)
-  URGENTE: "#fee2e2", // vermelho (red-100)
+  BAIXA: "#e0f2fe", // sky-100 (azul bebê)
+  MEDIA: "#fef9c3", // yellow-100 (amarelo)
+  ALTA: "#ffedd5", // orange-100 (laranja)
+  URGENTE: "#fee2e2", // red-100 (vermelho)
 };
 
 function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
