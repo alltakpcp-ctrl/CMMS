@@ -162,11 +162,11 @@ export default function DetalheOS() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <h2 className="mb-3 text-sm font-semibold text-slate-900">Dados da solicitação</h2>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
               <dt className="text-slate-500">Tipo</dt>
               <dd className="text-slate-900">{TYPE_LABELS[workOrder.type]}</dd>
               <dt className="text-slate-500">Ativo</dt>
@@ -200,7 +200,7 @@ export default function DetalheOS() {
           {workOrder.execution && (
             <Card>
               <h2 className="mb-3 text-sm font-semibold text-slate-900">Execução</h2>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
                 <dt className="text-slate-500">Início</dt>
                 <dd className="text-slate-900">{formatDateTime(workOrder.execution.startedAt)}</dd>
                 <dt className="text-slate-500">Fim</dt>
@@ -240,26 +240,28 @@ export default function DetalheOS() {
           {workOrder.parts.length > 0 && (
             <Card>
               <h2 className="mb-3 text-sm font-semibold text-slate-900">Peças utilizadas</h2>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="pb-2">Peça</th>
-                    <th className="pb-2">Quantidade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {workOrder.parts.map((wp) => (
-                    <tr key={wp.id}>
-                      <td className="py-2">
-                        {wp.part.code} — {wp.part.description}
-                      </td>
-                      <td className="py-2">
-                        {wp.quantity} {wp.part.unit}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="pb-2">Peça</th>
+                      <th className="pb-2">Quantidade</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {workOrder.parts.map((wp) => (
+                      <tr key={wp.id}>
+                        <td className="py-2">
+                          {wp.part.code} — {wp.part.description}
+                        </td>
+                        <td className="py-2">
+                          {wp.quantity} {wp.part.unit}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Card>
           )}
         </div>
