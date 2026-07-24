@@ -26,6 +26,7 @@ import { RegistrarForm } from "./actions/RegistrarForm";
 import { EncerramentoForm } from "./actions/EncerramentoForm";
 import { ValidarForm } from "./actions/ValidarForm";
 import { CancelarForm } from "./actions/CancelarForm";
+import { MoverFaseForm } from "./actions/MoverFaseForm";
 
 type ActionKey =
   | "triagem"
@@ -35,7 +36,8 @@ type ActionKey =
   | "registrar"
   | "encerramento"
   | "validar"
-  | "cancelar";
+  | "cancelar"
+  | "moverFase";
 
 const ACTION_LABELS: Record<ActionKey, string> = {
   triagem: "Fazer triagem",
@@ -46,6 +48,7 @@ const ACTION_LABELS: Record<ActionKey, string> = {
   encerramento: "Encerramento técnico",
   validar: "Validar",
   cancelar: "Cancelar OS",
+  moverFase: "Mover fase",
 };
 
 function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionKey[] {
@@ -71,10 +74,10 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
   if (wo.status === WorkOrderStatus.PLANEJADA && role === Role.SUPERVISOR) {
     actions.push("programacao");
   }
-  if (wo.status === WorkOrderStatus.PROGRAMADA && isAssignedTech) {
+  if (wo.status === WorkOrderStatus.PROGRAMADA && (isAssignedTech || role === Role.SUPERVISOR)) {
     actions.push("iniciar");
   }
-  if (wo.status === WorkOrderStatus.EM_EXECUCAO && isAssignedTech) {
+  if (wo.status === WorkOrderStatus.EM_EXECUCAO && (isAssignedTech || role === Role.SUPERVISOR)) {
     actions.push("registrar", "encerramento");
   }
   if (wo.status === WorkOrderStatus.AGUARDANDO_VALIDACAO && role === Role.SUPERVISOR) {
@@ -86,6 +89,12 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
     wo.status !== WorkOrderStatus.CANCELADA
   ) {
     actions.push("cancelar");
+  }
+  // Override de timeline: SUPERVISOR pode mover a OS para qualquer fase,
+  // em qualquer status, inclusive ENCERRADA/CANCELADA (fora da máquina de
+  // estados normal — ver PATCH /:id/timeline no backend).
+  if (role === Role.SUPERVISOR) {
+    actions.push("moverFase");
   }
 
   return actions;
@@ -328,6 +337,15 @@ export default function DetalheOS() {
       {activeAction === "cancelar" && (
         <Modal title={ACTION_LABELS.cancelar} onClose={() => setActiveAction(null)}>
           <CancelarForm workOrder={workOrder} onSuccess={handleActionSuccess} onClose={() => setActiveAction(null)} />
+        </Modal>
+      )}
+      {activeAction === "moverFase" && (
+        <Modal title={ACTION_LABELS.moverFase} onClose={() => setActiveAction(null)}>
+          <MoverFaseForm
+            workOrder={workOrder}
+            onSuccess={handleActionSuccess}
+            onClose={() => setActiveAction(null)}
+          />
         </Modal>
       )}
     </div>

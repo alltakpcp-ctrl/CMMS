@@ -65,6 +65,11 @@ export interface CancelarInput {
   note: string;
 }
 
+export interface TimelineOverrideInput {
+  toStatus: WorkOrderStatus;
+  note: string;
+}
+
 function query(filters: ListWorkOrdersFilters): string {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -116,4 +121,8 @@ export function validar(token: string, id: string, input: ValidarInput) {
 
 export function cancelar(token: string, id: string, input: CancelarInput) {
   return apiRequest<WorkOrder>(`/workorders/${id}/cancelar`, { method: "POST", token, body: input });
+}
+
+export function timelineOverride(token: string, id: string, input: TimelineOverrideInput) {
+  return apiRequest<WorkOrder>(`/workorders/${id}/timeline`, { method: "PATCH", token, body: input });
 }
