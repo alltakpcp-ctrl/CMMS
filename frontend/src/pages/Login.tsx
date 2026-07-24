@@ -12,10 +12,10 @@ const POLL_INTERVAL_MS = 30000;
 const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
 
 const PRIORITY_GRADIENT: Record<Priority, string> = {
-  BAIXA: "rgba(100, 116, 139, 0.18)", // slate-500
-  MEDIA: "rgba(59, 130, 246, 0.18)", // blue-500
-  ALTA: "rgba(245, 158, 11, 0.20)", // amber-500
-  URGENTE: "rgba(239, 68, 68, 0.22)", // red-500
+  BAIXA: "rgba(100, 116, 139, 0.35)", // slate-500
+  MEDIA: "rgba(59, 130, 246, 0.40)", // blue-500
+  ALTA: "rgba(245, 158, 11, 0.45)", // amber-500
+  URGENTE: "rgba(239, 68, 68, 0.48)", // red-500
 };
 
 function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
@@ -23,7 +23,7 @@ function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
     <div
       className="rounded-xl border border-white/40 bg-white/85 p-4 shadow-md backdrop-blur-sm"
       style={{
-        backgroundImage: `radial-gradient(circle at right, ${PRIORITY_GRADIENT[wo.priority]} 0%, transparent 60%)`,
+        backgroundImage: `radial-gradient(ellipse at right, ${PRIORITY_GRADIENT[wo.priority]} 0%, transparent 85%)`,
       }}
     >
       <div className="mb-1 flex items-start justify-between gap-2">
@@ -32,10 +32,17 @@ function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
       </div>
       <p className="text-sm font-medium text-slate-800">{wo.title}</p>
       <p className="mt-1 line-clamp-2 text-sm text-slate-500">{wo.description}</p>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-        {wo.targetSector && <span>{wo.targetSector.name}</span>}
-        <span>{wo.requester.name}</span>
-        <span>{formatDateTime(wo.createdAt)}</span>
+      <div className="mt-2 space-y-0.5 text-xs text-slate-600">
+        <p>
+          <span className="font-medium">Solicitante:</span> {wo.requester.name}
+        </p>
+        <p>
+          <span className="font-medium">Técnico:</span> {wo.assignedTo?.name ?? "Não designado"}
+        </p>
+        <p className="text-slate-500">
+          {wo.targetSector?.name && <>{wo.targetSector.name} · </>}
+          {formatDateTime(wo.createdAt)}
+        </p>
       </div>
     </div>
   );

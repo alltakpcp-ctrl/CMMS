@@ -9,6 +9,7 @@ export interface PublicOpenWorkOrder {
   createdAt: string;
   targetSector: { name: string } | null;
   requester: { name: string };
+  assignedTo: { name: string } | null;
 }
 
 export interface PublicWorkOrdersBoard {
