@@ -11,20 +11,18 @@ import { formatDateTime } from "../lib/format";
 const POLL_INTERVAL_MS = 30000;
 const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
 
-const PRIORITY_GRADIENT: Record<Priority, string> = {
-  BAIXA: "rgba(96, 165, 250, 0.40)", // azul bebê (blue-400)
-  MEDIA: "rgba(250, 204, 21, 0.45)", // amarelo (yellow-400)
-  ALTA: "rgba(249, 115, 22, 0.45)", // laranja (orange-500)
-  URGENTE: "rgba(239, 68, 68, 0.48)", // vermelho (red-500)
+const PRIORITY_BG: Record<Priority, string> = {
+  BAIXA: "#dbeafe", // azul bebê (blue-100)
+  MEDIA: "#fef9c3", // amarelo (yellow-100)
+  ALTA: "#ffedd5", // laranja (orange-100)
+  URGENTE: "#fee2e2", // vermelho (red-100)
 };
 
 function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
   return (
     <div
-      className="rounded-xl border border-white/40 bg-white/85 p-4 shadow-md backdrop-blur-sm"
-      style={{
-        backgroundImage: `radial-gradient(ellipse at right, ${PRIORITY_GRADIENT[wo.priority]} 0%, transparent 85%)`,
-      }}
+      className="rounded-xl border border-white/40 p-4 shadow-md backdrop-blur-sm"
+      style={{ backgroundColor: PRIORITY_BG[wo.priority] }}
     >
       <div className="mb-1 flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-slate-900">{wo.number}</span>
