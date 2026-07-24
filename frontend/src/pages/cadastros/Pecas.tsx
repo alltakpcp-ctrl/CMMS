@@ -203,6 +203,7 @@ export default function Pecas() {
                 { header: "Saldo", cell: (p) => p.stockQty },
                 {
                   header: "Ações",
+                  isActions: true,
                   cell: (p) => (
                     <div className="flex gap-2">
                       <Button variant="secondary" onClick={() => openEdit(p)}>

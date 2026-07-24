@@ -142,6 +142,7 @@ export default function Ativos() {
             { header: "Criticidade", cell: (a) => a.criticality },
             {
               header: "Ações",
+              isActions: true,
               cell: (a) => (
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => openEdit(a)}>

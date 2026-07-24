@@ -129,6 +129,7 @@ export default function MontarPedido() {
             { header: "Data", cell: (r) => formatDateTime(r.createdAt) },
             {
               header: "Ações",
+              isActions: true,
               cell: (r) => (
                 <Button variant="danger" onClick={() => setRejecting(r)}>
                   Rejeitar

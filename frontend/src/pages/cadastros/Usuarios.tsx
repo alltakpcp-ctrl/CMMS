@@ -221,6 +221,7 @@ export default function Usuarios() {
             { header: "Ativo", cell: (u) => (u.active ? <Badge color="green">Sim</Badge> : <Badge color="red">Não</Badge>) },
             {
               header: "Ações",
+              isActions: true,
               cell: (u) => (
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => openEdit(u)}>
