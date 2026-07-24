@@ -11,6 +11,11 @@ export interface PublicOpenWorkOrder {
   requester: { name: string };
 }
 
-export function getPublicOpenWorkOrders() {
-  return apiRequest<PublicOpenWorkOrder[]>("/public/workorders");
+export interface PublicWorkOrdersBoard {
+  abertas: PublicOpenWorkOrder[];
+  programadas: PublicOpenWorkOrder[];
+}
+
+export function getPublicWorkOrdersBoard() {
+  return apiRequest<PublicWorkOrdersBoard>("/public/workorders");
 }

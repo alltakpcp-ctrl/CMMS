@@ -2,15 +2,70 @@ import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api/client";
-import { getPublicOpenWorkOrders, PublicOpenWorkOrder } from "../api/publicWorkorders";
+import { getPublicWorkOrdersBoard, PublicOpenWorkOrder, PublicWorkOrdersBoard } from "../api/publicWorkorders";
 import { Badge } from "../components/Badge";
 import { PRIORITY_COLORS, PRIORITY_LABELS } from "../domain/labels";
 import { formatDateTime } from "../lib/format";
 
 const POLL_INTERVAL_MS = 30000;
+const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
+
+function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
+  return (
+    <div className="rounded-xl border border-white/40 bg-white/85 p-4 shadow-md backdrop-blur-sm">
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <span className="text-sm font-semibold text-slate-900">{wo.number}</span>
+        <Badge color={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge>
+      </div>
+      <p className="text-sm font-medium text-slate-800">{wo.title}</p>
+      <p className="mt-1 line-clamp-2 text-sm text-slate-500">{wo.description}</p>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+        {wo.targetSector && <span>{wo.targetSector.name}</span>}
+        <span>{wo.requester.name}</span>
+        <span>{formatDateTime(wo.createdAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+function BoardColumn({
+  title,
+  subtitle,
+  items,
+  loading,
+  emptyLabel,
+}: {
+  title: string;
+  subtitle: string;
+  items: PublicOpenWorkOrder[];
+  loading: boolean;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <h2 className="mb-1 flex items-baseline gap-2 text-2xl font-bold text-white drop-shadow">
+        {title}
+        <span className="text-base font-semibold text-white/70">({items.length})</span>
+      </h2>
+      <p className="mb-4 text-sm text-white/80">{subtitle}</p>
+
+      {loading ? (
+        <p className="text-sm text-white/90">Carregando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-white/90">{emptyLabel}</p>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          {items.map((wo) => (
+            <WorkOrderCard key={wo.number} wo={wo} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function NovasSolicitacoesBoard() {
-  const [items, setItems] = useState<PublicOpenWorkOrder[]>([]);
+  const [board, setBoard] = useState<PublicWorkOrdersBoard>(EMPTY_BOARD);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,8 +73,8 @@ function NovasSolicitacoesBoard() {
 
     async function load() {
       try {
-        const data = await getPublicOpenWorkOrders();
-        if (!cancelled) setItems(data);
+        const data = await getPublicWorkOrdersBoard();
+        if (!cancelled) setBoard(data);
       } catch {
         // Quadro público: falha silenciosa, mantém a última lista carregada.
       } finally {
@@ -36,36 +91,21 @@ function NovasSolicitacoesBoard() {
   }, []);
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <h2 className="mb-1 text-2xl font-bold text-white drop-shadow">Novas Solicitações</h2>
-      <p className="mb-4 text-sm text-white/80">Ordens de serviço em aberto</p>
-
-      {loading ? (
-        <p className="text-sm text-white/90">Carregando…</p>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-white/90">Nenhuma solicitação em aberto.</p>
-      ) : (
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-          {items.map((wo) => (
-            <div
-              key={wo.number}
-              className="rounded-xl border border-white/40 bg-white/85 p-4 shadow-md backdrop-blur-sm"
-            >
-              <div className="mb-1 flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold text-slate-900">{wo.number}</span>
-                <Badge color={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge>
-              </div>
-              <p className="text-sm font-medium text-slate-800">{wo.title}</p>
-              <p className="mt-1 line-clamp-2 text-sm text-slate-500">{wo.description}</p>
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-                {wo.targetSector && <span>{wo.targetSector.name}</span>}
-                <span>{wo.requester.name}</span>
-                <span>{formatDateTime(wo.createdAt)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="flex h-full w-full flex-col gap-6 sm:flex-row">
+      <BoardColumn
+        title="Novas OS"
+        subtitle="Ordens de serviço em aberto"
+        items={board.abertas}
+        loading={loading}
+        emptyLabel="Nenhuma solicitação em aberto."
+      />
+      <BoardColumn
+        title="OS Programadas"
+        subtitle="Ordenadas por prioridade"
+        items={board.programadas}
+        loading={loading}
+        emptyLabel="Nenhuma OS programada."
+      />
     </div>
   );
 }
@@ -108,7 +148,7 @@ export default function Login() {
 
       <div className="relative z-10 flex min-h-screen flex-col gap-8 px-6 py-8 md:flex-row md:items-stretch md:justify-between md:px-12 lg:px-20">
         {/* Board à esquerda, sobre a imagem */}
-        <div className="order-2 flex min-h-0 flex-1 flex-col md:order-1 md:max-w-2xl md:py-4">
+        <div className="order-2 flex min-h-0 flex-1 flex-col md:order-1 md:max-w-4xl md:py-4">
           <NovasSolicitacoesBoard />
         </div>
 
