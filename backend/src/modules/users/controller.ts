@@ -24,3 +24,11 @@ export async function changePasswordController(req: Request, res: Response) {
   const input = changePasswordSchema.parse(req.body);
   res.json(await usersService.setUserPassword(req.params.id, input.password));
 }
+
+export async function deleteUserController(req: Request, res: Response) {
+  if (!req.user) {
+    throw new AppError(401, "UNAUTHENTICATED", "Token de autenticação ausente.");
+  }
+  await usersService.deleteUser(req.params.id, req.user.userId);
+  res.status(204).send();
+}

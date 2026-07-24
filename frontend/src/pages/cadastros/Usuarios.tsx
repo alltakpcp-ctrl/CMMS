@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
+import { ApiError } from "../../api/client";
 import { Role } from "../../domain/enums";
 import { ROLE_LABELS } from "../../domain/labels";
 import * as usersApi from "../../api/users";
@@ -27,6 +28,7 @@ interface CreateFormState {
 
 interface EditFormState {
   name: string;
+  email: string;
   role: Role;
   active: boolean;
   sectorId: string | null;
@@ -63,11 +65,15 @@ export default function Usuarios() {
   const [editing, setEditing] = useState<PublicUser | null>(null);
   const [editForm, setEditForm] = useState<EditFormState>({
     name: "",
+    email: "",
     role: Role.OPERADOR,
     active: true,
     sectorId: null,
     canReceivePartRequests: false,
   });
+  const [editEmailError, setEditEmailError] = useState<string | null>(null);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
@@ -113,11 +119,13 @@ export default function Usuarios() {
     setEditing(user);
     setEditForm({
       name: user.name,
+      email: user.email,
       role: user.role,
       active: user.active,
       sectorId: user.sector?.id ?? null,
       canReceivePartRequests: user.canReceivePartRequests,
     });
+    setEditEmailError(null);
   }
 
   const editSectorMissing = editForm.role === Role.OPERADOR && !editForm.sectorId;
@@ -125,6 +133,7 @@ export default function Usuarios() {
   async function handleEditSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token || !editing || editSectorMissing) return;
+    setEditEmailError(null);
     setSubmitting(true);
     try {
       await usersApi.updateUser(token, editing.id, editForm);
@@ -132,9 +141,28 @@ export default function Usuarios() {
       setEditing(null);
       reload();
     } catch (err) {
-      showError(getErrorMessage(err));
+      if (err instanceof ApiError && err.code === "EMAIL_IN_USE") {
+        setEditEmailError(err.message);
+      } else {
+        showError(getErrorMessage(err));
+      }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(user: PublicUser) {
+    if (!token) return;
+    if (!confirm(`Excluir permanentemente o usuário ${user.name}? Esta ação não pode ser desfeita.`)) return;
+    setDeletingId(user.id);
+    try {
+      await usersApi.deleteUser(token, user.id);
+      showSuccess("Usuário excluído.");
+      reload();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -171,7 +199,8 @@ export default function Usuarios() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Usuários</h1>
           <p className="text-sm text-slate-500">
-            Cadastro de contas do sistema. Usuários nunca são removidos — apenas desativados.
+            Cadastro de contas do sistema. Usuários com histórico operacional (OS, pedidos,
+            aprovações) não podem ser excluídos — desative-os em vez disso.
           </p>
         </div>
         <Button onClick={openCreate}>Novo usuário</Button>
@@ -199,6 +228,13 @@ export default function Usuarios() {
                   </Button>
                   <Button variant="secondary" onClick={() => openPasswordModal(u)}>
                     Redefinir senha
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => handleDelete(u)}
+                    disabled={u.id === currentUser?.id || deletingId === u.id}
+                  >
+                    {deletingId === u.id ? "Excluindo…" : "Excluir"}
                   </Button>
                 </div>
               ),
@@ -279,6 +315,17 @@ export default function Usuarios() {
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               required
             />
+            <Input
+              label="E-mail"
+              type="email"
+              value={editForm.email}
+              onChange={(e) => {
+                setEditForm({ ...editForm, email: e.target.value });
+                setEditEmailError(null);
+              }}
+              error={editEmailError ?? undefined}
+              required
+            />
             <Select
               label="Perfil"
               value={editForm.role}
@@ -326,7 +373,7 @@ export default function Usuarios() {
             />
 
             <p className="text-xs text-slate-500">
-              E-mail e senha não são editáveis por aqui. Use o botão "Redefinir senha" na lista para trocar a senha.
+              Senha não é editável por aqui. Use o botão "Redefinir senha" na lista para trocar a senha.
             </p>
 
             <div className="flex justify-end gap-2">

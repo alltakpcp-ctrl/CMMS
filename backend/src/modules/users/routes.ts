@@ -3,6 +3,7 @@ import { Role } from "../../domain/enums";
 import {
   changePasswordController,
   createUserController,
+  deleteUserController,
   listUsersController,
   updateUserController,
 } from "./controller";
@@ -18,3 +19,4 @@ usersRoutes.get("/", asyncHandler(listUsersController));
 usersRoutes.post("/", asyncHandler(createUserController));
 usersRoutes.put("/:id", asyncHandler(updateUserController));
 usersRoutes.post("/:id/senha", asyncHandler(changePasswordController));
+usersRoutes.delete("/:id", asyncHandler(deleteUserController));

@@ -19,12 +19,12 @@ export const createUserSchema = z
     }
   });
 
-// Email e senha não são editáveis por aqui — troca de senha é um fluxo à parte
-// (fora do escopo do MVP) e email é a identidade de login. Nunca permite hard
-// delete: desativação é sempre active=false (§5.2b do spec 05 / CLAUDE.md).
+// Email é editável por aqui (checagem de unicidade fica no service, pois depende
+// do id atual). Senha continua sendo um fluxo à parte (changePasswordSchema).
 export const updateUserSchema = z
   .object({
     name: z.string().min(1, "Nome é obrigatório.").optional(),
+    email: z.string().email("E-mail inválido.").optional(),
     role: z.nativeEnum(Role).optional(),
     active: z.boolean().optional(),
     sectorId: z.string().nullable().optional(),

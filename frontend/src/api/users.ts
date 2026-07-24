@@ -12,6 +12,7 @@ export interface CreateUserInput {
 
 export interface UpdateUserInput {
   name?: string;
+  email?: string;
   role?: Role;
   active?: boolean;
   sectorId?: string | null;
@@ -32,4 +33,8 @@ export function updateUser(token: string, id: string, input: UpdateUserInput) {
 
 export function changeUserPassword(token: string, id: string, password: string) {
   return apiRequest<PublicUser>(`/users/${id}/senha`, { method: "POST", token, body: { password } });
+}
+
+export function deleteUser(token: string, id: string) {
+  return apiRequest<null>(`/users/${id}`, { method: "DELETE", token });
 }
