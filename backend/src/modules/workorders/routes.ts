@@ -13,6 +13,7 @@ import {
   planejamentoController,
   programacaoController,
   registrarController,
+  reprogramacaoController,
   triagemController,
   validarController,
 } from "./controller";
@@ -48,15 +49,30 @@ workOrdersRoutes.post(
   authorize(Role.TECNICO, Role.SUPERVISOR),
   asyncHandler(programacaoController)
 );
+// Reprogramação: troca de técnico e/ou reagendamento de datas a qualquer
+// momento (exceto ENCERRADA/CANCELADA), sem alterar o status da OS.
+workOrdersRoutes.patch(
+  "/:id/programacao",
+  authorize(Role.SUPERVISOR),
+  asyncHandler(reprogramacaoController)
+);
 
-// Etapa 4 — Execução (o service confere que o TECNICO é o assignedTo).
-workOrdersRoutes.post("/:id/iniciar", authorize(Role.TECNICO), asyncHandler(iniciarController));
-workOrdersRoutes.post("/:id/registrar", authorize(Role.TECNICO), asyncHandler(registrarController));
+// Etapa 4 — Execução (o service confere que o TECNICO é o assignedTo; SUPERVISOR é isento).
+workOrdersRoutes.post(
+  "/:id/iniciar",
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(iniciarController)
+);
+workOrdersRoutes.post(
+  "/:id/registrar",
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(registrarController)
+);
 
 // Etapa 5 — Encerramento técnico e Validação.
 workOrdersRoutes.post(
   "/:id/encerramento-tecnico",
-  authorize(Role.TECNICO),
+  authorize(Role.TECNICO, Role.SUPERVISOR),
   asyncHandler(encerramentoTecnicoController)
 );
 workOrdersRoutes.post("/:id/validar", authorize(Role.SUPERVISOR), asyncHandler(validarController));

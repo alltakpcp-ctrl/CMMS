@@ -140,7 +140,11 @@ export function canTransition(params: {
     };
   }
 
-  if (rule.requireAssignedTechnician && context.userId !== context.assignedToId) {
+  if (
+    rule.requireAssignedTechnician &&
+    context.role === Role.TECNICO &&
+    context.userId !== context.assignedToId
+  ) {
     return {
       ok: false,
       code: "NOT_ASSIGNED",

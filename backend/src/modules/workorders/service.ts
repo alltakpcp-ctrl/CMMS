@@ -16,6 +16,7 @@ import {
   PlanejamentoInput,
   ProgramacaoInput,
   RegistrarInput,
+  ReprogramacaoInput,
   TriagemInput,
   ValidarInput,
 } from "./schema";
@@ -313,6 +314,76 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
   });
 }
 
+// Não é uma transição de status — permite ao SUPERVISOR reatribuir técnico
+// e/ou reagendar datas a qualquer momento enquanto a OS estiver ativa, sem
+// depender da máquina de estados (análoga a registrar()). Reaproveita
+// StatusHistory (fromStatus === toStatus === status atual) só para manter
+// um rastro de auditoria, já que não há outro mecanismo de log no projeto.
+export async function reprogramacao(id: string, input: ReprogramacaoInput, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    if (workOrder.status === WorkOrderStatus.ENCERRADA || workOrder.status === WorkOrderStatus.CANCELADA) {
+      throw new AppError(
+        409,
+        "INVALID_STATE",
+        "OS encerrada/cancelada não pode ser reprogramada."
+      );
+    }
+
+    if (input.assignedToId) {
+      const tecnico = await tx.user.findUnique({ where: { id: input.assignedToId } });
+      if (!tecnico || tecnico.role !== Role.TECNICO || !tecnico.active) {
+        throw new AppError(
+          422,
+          "INVALID_ASSIGNEE",
+          "O responsável designado deve ser um usuário TECNICO ativo."
+        );
+      }
+    }
+
+    const previousAssignedToId = workOrder.assignedToId;
+    const previousScheduledStart = workOrder.scheduledStart;
+    const previousScheduledEnd = workOrder.scheduledEnd;
+
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: {
+        ...(input.assignedToId !== undefined && { assignedToId: input.assignedToId }),
+        ...(input.scheduledStart !== undefined && { scheduledStart: input.scheduledStart }),
+        ...(input.scheduledEnd !== undefined && { scheduledEnd: input.scheduledEnd }),
+      },
+      include: workOrderInclude,
+    });
+
+    const noteParts: string[] = [];
+    if (input.assignedToId !== undefined) {
+      noteParts.push(`técnico ${previousAssignedToId ?? "—"} → ${input.assignedToId}`);
+    }
+    if (input.scheduledStart !== undefined) {
+      noteParts.push(`início ${previousScheduledStart?.toISOString() ?? "—"} → ${input.scheduledStart.toISOString()}`);
+    }
+    if (input.scheduledEnd !== undefined) {
+      noteParts.push(`fim ${previousScheduledEnd?.toISOString() ?? "—"} → ${input.scheduledEnd.toISOString()}`);
+    }
+
+    await tx.statusHistory.create({
+      data: {
+        workOrderId: id,
+        fromStatus: workOrder.status,
+        toStatus: workOrder.status,
+        changedById: user.userId,
+        note: `Reprogramação: ${noteParts.join("; ")}`,
+      },
+    });
+
+    return updated;
+  });
+}
+
 export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
   return applyTransition({
     id,
@@ -355,8 +426,14 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
       );
     }
 
-    if (user.role !== Role.TECNICO || user.userId !== workOrder.assignedToId) {
-      throw new AppError(403, "NOT_ASSIGNED", "Somente o técnico responsável pela OS pode registrar a execução.");
+    const isSupervisor = user.role === Role.SUPERVISOR;
+    const isAssignedTecnico = user.role === Role.TECNICO && user.userId === workOrder.assignedToId;
+    if (!isSupervisor && !isAssignedTecnico) {
+      throw new AppError(
+        403,
+        "NOT_ASSIGNED",
+        "Somente o técnico responsável ou um supervisor pode registrar a execução."
+      );
     }
 
     await tx.execution.update({

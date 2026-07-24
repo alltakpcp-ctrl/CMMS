@@ -10,6 +10,7 @@ import {
   planejamentoSchema,
   programacaoSchema,
   registrarSchema,
+  reprogramacaoSchema,
   triagemSchema,
   validarSchema,
 } from "./schema";
@@ -49,6 +50,11 @@ export async function planejamentoController(req: Request, res: Response) {
 export async function programacaoController(req: Request, res: Response) {
   const input = programacaoSchema.parse(req.body);
   res.json(await workOrdersService.programacao(req.params.id, input, requireUser(req)));
+}
+
+export async function reprogramacaoController(req: Request, res: Response) {
+  const input = reprogramacaoSchema.parse(req.body);
+  res.json(await workOrdersService.reprogramacao(req.params.id, input, requireUser(req)));
 }
 
 export async function iniciarController(req: Request, res: Response) {

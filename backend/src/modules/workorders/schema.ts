@@ -45,6 +45,20 @@ export const programacaoSchema = z.object({
   assignedToId: z.string().min(1, "Técnico responsável é obrigatório."),
 });
 
+export const reprogramacaoSchema = z
+  .object({
+    scheduledStart: z.coerce.date().optional(),
+    scheduledEnd: z.coerce.date().optional(),
+    assignedToId: z.string().min(1, "Técnico responsável é obrigatório.").optional(),
+  })
+  .refine(
+    (data) =>
+      data.scheduledStart !== undefined ||
+      data.scheduledEnd !== undefined ||
+      data.assignedToId !== undefined,
+    { message: "Informe ao menos um campo para reprogramar (técnico e/ou datas)." }
+  );
+
 export const iniciarSchema = z.object({
   riskAnalysis: z.string().min(1, "Análise de risco é obrigatória."),
 });
@@ -86,6 +100,7 @@ export type ListWorkOrdersQuery = z.infer<typeof listWorkOrdersQuerySchema>;
 export type TriagemInput = z.infer<typeof triagemSchema>;
 export type PlanejamentoInput = z.infer<typeof planejamentoSchema>;
 export type ProgramacaoInput = z.infer<typeof programacaoSchema>;
+export type ReprogramacaoInput = z.infer<typeof reprogramacaoSchema>;
 export type IniciarInput = z.infer<typeof iniciarSchema>;
 export type RegistrarInput = z.infer<typeof registrarSchema>;
 export type EncerramentoTecnicoInput = z.infer<typeof encerramentoTecnicoSchema>;
