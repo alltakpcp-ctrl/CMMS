@@ -12,10 +12,10 @@ const POLL_INTERVAL_MS = 30000;
 const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
 
 const PRIORITY_GRADIENT: Record<Priority, string> = {
-  BAIXA: "rgba(100, 116, 139, 0.35)", // slate-500
-  MEDIA: "rgba(59, 130, 246, 0.40)", // blue-500
-  ALTA: "rgba(245, 158, 11, 0.45)", // amber-500
-  URGENTE: "rgba(239, 68, 68, 0.48)", // red-500
+  BAIXA: "rgba(96, 165, 250, 0.40)", // azul bebê (blue-400)
+  MEDIA: "rgba(250, 204, 21, 0.45)", // amarelo (yellow-400)
+  ALTA: "rgba(249, 115, 22, 0.45)", // laranja (orange-500)
+  URGENTE: "rgba(239, 68, 68, 0.48)", // vermelho (red-500)
 };
 
 function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
