@@ -5,7 +5,7 @@ import * as indicatorsApi from "../api/indicators";
 import { AssetIndicator, BacklogResult, Overview } from "../api/indicators";
 import { Card } from "../components/Card";
 import { Input } from "../components/Input";
-import { Select } from "../components/Select";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { EmptyState } from "../components/EmptyState";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
@@ -98,19 +98,16 @@ export default function Indicadores() {
           <Input label="Até" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <div className="w-44">
-          <Select
+          <SearchableSelect
             label="Setor"
             value={targetSectorId}
-            onChange={(e) => setTargetSectorId(e.target.value)}
+            onChange={setTargetSectorId}
             disabled={loadingSectors}
-          >
-            <option value="">{loadingSectors ? "Carregando setores..." : "Todos"}</option>
-            {sectors.map((sector) => (
-              <option key={sector.id} value={sector.id}>
-                {sector.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: loadingSectors ? "Carregando setores..." : "Todos" },
+              ...sectors.map((sector) => ({ value: sector.id, label: sector.name })),
+            ]}
+          />
         </div>
       </div>
 

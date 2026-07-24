@@ -10,6 +10,7 @@ import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
 import { Select } from "../../components/Select";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { Checkbox } from "../../components/Checkbox";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
@@ -247,21 +248,14 @@ export default function Usuarios() {
             </Select>
 
             {createForm.role === Role.OPERADOR && (
-              <Select
+              <SearchableSelect
                 label="Setor"
                 value={createForm.sectorId ?? ""}
-                onChange={(e) => setCreateForm({ ...createForm, sectorId: e.target.value || null })}
+                onChange={(sectorId) => setCreateForm({ ...createForm, sectorId: sectorId || null })}
+                options={sectors.map((sector) => ({ value: sector.id, label: sector.name }))}
+                placeholder="Selecione um setor"
                 required
-              >
-                <option value="" disabled>
-                  Selecione um setor
-                </option>
-                {sectors.map((sector) => (
-                  <option key={sector.id} value={sector.id}>
-                    {sector.name}
-                  </option>
-                ))}
-              </Select>
+              />
             )}
 
             <div className="flex justify-end gap-2">
@@ -306,21 +300,14 @@ export default function Usuarios() {
             )}
 
             {editForm.role === Role.OPERADOR && (
-              <Select
+              <SearchableSelect
                 label="Setor"
                 value={editForm.sectorId ?? ""}
-                onChange={(e) => setEditForm({ ...editForm, sectorId: e.target.value || null })}
+                onChange={(sectorId) => setEditForm({ ...editForm, sectorId: sectorId || null })}
+                options={sectors.map((sector) => ({ value: sector.id, label: sector.name }))}
+                placeholder="Selecione um setor"
                 required
-              >
-                <option value="" disabled>
-                  Selecione um setor
-                </option>
-                {sectors.map((sector) => (
-                  <option key={sector.id} value={sector.id}>
-                    {sector.name}
-                  </option>
-                ))}
-              </Select>
+              />
             )}
 
             <Checkbox

@@ -4,7 +4,7 @@ import * as workOrdersApi from "../../../api/workorders";
 import * as partsApi from "../../../api/parts";
 import { Part } from "../../../types";
 import { Textarea } from "../../../components/Textarea";
-import { Select } from "../../../components/Select";
+import { SearchableSelect } from "../../../components/SearchableSelect";
 import { Input } from "../../../components/Input";
 import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
@@ -121,20 +121,13 @@ export function PlanejamentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
           {partLines.map((line, index) => (
             <div key={index} className="flex items-start gap-2">
               <div className="flex-1">
-                <Select
+                <SearchableSelect
                   value={line.partId}
-                  onChange={(e) => updatePartLine(index, { partId: e.target.value })}
+                  onChange={(partId) => updatePartLine(index, { partId })}
+                  options={availableParts.map((part) => ({ value: part.id, label: `${part.code} — ${part.description}` }))}
+                  placeholder="Selecione a peça"
                   required
-                >
-                  <option value="" disabled>
-                    Selecione a peça
-                  </option>
-                  {availableParts.map((part) => (
-                    <option key={part.id} value={part.id}>
-                      {part.code} — {part.description}
-                    </option>
-                  ))}
-                </Select>
+                />
               </div>
               <div className="w-28">
                 <Input

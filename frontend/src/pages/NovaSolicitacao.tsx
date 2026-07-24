@@ -9,6 +9,7 @@ import { Asset } from "../types";
 import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { Textarea } from "../components/Textarea";
 import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
@@ -123,16 +124,14 @@ export default function NovaSolicitacao() {
             required
           />
 
-          <Select label="Ativo" value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
-            <option value="" disabled>
-              Selecione um ativo
-            </option>
-            {visibleAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.code} — {asset.name}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            label="Ativo"
+            value={assetId}
+            onChange={setAssetId}
+            options={visibleAssets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` }))}
+            placeholder="Selecione um ativo"
+            required
+          />
 
           <Button type="submit" disabled={submitting || isOperadorSemSetor}>
             {submitting ? "Enviando…" : "Abrir solicitação"}

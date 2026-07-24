@@ -7,7 +7,7 @@ import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
-import { Select } from "../../components/Select";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { EmptyState } from "../../components/EmptyState";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
@@ -162,22 +162,15 @@ export default function Ativos() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
             <Input label="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <Select
+            <SearchableSelect
               label="Setor"
               value={form.sectorId}
-              onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
+              onChange={(sectorId) => setForm({ ...form, sectorId })}
+              options={sectors.map((sector) => ({ value: sector.id, label: sector.name }))}
+              placeholder={loadingSectors ? "Carregando setores..." : "Selecione um setor"}
               disabled={loadingSectors}
               required
-            >
-              <option value="" disabled>
-                {loadingSectors ? "Carregando setores..." : "Selecione um setor"}
-              </option>
-              {sectors.map((sector) => (
-                <option key={sector.id} value={sector.id}>
-                  {sector.name}
-                </option>
-              ))}
-            </Select>
+            />
             <Input
               label="Localização"
               value={form.location}

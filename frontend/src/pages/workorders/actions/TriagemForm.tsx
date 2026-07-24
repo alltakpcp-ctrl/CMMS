@@ -5,6 +5,7 @@ import { Priority } from "../../../domain/enums";
 import { PRIORITY_LABELS } from "../../../domain/labels";
 import * as workOrdersApi from "../../../api/workorders";
 import { Select } from "../../../components/Select";
+import { SearchableSelect } from "../../../components/SearchableSelect";
 import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
 import { ActionFormProps } from "./types";
@@ -42,22 +43,15 @@ export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
         ))}
       </Select>
 
-      <Select
+      <SearchableSelect
         label="Setor destino"
         value={targetSectorId}
-        onChange={(e) => setTargetSectorId(e.target.value)}
+        onChange={setTargetSectorId}
+        options={sectors.map((sector) => ({ value: sector.id, label: sector.name }))}
+        placeholder={loadingSectors ? "Carregando setores..." : "Selecione um setor"}
         disabled={loadingSectors}
         required
-      >
-        <option value="" disabled>
-          {loadingSectors ? "Carregando setores..." : "Selecione um setor"}
-        </option>
-        {sectors.map((sector) => (
-          <option key={sector.id} value={sector.id}>
-            {sector.name}
-          </option>
-        ))}
-      </Select>
+      />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

@@ -7,6 +7,7 @@ import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
 import { Asset, WorkOrder } from "../types";
 import { Select } from "../components/Select";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Table } from "../components/Table";
@@ -97,14 +98,15 @@ export default function ListaOS() {
         </div>
 
         <div className="w-48">
-          <Select label="Ativo" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-            <option value="">Todos</option>
-            {visibleAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.code} — {asset.name}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            label="Ativo"
+            value={assetId}
+            onChange={setAssetId}
+            options={[
+              { value: "", label: "Todos" },
+              ...visibleAssets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` })),
+            ]}
+          />
         </div>
 
         <Button variant={onlyMine ? "primary" : "secondary"} type="button" onClick={() => setOnlyMine((v) => !v)}>

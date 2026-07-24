@@ -8,6 +8,7 @@ import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
 import { Select } from "../../components/Select";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { Textarea } from "../../components/Textarea";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
@@ -316,18 +317,15 @@ export default function Pecas() {
                 </Select>
 
                 {indicateForm.itemType === PartRequestItemType.PECA && (
-                  <Select
+                  <SearchableSelect
                     label="Peça já cadastrada (opcional)"
                     value={indicateForm.partId}
-                    onChange={(e) => setIndicateForm({ ...indicateForm, partId: e.target.value })}
-                  >
-                    <option value="">Não cadastrada</option>
-                    {parts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} — {p.description}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(partId) => setIndicateForm({ ...indicateForm, partId })}
+                    options={[
+                      { value: "", label: "Não cadastrada" },
+                      ...parts.map((p) => ({ value: p.id, label: `${p.code} — ${p.description}` })),
+                    ]}
+                  />
                 )}
 
                 <Input
