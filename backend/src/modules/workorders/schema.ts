@@ -95,6 +95,15 @@ export const cancelarSchema = z.object({
   note: z.string().min(1, "Nota é obrigatória para cancelar a OS."),
 });
 
+// Override manual da timeline pelo SUPERVISOR — não passa pela máquina de
+// estados (canTransition). Nota é obrigatória por ser uma ação excepcional.
+export const timelineOverrideSchema = z.object({
+  toStatus: z.nativeEnum(WorkOrderStatus, {
+    errorMap: () => ({ message: "Status de destino inválido." }),
+  }),
+  note: z.string().min(5, "Motivo do override é obrigatório (mín. 5 caracteres)."),
+});
+
 export type CreateWorkOrderInput = z.infer<typeof createWorkOrderSchema>;
 export type ListWorkOrdersQuery = z.infer<typeof listWorkOrdersQuerySchema>;
 export type TriagemInput = z.infer<typeof triagemSchema>;
@@ -106,3 +115,4 @@ export type RegistrarInput = z.infer<typeof registrarSchema>;
 export type EncerramentoTecnicoInput = z.infer<typeof encerramentoTecnicoSchema>;
 export type ValidarInput = z.infer<typeof validarSchema>;
 export type CancelarInput = z.infer<typeof cancelarSchema>;
+export type TimelineOverrideInput = z.infer<typeof timelineOverrideSchema>;

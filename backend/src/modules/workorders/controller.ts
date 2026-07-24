@@ -11,6 +11,7 @@ import {
   programacaoSchema,
   registrarSchema,
   reprogramacaoSchema,
+  timelineOverrideSchema,
   triagemSchema,
   validarSchema,
 } from "./schema";
@@ -80,4 +81,9 @@ export async function validarController(req: Request, res: Response) {
 export async function cancelarController(req: Request, res: Response) {
   const input = cancelarSchema.parse(req.body);
   res.json(await workOrdersService.cancelar(req.params.id, input, requireUser(req)));
+}
+
+export async function timelineOverrideController(req: Request, res: Response) {
+  const input = timelineOverrideSchema.parse(req.body);
+  res.json(await workOrdersService.timelineOverride(req.params.id, input, requireUser(req)));
 }

@@ -14,6 +14,7 @@ import {
   programacaoController,
   registrarController,
   reprogramacaoController,
+  timelineOverrideController,
   triagemController,
   validarController,
 } from "./controller";
@@ -77,3 +78,11 @@ workOrdersRoutes.post(
 );
 workOrdersRoutes.post("/:id/validar", authorize(Role.SUPERVISOR), asyncHandler(validarController));
 workOrdersRoutes.post("/:id/cancelar", authorize(Role.SUPERVISOR), asyncHandler(cancelarController));
+
+// Override manual da linha do tempo — SUPERVISOR pode mover a OS para
+// qualquer status, fora da máquina de estados normal (canTransition).
+workOrdersRoutes.patch(
+  "/:id/timeline",
+  authorize(Role.SUPERVISOR),
+  asyncHandler(timelineOverrideController)
+);

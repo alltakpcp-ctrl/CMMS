@@ -17,6 +17,7 @@ import {
   ProgramacaoInput,
   RegistrarInput,
   ReprogramacaoInput,
+  TimelineOverrideInput,
   TriagemInput,
   ValidarInput,
 } from "./schema";
@@ -503,5 +504,45 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
     role: user.role,
     userId: user.userId,
     note: input.note,
+  });
+}
+
+// Override manual da linha do tempo — exclusivo do SUPERVISOR (§ rota).
+// Propositalmente NÃO usa applyTransition/canTransition: é uma ação de
+// exceção que pode mover a OS para qualquer status, inclusive retrocedendo
+// ou saindo de ENCERRADA/CANCELADA. Não mexe em dados de execução/planejamento
+// — só o status muda, e a auditoria fica marcada com prefixo "[OVERRIDE
+// SUPERVISOR]" no StatusHistory para se distinguir das transições normais.
+export function timelineOverride(id: string, dto: TimelineOverrideInput, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    if (!Object.values(WorkOrderStatus).includes(dto.toStatus as WorkOrderStatus)) {
+      throw new AppError(400, "INVALID_STATUS", "Status de destino inválido.");
+    }
+
+    if (dto.toStatus === workOrder.status) {
+      throw new AppError(409, "NO_CHANGE", "A OS já está neste status.");
+    }
+
+    await tx.workOrder.update({
+      where: { id },
+      data: { status: dto.toStatus },
+    });
+
+    await tx.statusHistory.create({
+      data: {
+        workOrderId: id,
+        fromStatus: workOrder.status,
+        toStatus: dto.toStatus,
+        changedById: user.userId,
+        note: `[OVERRIDE SUPERVISOR] ${dto.note}`,
+      },
+    });
+
+    return tx.workOrder.findUniqueOrThrow({ where: { id }, include: workOrderInclude });
   });
 }
