@@ -9,6 +9,7 @@ import FilaTriagem from "./pages/FilaTriagem";
 import Agenda from "./pages/Agenda";
 import MinhasOS from "./pages/MinhasOS";
 import Ativos from "./pages/cadastros/Ativos";
+import Setores from "./pages/cadastros/Setores";
 import Pecas from "./pages/cadastros/Pecas";
 import Usuarios from "./pages/cadastros/Usuarios";
 import MontarPedido from "./pages/pedidos/MontarPedido";
@@ -89,6 +90,14 @@ export default function App() {
           element={
             <RequireRole roles={[Role.SUPERVISOR]}>
               <Ativos />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/cadastros/setores"
+          element={
+            <RequireRole roles={[Role.SUPERVISOR]}>
+              <Setores />
             </RequireRole>
           }
         />
