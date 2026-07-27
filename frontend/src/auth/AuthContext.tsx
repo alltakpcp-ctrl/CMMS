@@ -16,7 +16,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, lat?: number, lng?: number) => Promise<void>;
   logout: () => void;
 }
 
@@ -46,8 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  async function login(email: string, password: string) {
-    const result = await authApi.login(email, password);
+  async function login(email: string, password: string, lat?: number, lng?: number) {
+    const result = await authApi.login(email, password, lat, lng);
     localStorage.setItem(TOKEN_STORAGE_KEY, result.token);
     setToken(result.token);
     setUser(result.user);

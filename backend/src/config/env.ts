@@ -16,4 +16,8 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  geofenceEnabled: (process.env.GEOFENCE_ENABLED ?? "false") === "true",
+  geofenceLat: Number(process.env.GEOFENCE_LAT ?? 0),
+  geofenceLng: Number(process.env.GEOFENCE_LNG ?? 0),
+  geofenceRadiusM: Number(process.env.GEOFENCE_RADIUS_M ?? 0),
 };
