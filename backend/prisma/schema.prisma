@@ -40,16 +40,19 @@ model Sector {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  assets     Asset[]
-  workOrders WorkOrder[]
-  users      User[]
+  assets       Asset[]
+  assetSectors AssetSector[]
+  workOrders   WorkOrder[]
+  users        User[]
 }
 
 model Asset {
   id                         String   @id @default(cuid())
   code                       String   @unique
   name                       String
+  // @deprecated setor primário; visibilidade real via AssetSector (N:N)
   sectorId                   String
+  // @deprecated setor primário; visibilidade real via AssetSector (N:N)
   sector                     Sector   @relation(fields: [sectorId], references: [id], onDelete: Restrict)
   location                   String
   criticality                Int
@@ -63,6 +66,17 @@ model Asset {
   createdAt                  DateTime @default(now())
 
   workOrders WorkOrder[]
+  sectors    AssetSector[]
+}
+
+model AssetSector {
+  assetId   String
+  sectorId  String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  sector    Sector   @relation(fields: [sectorId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@id([assetId, sectorId])
 }
 
 model Part {

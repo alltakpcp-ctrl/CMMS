@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { createAssetSchema, updateAssetSchema } from "./schema";
 import * as assetsService from "./service";
 
-export async function listAssetsController(_req: Request, res: Response) {
-  res.json(await assetsService.listAssets());
+export async function listAssetsController(req: Request, res: Response) {
+  res.json(await assetsService.listAssets(req.user!));
 }
 
 export async function getAssetController(req: Request, res: Response) {
