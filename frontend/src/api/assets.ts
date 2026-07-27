@@ -4,7 +4,7 @@ import { Asset } from "../types";
 export interface AssetInput {
   code: string;
   name: string;
-  sectorId: string;
+  sectorIds: string[];
   location: string;
   criticality: number;
   preventivePeriodicityDays?: number;

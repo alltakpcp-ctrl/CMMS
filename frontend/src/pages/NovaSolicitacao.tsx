@@ -40,9 +40,6 @@ export default function NovaSolicitacao() {
       .catch((err) => showError(getErrorMessage(err)));
   }, [token, showError]);
 
-  const visibleAssets =
-    user?.role === Role.OPERADOR ? assets.filter((asset) => asset.sectorId === user.sectorId) : assets;
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
@@ -143,7 +140,7 @@ export default function NovaSolicitacao() {
             label="Ativo"
             value={assetId}
             onChange={setAssetId}
-            options={visibleAssets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` }))}
+            options={assets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` }))}
             placeholder="Selecione um ativo"
             required
           />

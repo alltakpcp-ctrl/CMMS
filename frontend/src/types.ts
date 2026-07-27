@@ -27,6 +27,7 @@ export interface Asset {
   name: string;
   sectorId: string;
   sector?: Sector;
+  sectors?: { sector: Sector }[];
   location: string;
   criticality: number;
   preventivePeriodicityDays: number | null;

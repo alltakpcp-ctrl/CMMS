@@ -7,7 +7,6 @@ import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
-import { SearchableSelect } from "../../components/SearchableSelect";
 import { EmptyState } from "../../components/EmptyState";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
@@ -15,7 +14,7 @@ import { useToast } from "../../components/ToastProvider";
 interface AssetFormState {
   code: string;
   name: string;
-  sectorId: string;
+  sectorIds: string[];
   location: string;
   criticality: number;
   preventivePeriodicityDays: string;
@@ -24,7 +23,7 @@ interface AssetFormState {
 const emptyForm: AssetFormState = {
   code: "",
   name: "",
-  sectorId: "",
+  sectorIds: [],
   location: "",
   criticality: 3,
   preventivePeriodicityDays: "",
@@ -65,7 +64,10 @@ export default function Ativos() {
     setForm({
       code: asset.code,
       name: asset.name,
-      sectorId: asset.sectorId,
+      sectorIds:
+        asset.sectors && asset.sectors.length > 0
+          ? asset.sectors.map((s) => s.sector.id)
+          : [asset.sectorId],
       location: asset.location,
       criticality: asset.criticality,
       preventivePeriodicityDays: asset.preventivePeriodicityDays?.toString() ?? "",
@@ -73,15 +75,24 @@ export default function Ativos() {
     setShowForm(true);
   }
 
+  function toggleSector(sectorId: string) {
+    setForm((prev) => ({
+      ...prev,
+      sectorIds: prev.sectorIds.includes(sectorId)
+        ? prev.sectorIds.filter((id) => id !== sectorId)
+        : [...prev.sectorIds, sectorId],
+    }));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token || !form.sectorId) return;
+    if (!token || form.sectorIds.length === 0) return;
     setSubmitting(true);
     try {
       const payload = {
         code: form.code,
         name: form.name,
-        sectorId: form.sectorId,
+        sectorIds: form.sectorIds,
         location: form.location,
         criticality: Number(form.criticality),
         preventivePeriodicityDays: form.preventivePeriodicityDays
@@ -137,7 +148,13 @@ export default function Ativos() {
           columns={[
             { header: "Código", cell: (a) => a.code },
             { header: "Nome", cell: (a) => a.name },
-            { header: "Setor", cell: (a) => a.sector?.name ?? "—" },
+            {
+              header: "Setor",
+              cell: (a) =>
+                a.sectors && a.sectors.length > 0
+                  ? a.sectors.map((s) => s.sector.name).join(", ")
+                  : a.sector?.name ?? "—",
+            },
             { header: "Local", cell: (a) => a.location },
             { header: "Criticidade", cell: (a) => a.criticality },
             {
@@ -163,15 +180,27 @@ export default function Ativos() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
             <Input label="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <SearchableSelect
-              label="Setor"
-              value={form.sectorId}
-              onChange={(sectorId) => setForm({ ...form, sectorId })}
-              options={sectors.map((sector) => ({ value: sector.id, label: sector.name }))}
-              placeholder={loadingSectors ? "Carregando setores..." : "Selecione um setor"}
-              disabled={loadingSectors}
-              required
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Setores</label>
+              {loadingSectors && <p className="text-sm text-slate-500">Carregando setores...</p>}
+              {!loadingSectors && (
+                <div className="space-y-1 rounded border border-slate-300 p-2">
+                  {sectors.map((sector) => (
+                    <label key={sector.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.sectorIds.includes(sector.id)}
+                        onChange={() => toggleSector(sector.id)}
+                      />
+                      {sector.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {form.sectorIds.length === 0 && (
+                <p className="mt-1 text-xs text-red-600">Selecione ao menos um setor.</p>
+              )}
+            </div>
             <Input
               label="Localização"
               value={form.location}

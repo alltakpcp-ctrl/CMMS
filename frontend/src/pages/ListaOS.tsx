@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Role, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
 import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
@@ -36,9 +36,6 @@ export default function ListaOS() {
       .then(setAssets)
       .catch((err) => showError(getErrorMessage(err)));
   }, [token, showError]);
-
-  const visibleAssets =
-    user?.role === Role.OPERADOR ? assets.filter((asset) => asset.sectorId === user.sectorId) : assets;
 
   useEffect(() => {
     if (!token || !user) return;
@@ -104,7 +101,7 @@ export default function ListaOS() {
             onChange={setAssetId}
             options={[
               { value: "", label: "Todos" },
-              ...visibleAssets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` })),
+              ...assets.map((asset) => ({ value: asset.id, label: `${asset.code} — ${asset.name}` })),
             ]}
           />
         </div>
