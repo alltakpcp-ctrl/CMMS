@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Priority, Role, WorkOrderType } from "../domain/enums";
-import { PRIORITY_LABELS, TYPE_LABELS } from "../domain/labels";
+import { Disciplina, Priority, Role, WorkOrderType } from "../domain/enums";
+import { DISCIPLINA_LABELS, PRIORITY_LABELS, TYPE_LABELS } from "../domain/labels";
 import * as assetsApi from "../api/assets";
 import * as workOrdersApi from "../api/workorders";
 import { Asset } from "../types";
@@ -24,6 +24,7 @@ export default function NovaSolicitacao() {
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [type, setType] = useState<WorkOrderType>(WorkOrderType.CORRETIVA);
+  const [disciplina, setDisciplina] = useState<Disciplina>(Disciplina.ELETRICA);
   const [priority, setPriority] = useState<Priority>(Priority.MEDIA);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,6 +51,7 @@ export default function NovaSolicitacao() {
     try {
       const workOrder = await workOrdersApi.createWorkOrder(token, {
         type,
+        disciplina,
         priority,
         title,
         description,
@@ -97,6 +99,19 @@ export default function NovaSolicitacao() {
             {Object.values(WorkOrderType).map((value) => (
               <option key={value} value={value}>
                 {TYPE_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Disciplina"
+            value={disciplina}
+            onChange={(e) => setDisciplina(e.target.value as Disciplina)}
+            required
+          >
+            {Object.values(Disciplina).map((value) => (
+              <option key={value} value={value}>
+                {DISCIPLINA_LABELS[value]}
               </option>
             ))}
           </Select>

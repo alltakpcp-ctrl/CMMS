@@ -56,6 +56,7 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
       data: {
         number,
         type: input.type,
+        disciplina: input.disciplina,
         priority: input.priority,
         title: input.title,
         description: input.description,

@@ -18,6 +18,12 @@ export const WorkOrderType = {
 } as const;
 export type WorkOrderType = (typeof WorkOrderType)[keyof typeof WorkOrderType];
 
+export const Disciplina = {
+  ELETRICA: "ELETRICA",
+  MECANICA: "MECANICA",
+} as const;
+export type Disciplina = (typeof Disciplina)[keyof typeof Disciplina];
+
 export const WorkOrderStatus = {
   ABERTA: "ABERTA",
   TRIAGEM: "TRIAGEM",

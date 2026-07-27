@@ -82,6 +82,7 @@ model WorkOrder {
   id             String    @id @default(cuid())
   number         String    @unique
   type           String
+  disciplina     String    @default("ELETRICA")
   status         String    @default("ABERTA")
   priority       String
   title          String

@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import { Disciplina, Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 
 export const createWorkOrderSchema = z.object({
   type: z.nativeEnum(WorkOrderType),
+  disciplina: z.nativeEnum(Disciplina),
   priority: z.nativeEnum(Priority),
   title: z.string().min(1, "Título é obrigatório."),
   description: z.string().min(1, "Descrição é obrigatória."),

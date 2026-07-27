@@ -1,4 +1,5 @@
 import {
+  Disciplina,
   PartRequestItemType,
   PartRequestStatus,
   Priority,
@@ -18,6 +19,11 @@ export const TYPE_LABELS: Record<WorkOrderType, string> = {
   CORRETIVA: "Corretiva",
   PREVENTIVA: "Preventiva",
   PREDITIVA: "Preditiva",
+};
+
+export const DISCIPLINA_LABELS: Record<Disciplina, string> = {
+  ELETRICA: "Elétrica",
+  MECANICA: "Mecânica",
 };
 
 export const STATUS_LABELS: Record<WorkOrderStatus, string> = {

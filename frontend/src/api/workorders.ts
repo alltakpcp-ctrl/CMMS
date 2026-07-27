@@ -1,9 +1,10 @@
 import { apiRequest } from "./client";
 import { Paginated, WorkOrder } from "../types";
-import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Disciplina, Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export interface CreateWorkOrderInput {
   type: WorkOrderType;
+  disciplina: Disciplina;
   priority: Priority;
   title: string;
   description: string;
