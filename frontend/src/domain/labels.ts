@@ -24,6 +24,7 @@ export const TYPE_LABELS: Record<WorkOrderType, string> = {
 export const DISCIPLINA_LABELS: Record<Disciplina, string> = {
   ELETRICA: "Elétrica",
   MECANICA: "Mecânica",
+  PREDIAL: "Predial",
 };
 
 export const STATUS_LABELS: Record<WorkOrderStatus, string> = {

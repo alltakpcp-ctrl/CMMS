@@ -21,6 +21,7 @@ export type WorkOrderType = (typeof WorkOrderType)[keyof typeof WorkOrderType];
 export const Disciplina = {
   ELETRICA: "ELETRICA",
   MECANICA: "MECANICA",
+  PREDIAL: "PREDIAL",
 } as const;
 export type Disciplina = (typeof Disciplina)[keyof typeof Disciplina];
 
