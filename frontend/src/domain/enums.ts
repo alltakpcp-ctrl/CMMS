@@ -15,6 +15,7 @@ export const WorkOrderType = {
   CORRETIVA: "CORRETIVA",
   PREVENTIVA: "PREVENTIVA",
   PREDITIVA: "PREDITIVA",
+  MELHORIA: "MELHORIA",
 } as const;
 export type WorkOrderType = (typeof WorkOrderType)[keyof typeof WorkOrderType];
 

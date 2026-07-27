@@ -19,6 +19,7 @@ export const TYPE_LABELS: Record<WorkOrderType, string> = {
   CORRETIVA: "Corretiva",
   PREVENTIVA: "Preventiva",
   PREDITIVA: "Preditiva",
+  MELHORIA: "Melhoria",
 };
 
 export const DISCIPLINA_LABELS: Record<Disciplina, string> = {
