@@ -7,7 +7,7 @@ export const createUserSchema = z
     email: z.string().email("E-mail inválido."),
     password: z.string().min(6, "Senha deve ter ao menos 6 caracteres."),
     role: z.nativeEnum(Role),
-    sectorId: z.string().optional(),
+    sectorId: z.string().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === Role.OPERADOR && !data.sectorId) {
