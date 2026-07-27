@@ -39,6 +39,7 @@ model Sector {
   name      String   @unique
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   assets       Asset[]
   assetSectors AssetSector[]
