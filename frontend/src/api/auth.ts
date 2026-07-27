@@ -6,15 +6,10 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
-export function login(email: string, password: string, lat?: number, lng?: number) {
+export function login(email: string, password: string) {
   return apiRequest<LoginResponse>("/auth/login", {
     method: "POST",
-    body: {
-      email,
-      password,
-      ...(lat !== undefined ? { lat } : {}),
-      ...(lng !== undefined ? { lng } : {}),
-    },
+    body: { email, password },
   });
 }
 

@@ -147,34 +147,15 @@ export default function Login() {
     return <Navigate to={from} replace />;
   }
 
-  async function getCoords(): Promise<{ lat?: number; lng?: number }> {
-    if (!("geolocation" in navigator)) {
-      return {};
-    }
-
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-        () => resolve({}),
-        { enableHighAccuracy: false, timeout: 10000 }
-      );
-    });
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const { lat, lng } = await getCoords();
-      await login(email, password, lat, lng);
+      await login(email, password);
       navigate("/", { replace: true });
     } catch (err) {
-      if (err instanceof ApiError && (err.code === "GEO_REQUIRED" || err.code === "GEO_OUT_OF_RANGE")) {
-        setError(err.message);
-      } else {
-        setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente novamente.");
-      }
+      setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
