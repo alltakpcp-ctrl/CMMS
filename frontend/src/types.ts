@@ -1,4 +1,5 @@
 import {
+  Disciplina,
   PartRequestItemType,
   PartRequestStatus,
   Priority,
@@ -85,6 +86,7 @@ export interface WorkOrder {
   id: string;
   number: string;
   type: WorkOrderType;
+  disciplina: Disciplina;
   status: WorkOrderStatus;
   priority: Priority | null;
   title: string;

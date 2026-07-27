@@ -17,10 +17,12 @@ const publicWorkOrderSelect = {
   title: true,
   description: true,
   priority: true,
+  disciplina: true,
   createdAt: true,
   targetSector: { select: { name: true } },
   requester: { select: { name: true } },
   assignedTo: { select: { name: true } },
+  asset: { select: { name: true } },
 } as const;
 
 export async function listPublicOpenWorkOrdersController(_req: Request, res: Response) {

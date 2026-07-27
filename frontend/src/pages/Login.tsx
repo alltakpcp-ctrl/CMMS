@@ -5,7 +5,7 @@ import { ApiError } from "../api/client";
 import { getPublicWorkOrdersBoard, PublicOpenWorkOrder, PublicWorkOrdersBoard } from "../api/publicWorkorders";
 import { Badge } from "../components/Badge";
 import { Priority } from "../domain/enums";
-import { PRIORITY_COLORS, PRIORITY_LABELS } from "../domain/labels";
+import { DISCIPLINA_LABELS, PRIORITY_COLORS, PRIORITY_LABELS } from "../domain/labels";
 import { formatDateTime } from "../lib/format";
 
 const POLL_INTERVAL_MS = 30000;
@@ -28,19 +28,23 @@ function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
         <span className="text-sm font-semibold text-slate-900">{wo.number}</span>
         <Badge color={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge>
       </div>
-      <p className="text-sm font-medium text-slate-800">{wo.title}</p>
-      <p className="mt-1 line-clamp-2 text-sm text-slate-500">{wo.description}</p>
       <div className="mt-2 space-y-0.5 text-xs text-slate-600">
+        <p>
+          <span className="font-medium">Ativo:</span> {wo.asset.name}
+        </p>
+        <p>
+          <span className="font-medium">Disciplina:</span> {DISCIPLINA_LABELS[wo.disciplina]}
+        </p>
+        <p>
+          <span className="font-medium">Título:</span> {wo.title}
+        </p>
         <p>
           <span className="font-medium">Solicitante:</span> {wo.requester.name}
         </p>
         <p>
           <span className="font-medium">Técnico:</span> {wo.assignedTo?.name ?? "Não designado"}
         </p>
-        <p className="text-slate-500">
-          {wo.targetSector?.name && <>{wo.targetSector.name} · </>}
-          {formatDateTime(wo.createdAt)}
-        </p>
+        <p className="text-slate-500">{formatDateTime(wo.createdAt)}</p>
       </div>
     </div>
   );

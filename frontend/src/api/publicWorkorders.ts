@@ -1,15 +1,17 @@
 import { apiRequest } from "./client";
-import { Priority } from "../domain/enums";
+import { Disciplina, Priority } from "../domain/enums";
 
 export interface PublicOpenWorkOrder {
   number: string;
   title: string;
   description: string;
   priority: Priority;
+  disciplina: Disciplina;
   createdAt: string;
   targetSector: { name: string } | null;
   requester: { name: string };
   assignedTo: { name: string } | null;
+  asset: { name: string };
 }
 
 export interface PublicWorkOrdersBoard {
