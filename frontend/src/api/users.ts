@@ -23,6 +23,13 @@ export function listUsers(token: string) {
   return apiRequest<PublicUser[]>("/users", { token });
 }
 
+// Lista restrita a TECNICO ativo — liberada também para TECNICO (diferente de
+// listUsers, exclusivo de SUPERVISOR). Usada para seleção de manutentores de apoio.
+export function listTecnicos(token: string, excludeUserId?: string) {
+  const qs = excludeUserId ? `?excludeUserId=${encodeURIComponent(excludeUserId)}` : "";
+  return apiRequest<PublicUser[]>(`/users/tecnicos${qs}`, { token });
+}
+
 export function createUser(token: string, input: CreateUserInput) {
   return apiRequest<PublicUser>("/users", { method: "POST", token, body: input });
 }

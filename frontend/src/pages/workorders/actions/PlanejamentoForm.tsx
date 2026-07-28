@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../../auth/AuthContext";
+import { useTecnicos } from "../../../hooks/useTecnicos";
 import * as workOrdersApi from "../../../api/workorders";
 import * as partsApi from "../../../api/parts";
 import { Part } from "../../../types";
 import { Textarea } from "../../../components/Textarea";
 import { SearchableSelect } from "../../../components/SearchableSelect";
+import { MultiSearchableSelect } from "../../../components/MultiSearchableSelect";
 import { Input } from "../../../components/Input";
 import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
@@ -16,10 +18,10 @@ interface PartLine {
 }
 
 export function PlanejamentoForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [plan, setPlan] = useState("");
-  const [numMaintainers, setNumMaintainers] = useState<number | "">("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [tools, setTools] = useState<string[]>([]);
   const [toolInput, setToolInput] = useState("");
@@ -35,6 +37,13 @@ export function PlanejamentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
       .then(setAvailableParts)
       .catch((err) => setError(getErrorMessage(err)));
   }, [token]);
+
+  // Exclui o responsável já designado (se houver) e o próprio usuário — nenhum
+  // dos dois pode constar como manutentor de apoio (ver workorders/service.ts).
+  const { tecnicos } = useTecnicos(workOrder.assignedToId ?? user?.id);
+  const tecnicoOptions = tecnicos
+    .filter((t) => t.id !== workOrder.assignedToId)
+    .map((t) => ({ value: t.id, label: t.name }));
 
   function addPartLine() {
     setPartLines((current) => [...current, { partId: "", quantity: 1 }]);
@@ -79,10 +88,10 @@ export function PlanejamentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
       const validPartLines = partLines.filter((l) => l.partId && l.quantity > 0);
       const updated = await workOrdersApi.planejamento(token, workOrder.id, {
         plan,
-        numMaintainers: numMaintainers === "" ? undefined : numMaintainers,
         plannedParts: validPartLines.length > 0 ? validPartLines : undefined,
         tools: tools.length > 0 ? tools : undefined,
         ppe: ppe.length > 0 ? ppe : undefined,
+        assigneeIds,
       });
       onSuccess(updated);
     } catch (err) {
@@ -101,13 +110,18 @@ export function PlanejamentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
         required
       />
 
-      <Input
-        label="Nº de manutentores"
-        type="number"
-        min={1}
-        value={numMaintainers}
-        onChange={(e) => setNumMaintainers(e.target.value === "" ? "" : Number(e.target.value))}
-      />
+      <div>
+        <MultiSearchableSelect
+          label="Manutentores de apoio (além do responsável principal)"
+          value={assigneeIds}
+          onChange={setAssigneeIds}
+          options={tecnicoOptions}
+          placeholder="Buscar técnico…"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Manutentores envolvidos: {1 + assigneeIds.length} (1 responsável principal + {assigneeIds.length} de apoio)
+        </p>
+      </div>
 
       <div>
         <div className="mb-2 flex items-center justify-between">

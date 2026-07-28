@@ -29,11 +29,11 @@ export interface TriagemInput {
 
 export interface PlanejamentoInput {
   plan: string;
-  numMaintainers?: number;
   estimatedMinutes?: number;
   plannedParts?: Array<{ partId: string; quantity: number }>;
   tools?: string[];
   ppe?: string[];
+  assigneeIds?: string[];
 }
 
 export interface ProgramacaoInput {
@@ -44,6 +44,7 @@ export interface ProgramacaoInput {
 
 export interface IniciarInput {
   riskAnalysis: string;
+  assigneeIds?: string[];
 }
 
 export interface RegistrarInput {

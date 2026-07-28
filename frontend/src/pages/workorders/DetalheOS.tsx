@@ -178,6 +178,21 @@ export default function DetalheOS() {
               <dd className="text-slate-900">{workOrder.requester.name}</dd>
               <dt className="text-slate-500">Responsável</dt>
               <dd className="text-slate-900">{workOrder.assignedTo?.name ?? "—"}</dd>
+              {workOrder.assignees.length > 0 && (
+                <>
+                  <dt className="text-slate-500">Apoio</dt>
+                  <dd className="flex flex-wrap gap-1">
+                    {workOrder.assignees.map((assignee) => (
+                      <span
+                        key={assignee.id}
+                        className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                      >
+                        {assignee.user.name}
+                      </span>
+                    ))}
+                  </dd>
+                </>
+              )}
               <dt className="text-slate-500">Programação</dt>
               <dd className="text-slate-900">
                 {workOrder.scheduledStart ? formatDateTime(workOrder.scheduledStart) : "—"}

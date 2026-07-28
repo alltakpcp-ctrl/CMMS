@@ -72,6 +72,13 @@ export interface WorkOrderPlannedPart {
   part: Part;
 }
 
+export interface WorkOrderAssignee {
+  id: string;
+  workOrderId: string;
+  userId: string;
+  user: { id: string; name: string };
+}
+
 export interface StatusHistoryEntry {
   id: string;
   workOrderId: string;
@@ -99,6 +106,7 @@ export interface WorkOrder {
   targetSectorId: string | null;
   targetSector?: Sector | null;
   plan: string | null;
+  // Derivado no backend (assignees.length + 1) — não é mais um input do form.
   numMaintainers: number | null;
   estimatedMinutes: number | null;
   tools: string[] | null;
@@ -107,6 +115,7 @@ export interface WorkOrder {
   scheduledEnd: string | null;
   assignedToId: string | null;
   assignedTo: PublicUser | null;
+  assignees: WorkOrderAssignee[];
   createdAt: string;
   updatedAt: string;
   execution: Execution | null;
