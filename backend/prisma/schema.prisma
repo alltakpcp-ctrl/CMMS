@@ -32,6 +32,7 @@ model User {
   partRequestsCreated   PartRequest[]   @relation("partRequestsCreated")
   purchaseOrdersCreated PurchaseOrder[] @relation("purchaseOrdersCreated")
   purchaseOrdersReviewed PurchaseOrder[] @relation("purchaseOrdersReviewed")
+  assigneeOf          WorkOrderAssignee[]
 }
 
 model Sector {
@@ -109,6 +110,9 @@ model WorkOrder {
   targetSectorId String?
   targetSector   Sector?   @relation(fields: [targetSectorId], references: [id], onDelete: Restrict)
   plan           String?
+  // @deprecated como input — agora derivado de assignees.count + 1 (responsável
+  // principal + manutentores de apoio). Mantido como coluna para não quebrar
+  // dados existentes; não deve mais ser aceito diretamente pela API.
   numMaintainers   Int?
   estimatedMinutes Int?
   safetyEquipment  String?   // @deprecated usar ppe
@@ -132,6 +136,23 @@ model WorkOrder {
   statusHistory  StatusHistory[]
   partRequests   PartRequest[]
   plannedPartItems WorkOrderPlannedPart[]
+  assignees        WorkOrderAssignee[]
+}
+
+// Manutentores de apoio (N:N), distintos do responsável principal
+// (WorkOrder.assignedToId). Preenchida em planejamento()/iniciar() —
+// numMaintainers passa a ser derivado de assignees.count + 1.
+model WorkOrderAssignee {
+  id          String    @id @default(cuid())
+  workOrderId String
+  userId      String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([workOrderId, userId])
+  @@index([workOrderId])
+  @@index([userId])
 }
 
 model Execution {

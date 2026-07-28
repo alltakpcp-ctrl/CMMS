@@ -10,6 +10,21 @@ export async function listUsers() {
   return prisma.user.findMany({ select: publicUserSelect, orderBy: { name: "asc" } });
 }
 
+// Lista restrita a TECNICO ativo — usada para popular a seleção de
+// manutentores de apoio (planejamento/iniciar), inclusive por TECNICO,
+// diferente de listUsers (CRUD completo, exclusivo de SUPERVISOR).
+export async function listTecnicos(excludeUserId?: string) {
+  return prisma.user.findMany({
+    where: {
+      role: Role.TECNICO,
+      active: true,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: publicUserSelect,
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function createUser(input: CreateUserInput) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) {

@@ -33,11 +33,13 @@ export const plannedPartSchema = z.object({
 
 export const planejamentoSchema = z.object({
   plan: z.string().min(1, "Plano é obrigatório."),
-  numMaintainers: z.number().int().positive().optional(),
+  // numMaintainers não é mais aceito como input — é derivado de
+  // assigneeIds.length + 1 (responsável principal) em workorders/service.ts.
   estimatedMinutes: z.number().int().positive().optional(),
   plannedParts: z.array(plannedPartSchema).optional(),
   tools: z.array(z.string().min(1)).optional(),
   ppe: z.array(z.string().min(1)).optional(),
+  assigneeIds: z.array(z.string().min(1)).optional().default([]),
 });
 
 export const programacaoSchema = z.object({
@@ -62,6 +64,7 @@ export const reprogramacaoSchema = z
 
 export const iniciarSchema = z.object({
   riskAnalysis: z.string().min(1, "Análise de risco é obrigatória."),
+  assigneeIds: z.array(z.string().min(1)).optional().default([]),
 });
 
 export const registrarSchema = z.object({

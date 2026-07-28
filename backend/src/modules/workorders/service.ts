@@ -27,10 +27,56 @@ const workOrderInclude = {
   targetSector: true,
   requester: { select: publicUserSelect },
   assignedTo: { select: publicUserSelect },
+  assignees: { include: { user: { select: { id: true, name: true } } } },
   execution: true,
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
 } satisfies Prisma.WorkOrderInclude;
+
+// Valida a lista de manutentores de apoio (assigneeIds) para planejamento()/
+// iniciar(): dedup, todos devem ser TECNICO ativo, e nenhum pode coincidir
+// com o responsável principal (rejectIds) — ou é removido da lista
+// silenciosamente quando for o próprio auto-atribuído (excludeIds), caso do
+// início imediato em iniciar().
+async function resolveAssigneeIds(
+  tx: Prisma.TransactionClient,
+  assigneeIds: string[],
+  options: { rejectIds?: Array<string | null | undefined>; excludeIds?: Array<string | null | undefined> } = {}
+): Promise<string[]> {
+  const excludeSet = new Set(options.excludeIds?.filter((id): id is string => Boolean(id)));
+  const rejectSet = new Set(options.rejectIds?.filter((id): id is string => Boolean(id)));
+
+  const deduped = Array.from(new Set(assigneeIds)).filter((id) => !excludeSet.has(id));
+
+  if (deduped.some((id) => rejectSet.has(id))) {
+    throw new AppError(
+      422,
+      "INVALID_ASSIGNEE",
+      "O responsável pela OS não pode constar também como manutentor de apoio."
+    );
+  }
+
+  if (deduped.length === 0) {
+    return [];
+  }
+
+  const found = await tx.user.findMany({
+    where: { id: { in: deduped } },
+    select: { id: true, role: true, active: true },
+  });
+  const validIds = new Set(found.filter((u) => u.role === Role.TECNICO && u.active).map((u) => u.id));
+  const allValid = deduped.every((id) => validIds.has(id));
+
+  if (!allValid) {
+    throw new AppError(
+      422,
+      "INVALID_ASSIGNEE",
+      "Todos os manutentores de apoio devem ser usuários TECNICO ativos."
+    );
+  }
+
+  return deduped;
+}
 
 export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
   const asset = await prisma.asset.findUnique({ where: { id: input.assetId } });
@@ -258,7 +304,7 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
     to: WorkOrderStatus.PLANEJADA,
     role: user.role,
     userId: user.userId,
-    mutate: async (tx) => {
+    mutate: async (tx, workOrder) => {
       const plannedParts = input.plannedParts ?? [];
 
       if (plannedParts.length > 0) {
@@ -277,15 +323,25 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
         }
       }
 
+      // O responsável (atual assignedTo, se já houver, e o próprio usuário
+      // logado) nunca entra como manutentor de apoio.
+      const assigneeIds = await resolveAssigneeIds(tx, input.assigneeIds ?? [], {
+        rejectIds: [user.userId, workOrder.assignedToId],
+      });
+
       return {
         plan: input.plan,
-        numMaintainers: input.numMaintainers,
         estimatedMinutes: input.estimatedMinutes,
         tools: input.tools,
         ppe: input.ppe,
         plannedPartItems: {
           create: plannedParts.map((p) => ({ partId: p.partId, quantity: p.quantity })),
         },
+        assignees: {
+          deleteMany: {},
+          create: assigneeIds.map((assigneeId) => ({ userId: assigneeId })),
+        },
+        numMaintainers: 1 + assigneeIds.length,
       };
     },
   });
@@ -403,13 +459,27 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
 
       // Início direto da TRIAGEM ou PLANEJADA (prioridade URGENTE, ver
       // workOrderStateMachine): o técnico ainda não é o assignedTo — auto-atribui.
-      if (
+      const isImmediateStart =
         (workOrder.status === WorkOrderStatus.TRIAGEM || workOrder.status === WorkOrderStatus.PLANEJADA) &&
-        !workOrder.assignedToId
-      ) {
-        return { assignedTo: { connect: { id: user.userId } } };
-      }
-      return {};
+        !workOrder.assignedToId;
+      const principalId = isImmediateStart ? user.userId : workOrder.assignedToId;
+
+      // O principal (auto-atribuído ou já designado na programação) é
+      // silenciosamente excluído se vier na lista de apoio — diferente de
+      // planejamento(), aqui não é erro do usuário, é o próprio fluxo de
+      // auto-atribuição que o torna redundante na lista.
+      const assigneeIds = await resolveAssigneeIds(tx, input.assigneeIds ?? [], {
+        excludeIds: [principalId],
+      });
+
+      return {
+        ...(isImmediateStart ? { assignedTo: { connect: { id: user.userId } } } : {}),
+        assignees: {
+          deleteMany: {},
+          create: assigneeIds.map((assigneeId) => ({ userId: assigneeId })),
+        },
+        numMaintainers: 1 + assigneeIds.length,
+      };
     },
   });
 }

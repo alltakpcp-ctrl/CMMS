@@ -43,6 +43,10 @@ export const updateUserSchema = z
     }
   });
 
+export const listTecnicosQuerySchema = z.object({
+  excludeUserId: z.string().min(1).optional(),
+});
+
 export const changePasswordSchema = z.object({
   password: z
     .string()
@@ -55,3 +59,4 @@ export const changePasswordSchema = z.object({
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ListTecnicosQuery = z.infer<typeof listTecnicosQuerySchema>;

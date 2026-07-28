@@ -1,10 +1,15 @@
 import { Request, Response } from "express";
 import { AppError } from "../../lib/AppError";
-import { changePasswordSchema, createUserSchema, updateUserSchema } from "./schema";
+import { changePasswordSchema, createUserSchema, listTecnicosQuerySchema, updateUserSchema } from "./schema";
 import * as usersService from "./service";
 
 export async function listUsersController(_req: Request, res: Response) {
   res.json(await usersService.listUsers());
+}
+
+export async function listTecnicosController(req: Request, res: Response) {
+  const query = listTecnicosQuerySchema.parse(req.query);
+  res.json(await usersService.listTecnicos(query.excludeUserId));
 }
 
 export async function createUserController(req: Request, res: Response) {

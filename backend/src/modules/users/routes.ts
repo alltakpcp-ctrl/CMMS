@@ -4,6 +4,7 @@ import {
   changePasswordController,
   createUserController,
   deleteUserController,
+  listTecnicosController,
   listUsersController,
   updateUserController,
 } from "./controller";
@@ -12,6 +13,16 @@ import { authorize } from "../../middlewares/authorize";
 import { asyncHandler } from "../../lib/asyncHandler";
 
 export const usersRoutes = Router();
+
+// Lista de apoio para seleção de manutentores — liberada também para TECNICO
+// (diferente do CRUD de usuários abaixo, exclusivo de SUPERVISOR). Precisa
+// ficar registrada antes do usersRoutes.use(authorize(SUPERVISOR)) global.
+usersRoutes.get(
+  "/tecnicos",
+  authenticate,
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(listTecnicosController)
+);
 
 usersRoutes.use(authenticate, authorize(Role.SUPERVISOR));
 
