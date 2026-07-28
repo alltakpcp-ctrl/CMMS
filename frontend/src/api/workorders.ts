@@ -39,7 +39,7 @@ export interface PlanejamentoInput {
 export interface ProgramacaoInput {
   scheduledStart: string;
   scheduledEnd: string;
-  assignedToId: string;
+  assigneeIds: string[];
 }
 
 export interface IniciarInput {

@@ -90,7 +90,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
       .send({
         scheduledStart: new Date().toISOString(),
         scheduledEnd: new Date(Date.now() + 3600_000).toISOString(),
-        assignedToId: tecnicoId,
+        assigneeIds: [tecnicoId],
       });
     expect(programacao.status).toBe(200);
     expect(programacao.body.status).toBe("PROGRAMADA");
@@ -183,7 +183,7 @@ describe("caminhos de erro", () => {
       .send({
         scheduledStart: new Date().toISOString(),
         scheduledEnd: new Date(Date.now() + 3600_000).toISOString(),
-        assignedToId: tecnicoId,
+        assigneeIds: [tecnicoId],
       });
 
     expect(res.status).toBe(409);
@@ -211,7 +211,7 @@ describe("caminhos de erro", () => {
       .send({
         scheduledStart: new Date().toISOString(),
         scheduledEnd: new Date(Date.now() + 3600_000).toISOString(),
-        assignedToId: tecnicoId,
+        assigneeIds: [tecnicoId],
       });
     await request(app)
       .post(`/workorders/${id}/iniciar`)

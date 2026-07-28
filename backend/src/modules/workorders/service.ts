@@ -356,21 +356,21 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
     context: {
       hasScheduledStart: Boolean(input.scheduledStart),
       hasScheduledEnd: Boolean(input.scheduledEnd),
-      hasAssignedTechnician: Boolean(input.assignedToId),
+      hasAssignedTechnician: Boolean(input.assigneeIds?.length),
     },
     mutate: async (tx) => {
-      const tecnico = await tx.user.findUnique({ where: { id: input.assignedToId } });
-      if (!tecnico || tecnico.role !== Role.TECNICO || !tecnico.active) {
-        throw new AppError(
-          422,
-          "INVALID_ASSIGNEE",
-          "O responsável designado deve ser um usuário TECNICO ativo."
-        );
-      }
+      // Primeiro id vira o responsável principal (assignedToId); os demais
+      // (deduplicados) somam aos manutentores de apoio já existentes na OS —
+      // skipDuplicates evita recriar vínculos já presentes em WorkOrderAssignee.
+      const [principalId, ...supportIds] = await resolveAssigneeIds(tx, input.assigneeIds);
+
       return {
         scheduledStart: input.scheduledStart,
         scheduledEnd: input.scheduledEnd,
-        assignedToId: input.assignedToId,
+        assignedToId: principalId,
+        assignees: {
+          createMany: { data: supportIds.map((assigneeId) => ({ userId: assigneeId })), skipDuplicates: true },
+        },
       };
     },
   });

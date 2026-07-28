@@ -45,7 +45,7 @@ export const planejamentoSchema = z.object({
 export const programacaoSchema = z.object({
   scheduledStart: z.coerce.date(),
   scheduledEnd: z.coerce.date(),
-  assignedToId: z.string().min(1, "Técnico responsável é obrigatório."),
+  assigneeIds: z.array(z.string().min(1)).min(1, "Selecione ao menos um técnico."),
 });
 
 export const reprogramacaoSchema = z

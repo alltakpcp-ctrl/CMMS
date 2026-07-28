@@ -1,42 +1,37 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useAuth } from "../../../auth/AuthContext";
-import { Role } from "../../../domain/enums";
+import { useTecnicos } from "../../../hooks/useTecnicos";
 import * as workOrdersApi from "../../../api/workorders";
-import * as usersApi from "../../../api/users";
-import { PublicUser } from "../../../types";
 import { Input } from "../../../components/Input";
-import { Select } from "../../../components/Select";
+import { MultiSearchableSelect } from "../../../components/MultiSearchableSelect";
 import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
 import { ActionFormProps } from "./types";
 
 export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
   const { token } = useAuth();
-  const [tecnicos, setTecnicos] = useState<PublicUser[]>([]);
+  const { tecnicos } = useTecnicos();
+  const tecnicoOptions = tecnicos.map((t) => ({ value: t.id, label: t.name }));
   const [scheduledStart, setScheduledStart] = useState("");
   const [scheduledEnd, setScheduledEnd] = useState("");
-  const [assignedToId, setAssignedToId] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!token) return;
-    usersApi
-      .listUsers(token)
-      .then((users) => setTecnicos(users.filter((u) => u.role === Role.TECNICO && u.active)))
-      .catch((err) => setError(getErrorMessage(err)));
-  }, [token]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (assigneeIds.length === 0) {
+      setError("Selecione ao menos um técnico.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const updated = await workOrdersApi.programacao(token, workOrder.id, {
         scheduledStart: new Date(scheduledStart).toISOString(),
         scheduledEnd: new Date(scheduledEnd).toISOString(),
-        assignedToId,
+        assigneeIds,
       });
       onSuccess(updated);
     } catch (err) {
@@ -62,16 +57,13 @@ export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormPro
         onChange={(e) => setScheduledEnd(e.target.value)}
         required
       />
-      <Select label="Técnico responsável" value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} required>
-        <option value="" disabled>
-          Selecione um técnico
-        </option>
-        {tecnicos.map((tecnico) => (
-          <option key={tecnico.id} value={tecnico.id}>
-            {tecnico.name}
-          </option>
-        ))}
-      </Select>
+      <MultiSearchableSelect
+        label="Técnicos"
+        value={assigneeIds}
+        onChange={setAssigneeIds}
+        options={tecnicoOptions}
+        placeholder="Buscar técnico…"
+      />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
