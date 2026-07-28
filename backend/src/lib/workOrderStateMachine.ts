@@ -1,4 +1,4 @@
-import { Priority, Role, WorkOrderStatus } from "../domain/enums";
+import { Role, WorkOrderStatus } from "../domain/enums";
 
 export type TransitionErrorCode =
   | "ROLE_FORBIDDEN"
@@ -53,25 +53,19 @@ const TRANSITIONS: TransitionRule[] = [
     roles: [Role.TECNICO],
     requireAssignedTechnician: true,
   },
-  // Prioridade final URGENTE (definida na triagem) libera o próprio técnico
-  // a iniciar direto, sem passar pela programação do supervisor.
+  // O próprio técnico pode iniciar direto da triagem, em qualquer prioridade,
+  // sem passar pela programação do supervisor.
   {
     from: WorkOrderStatus.TRIAGEM,
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
-    guard: (context) => context.priority === Priority.URGENTE,
-    guardErrorCode: "PRIORITY_NOT_URGENT",
-    guardErrorMessage: "Só é possível iniciar direto da triagem quando a prioridade final for URGENTE.",
   },
-  // Mesma lógica, mas quando o planejamento já foi feito antes de a prioridade
-  // final ser reavaliada como URGENTE — pula a programação do supervisor.
+  // Mesma lógica, mas quando o planejamento já foi feito antes de o técnico
+  // iniciar — pula a programação do supervisor.
   {
     from: WorkOrderStatus.PLANEJADA,
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
-    guard: (context) => context.priority === Priority.URGENTE,
-    guardErrorCode: "PRIORITY_NOT_URGENT",
-    guardErrorMessage: "Só é possível iniciar direto quando a prioridade for URGENTE.",
   },
   {
     from: WorkOrderStatus.EM_EXECUCAO,
