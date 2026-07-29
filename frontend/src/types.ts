@@ -118,7 +118,7 @@ export interface WorkOrder {
   assignees: WorkOrderAssignee[];
   createdAt: string;
   updatedAt: string;
-  execution: Execution | null;
+  executions: Execution[];
   parts: WorkOrderPart[];
   plannedPartItems: WorkOrderPlannedPart[];
   statusHistory?: StatusHistoryEntry[];

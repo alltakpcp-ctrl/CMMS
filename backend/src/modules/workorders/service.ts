@@ -28,7 +28,7 @@ const workOrderInclude = {
   requester: { select: publicUserSelect },
   assignedTo: { select: publicUserSelect },
   assignees: { include: { user: { select: { id: true, name: true } } } },
-  execution: true,
+  executions: { orderBy: { startedAt: "asc" } },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
 } satisfies Prisma.WorkOrderInclude;
@@ -453,6 +453,22 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
     role: user.role,
     userId: user.userId,
     mutate: async (tx, workOrder) => {
+      // Invariante: no máximo uma execução em aberto (finishedAt = null) por OS.
+      // Reinício após override do supervisor (OS devolvida a PROGRAMADA com a
+      // execução anterior já fechada) abre um novo ciclo; reinício indevido
+      // com um ciclo ainda aberto é rejeitado em vez de duplicar a linha.
+      const openExecution = await tx.execution.findFirst({
+        where: { workOrderId: id, finishedAt: null },
+        select: { id: true },
+      });
+      if (openExecution) {
+        throw new AppError(
+          409,
+          "EXECUTION_ALREADY_OPEN",
+          "Já existe uma execução em aberto para esta OS."
+        );
+      }
+
       await tx.execution.create({
         data: { workOrderId: id, riskAnalysis: input.riskAnalysis, startedAt: new Date() },
       });
@@ -512,8 +528,16 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
       );
     }
 
+    const openExecution = await tx.execution.findFirst({
+      where: { workOrderId: id, finishedAt: null },
+      select: { id: true },
+    });
+    if (!openExecution) {
+      throw new AppError(409, "NO_OPEN_EXECUTION", "Nenhuma execução em aberto para atualizar.");
+    }
+
     await tx.execution.update({
-      where: { workOrderId: id },
+      where: { id: openExecution.id },
       data: { rootCause: input.rootCause, repairDescription: input.repairDescription },
     });
 
@@ -545,8 +569,16 @@ export function encerramentoTecnico(id: string, input: EncerramentoTecnicoInput,
     role: user.role,
     userId: user.userId,
     mutate: async (tx) => {
+      const openExecution = await tx.execution.findFirst({
+        where: { workOrderId: id, finishedAt: null },
+        select: { id: true },
+      });
+      if (!openExecution) {
+        throw new AppError(409, "NO_OPEN_EXECUTION", "Nenhuma execução em aberto para encerrar.");
+      }
+
       await tx.execution.update({
-        where: { workOrderId: id },
+        where: { id: openExecution.id },
         data: { testNotes: input.testNotes, cleanupDone: input.cleanupDone, finishedAt: new Date() },
       });
     },

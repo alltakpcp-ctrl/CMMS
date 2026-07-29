@@ -31,7 +31,7 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
       targetSectorId: true,
       priority: true,
       scheduledStart: true,
-      execution: { select: { startedAt: true, finishedAt: true } },
+      executions: { select: { startedAt: true, finishedAt: true } },
     },
   });
 
@@ -43,7 +43,7 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
     targetSectorId: wo.targetSectorId,
     priority: wo.priority as Priority | null,
     scheduledStart: wo.scheduledStart,
-    execution: wo.execution,
+    executions: wo.executions,
   }));
 }
 

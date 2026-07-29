@@ -211,45 +211,49 @@ export default function DetalheOS() {
             )}
           </Card>
 
-          {workOrder.execution && (
-            <Card>
-              <h2 className="mb-3 text-sm font-semibold text-slate-900">Execução</h2>
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
-                <dt className="text-slate-500">Início</dt>
-                <dd className="text-slate-900">{formatDateTime(workOrder.execution.startedAt)}</dd>
-                <dt className="text-slate-500">Fim</dt>
-                <dd className="text-slate-900">{formatDateTime(workOrder.execution.finishedAt)}</dd>
-                <dt className="text-slate-500">5S / Limpeza</dt>
-                <dd className="text-slate-900">{workOrder.execution.cleanupDone ? "Sim" : "Não"}</dd>
-              </dl>
-              {workOrder.execution.riskAnalysis && (
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-slate-700">Análise de risco</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{workOrder.execution.riskAnalysis}</p>
-                </div>
-              )}
-              {workOrder.execution.rootCause && (
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-slate-700">Causa raiz</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{workOrder.execution.rootCause}</p>
-                </div>
-              )}
-              {workOrder.execution.repairDescription && (
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-slate-700">Reparo realizado</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {workOrder.execution.repairDescription}
-                  </p>
-                </div>
-              )}
-              {workOrder.execution.testNotes && (
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-slate-700">Notas de teste</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{workOrder.execution.testNotes}</p>
-                </div>
-              )}
-            </Card>
-          )}
+          {workOrder.executions.length > 0 &&
+            workOrder.executions.map((execution, index) => (
+              <Card key={execution.id}>
+                <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                  Execução — Ciclo {index + 1}
+                  {execution.startedAt ? ` (${formatDateTime(execution.startedAt)})` : ""}
+                </h2>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                  <dt className="text-slate-500">Início</dt>
+                  <dd className="text-slate-900">{formatDateTime(execution.startedAt)}</dd>
+                  <dt className="text-slate-500">Fim</dt>
+                  <dd className="text-slate-900">{formatDateTime(execution.finishedAt)}</dd>
+                  <dt className="text-slate-500">5S / Limpeza</dt>
+                  <dd className="text-slate-900">{execution.cleanupDone ? "Sim" : "Não"}</dd>
+                </dl>
+                {execution.riskAnalysis && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Análise de risco</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.riskAnalysis}</p>
+                  </div>
+                )}
+                {execution.rootCause && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Causa raiz</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.rootCause}</p>
+                  </div>
+                )}
+                {execution.repairDescription && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Reparo realizado</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                      {execution.repairDescription}
+                    </p>
+                  </div>
+                )}
+                {execution.testNotes && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Notas de teste</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.testNotes}</p>
+                  </div>
+                )}
+              </Card>
+            ))}
 
           {workOrder.parts.length > 0 && (
             <Card>

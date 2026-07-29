@@ -17,7 +17,7 @@ function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators 
     targetSectorId: "sector-mecanica",
     priority: Priority.MEDIA,
     scheduledStart: null,
-    execution: null,
+    executions: [],
     ...overrides,
   };
 }
@@ -31,10 +31,10 @@ describe("calculateMttr", () => {
   it("calcula a média em horas de OS encerradas com execução completa", () => {
     const workOrders = [
       wo({
-        execution: { startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") },
+        executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") }],
       }), // 2h
       wo({
-        execution: { startedAt: new Date("2026-01-02T08:00:00Z"), finishedAt: new Date("2026-01-02T12:00:00Z") },
+        executions: [{ startedAt: new Date("2026-01-02T08:00:00Z"), finishedAt: new Date("2026-01-02T12:00:00Z") }],
       }), // 4h
     ];
     const result = calculateMttr(workOrders);
@@ -44,8 +44,8 @@ describe("calculateMttr", () => {
 
   it("ignora OS não encerradas ou sem execução completa", () => {
     const workOrders = [
-      wo({ status: WorkOrderStatus.EM_EXECUCAO, execution: { startedAt: new Date(), finishedAt: null } }),
-      wo({ status: WorkOrderStatus.ENCERRADA, execution: null }),
+      wo({ status: WorkOrderStatus.EM_EXECUCAO, executions: [{ startedAt: new Date(), finishedAt: null }] }),
+      wo({ status: WorkOrderStatus.ENCERRADA, executions: [] }),
     ];
     const result = calculateMttr(workOrders);
     expect(result.overall).toEqual({ hours: null, sampleSize: 0 });
@@ -65,10 +65,10 @@ describe("calculateMtbf", () => {
     // MTBF = (49 - 3) / 2 = 23h
     const workOrders = [
       wo({
-        execution: { startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") },
+        executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") }],
       }),
       wo({
-        execution: { startedAt: new Date("2026-01-03T08:00:00Z"), finishedAt: new Date("2026-01-03T09:00:00Z") },
+        executions: [{ startedAt: new Date("2026-01-03T08:00:00Z"), finishedAt: new Date("2026-01-03T09:00:00Z") }],
       }),
     ];
     const result = calculateMtbf(workOrders);
@@ -80,7 +80,7 @@ describe("calculateMtbf", () => {
     const workOrders = [
       wo({
         type: WorkOrderType.PREVENTIVA,
-        execution: { startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") },
+        executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") }],
       }),
     ];
     const result = calculateMtbf(workOrders);
@@ -98,13 +98,13 @@ describe("calculateAdherence", () => {
     const workOrders = [
       wo({
         scheduledStart: new Date("2026-01-05T08:00:00Z"),
-        execution: { startedAt: new Date("2026-01-05T09:30:00Z"), finishedAt: null },
+        executions: [{ startedAt: new Date("2026-01-05T09:30:00Z"), finishedAt: null }],
       }), // no prazo
       wo({
         scheduledStart: new Date("2026-01-06T08:00:00Z"),
-        execution: { startedAt: new Date("2026-01-07T08:00:00Z"), finishedAt: null },
+        executions: [{ startedAt: new Date("2026-01-07T08:00:00Z"), finishedAt: null }],
       }), // atrasada
-      wo({ scheduledStart: new Date("2026-01-08T08:00:00Z"), execution: null }), // ainda não iniciou
+      wo({ scheduledStart: new Date("2026-01-08T08:00:00Z"), executions: [] }), // ainda não iniciou
     ];
     const result = calculateAdherence(workOrders);
     expect(result.totalScheduled).toBe(3);

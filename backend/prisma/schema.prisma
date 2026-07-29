@@ -131,7 +131,7 @@ model WorkOrder {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  execution      Execution?
+  executions     Execution[]
   parts          WorkOrderPart[]
   statusHistory  StatusHistory[]
   partRequests   PartRequest[]
@@ -157,7 +157,7 @@ model WorkOrderAssignee {
 
 model Execution {
   id                String    @id @default(cuid())
-  workOrderId       String    @unique
+  workOrderId       String
   workOrder         WorkOrder @relation(fields: [workOrderId], references: [id])
   riskAnalysis      String?
   rootCause         String?
@@ -166,6 +166,8 @@ model Execution {
   finishedAt        DateTime?
   testNotes         String?
   cleanupDone       Boolean   @default(false)
+
+  @@index([workOrderId])
 }
 
 model WorkOrderPart {
