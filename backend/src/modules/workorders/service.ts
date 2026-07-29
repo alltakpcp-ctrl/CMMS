@@ -628,6 +628,12 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
     role: user.role,
     userId: user.userId,
     note: input.note,
+    mutate: async (tx) => {
+      await tx.execution.updateMany({
+        where: { workOrderId: id, finishedAt: null },
+        data: { finishedAt: new Date() },
+      });
+    },
   });
 }
 
