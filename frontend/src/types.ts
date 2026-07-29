@@ -44,16 +44,26 @@ export interface Part {
   createdAt: string;
 }
 
+export interface ExecutionLog {
+  id: string;
+  note: string;
+  createdAt: string;
+  author: { id: string; name: string };
+}
+
 export interface Execution {
   id: string;
   workOrderId: string;
   riskAnalysis: string | null;
+  // @deprecated registro legado (pré-ExecutionLog) — ver `logs`.
   rootCause: string | null;
+  // @deprecated ver rootCause acima.
   repairDescription: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   testNotes: string | null;
   cleanupDone: boolean;
+  logs: ExecutionLog[];
 }
 
 export interface WorkOrderPart {

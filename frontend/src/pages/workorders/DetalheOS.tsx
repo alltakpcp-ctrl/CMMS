@@ -44,7 +44,7 @@ const ACTION_LABELS: Record<ActionKey, string> = {
   planejamento: "Planejar",
   programacao: "Programar",
   iniciar: "Iniciar execução",
-  registrar: "Registrar execução",
+  registrar: "Adicionar registro",
   encerramento: "Encerramento técnico",
   validar: "Validar",
   cancelar: "Cancelar OS",
@@ -244,6 +244,21 @@ export default function DetalheOS() {
                     <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
                       {execution.repairDescription}
                     </p>
+                  </div>
+                )}
+                {execution.logs.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Histórico de registros</p>
+                    <ul className="mt-1 space-y-2">
+                      {execution.logs.map((log) => (
+                        <li key={log.id} className="border-l-2 border-slate-200 pl-2">
+                          <p className="whitespace-pre-line text-sm text-slate-600">{log.note}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {log.author.name} — {formatDateTime(log.createdAt)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 {execution.testNotes && (

@@ -129,7 +129,7 @@ export function RegistrarForm({ workOrder, onSuccess, onClose }: ActionFormProps
           Cancelar
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Salvando…" : "Registrar execução"}
+          {submitting ? "Salvando…" : "Adicionar registro"}
         </Button>
       </div>
     </form>
