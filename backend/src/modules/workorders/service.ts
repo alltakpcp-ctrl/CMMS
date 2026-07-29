@@ -28,7 +28,15 @@ const workOrderInclude = {
   requester: { select: publicUserSelect },
   assignedTo: { select: publicUserSelect },
   assignees: { include: { user: { select: { id: true, name: true } } } },
-  executions: { orderBy: { startedAt: "asc" } },
+  executions: {
+    orderBy: { startedAt: "asc" },
+    include: {
+      logs: {
+        include: { author: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
 } satisfies Prisma.WorkOrderInclude;
@@ -536,9 +544,18 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
       throw new AppError(409, "NO_OPEN_EXECUTION", "Nenhuma execução em aberto para atualizar.");
     }
 
-    await tx.execution.update({
-      where: { id: openExecution.id },
-      data: { rootCause: input.rootCause, repairDescription: input.repairDescription },
+    // Cada chamada acrescenta uma entrada nova (histórico), em vez de
+    // sobrescrever Execution.rootCause/repairDescription (legado, congelado).
+    const noteParts = [];
+    if (input.rootCause?.trim()) noteParts.push(`Causa raiz: ${input.rootCause.trim()}`);
+    if (input.repairDescription?.trim()) noteParts.push(`Descrição: ${input.repairDescription.trim()}`);
+
+    await tx.executionLog.create({
+      data: {
+        executionId: openExecution.id,
+        note: noteParts.join("\n\n"),
+        authorId: user.userId,
+      },
     });
 
     // GANCHO FUTURO (§5.6): a baixa abaixo é direta e imediata (decisão de MVP,

@@ -67,18 +67,22 @@ export const iniciarSchema = z.object({
   assigneeIds: z.array(z.string().min(1)).optional().default([]),
 });
 
-export const registrarSchema = z.object({
-  rootCause: z.string().min(1, "Causa raiz é obrigatória."),
-  repairDescription: z.string().min(1, "Descrição do reparo é obrigatória."),
-  parts: z
-    .array(
-      z.object({
-        partId: z.string().min(1),
-        quantity: z.number().int().positive(),
-      })
-    )
-    .optional(),
-});
+export const registrarSchema = z
+  .object({
+    rootCause: z.string().min(1).optional(),
+    repairDescription: z.string().min(1).optional(),
+    parts: z
+      .array(
+        z.object({
+          partId: z.string().min(1),
+          quantity: z.number().int().positive(),
+        })
+      )
+      .optional(),
+  })
+  .refine((data) => Boolean(data.rootCause?.trim()) || Boolean(data.repairDescription?.trim()), {
+    message: "Informe a causa raiz e/ou a descrição do reparo.",
+  });
 
 export const encerramentoTecnicoSchema = z.object({
   testNotes: z.string().min(1, "Notas de teste são obrigatórias."),

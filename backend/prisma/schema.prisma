@@ -33,6 +33,7 @@ model User {
   purchaseOrdersCreated PurchaseOrder[] @relation("purchaseOrdersCreated")
   purchaseOrdersReviewed PurchaseOrder[] @relation("purchaseOrdersReviewed")
   assigneeOf          WorkOrderAssignee[]
+  executionLogs       ExecutionLog[]
 }
 
 model Sector {
@@ -160,14 +161,34 @@ model Execution {
   workOrderId       String
   workOrder         WorkOrder @relation(fields: [workOrderId], references: [id])
   riskAnalysis      String?
+  // @deprecated registro legado (pré-ExecutionLog) — mantido como primeira
+  // entrada histórica exibida na UI; novos registros vão para `logs`.
   rootCause         String?
+  // @deprecated ver rootCause acima.
   repairDescription String?
   startedAt         DateTime?
   finishedAt        DateTime?
   testNotes         String?
   cleanupDone       Boolean   @default(false)
 
+  logs              ExecutionLog[]
+
   @@index([workOrderId])
+}
+
+// Histórico de registros de execução (causa raiz + reparo) dentro de um
+// mesmo ciclo de Execution — cada chamada a registrar() cria uma entrada
+// nova em vez de sobrescrever Execution.rootCause/repairDescription.
+model ExecutionLog {
+  id          String    @id @default(cuid())
+  executionId String
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  note        String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([executionId])
 }
 
 model WorkOrderPart {
