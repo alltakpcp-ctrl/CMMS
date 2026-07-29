@@ -634,9 +634,11 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
 // Override manual da linha do tempo — exclusivo do SUPERVISOR (§ rota).
 // Propositalmente NÃO usa applyTransition/canTransition: é uma ação de
 // exceção que pode mover a OS para qualquer status, inclusive retrocedendo
-// ou saindo de ENCERRADA/CANCELADA. Não mexe em dados de execução/planejamento
-// — só o status muda, e a auditoria fica marcada com prefixo "[OVERRIDE
-// SUPERVISOR]" no StatusHistory para se distinguir das transições normais.
+// ou saindo de ENCERRADA/CANCELADA. Não mexe em dados de planejamento — só o
+// status muda e, se houver uma Execution vigente (finishedAt = null), ela é
+// encerrada (ver comentário abaixo) para não travar um reinício futuro. A
+// auditoria fica marcada com prefixo "[OVERRIDE SUPERVISOR]" no StatusHistory
+// para se distinguir das transições normais.
 export function timelineOverride(id: string, dto: TimelineOverrideInput, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
     const workOrder = await tx.workOrder.findUnique({ where: { id } });
@@ -657,13 +659,24 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
       data: { status: dto.toStatus },
     });
 
+    // Override pode devolver a OS para antes de EM_EXECUCAO, deixando a
+    // Execution vigente órfã (finishedAt = null) e travando um reinício
+    // futuro no guard EXECUTION_ALREADY_OPEN de iniciar(). Encerrar aqui
+    // mantém o registro histórico e libera a OS para um novo ciclo.
+    const { count: closedExecutions } = await tx.execution.updateMany({
+      where: { workOrderId: id, finishedAt: null },
+      data: { finishedAt: new Date() },
+    });
+
     await tx.statusHistory.create({
       data: {
         workOrderId: id,
         fromStatus: workOrder.status,
         toStatus: dto.toStatus,
         changedById: user.userId,
-        note: `[OVERRIDE SUPERVISOR] ${dto.note}`,
+        note: closedExecutions
+          ? `[OVERRIDE SUPERVISOR] ${dto.note} (execução vigente encerrada automaticamente)`
+          : `[OVERRIDE SUPERVISOR] ${dto.note}`,
       },
     });
 
