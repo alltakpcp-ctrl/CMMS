@@ -118,3 +118,25 @@ export function getLifecycle(token: string, filters: IndicatorsFilters = {}) {
 export function getDistribution(token: string, filters: IndicatorsFilters = {}) {
   return apiRequest<DistributionResult>(`/indicators/distribution${query(filters)}`, { token });
 }
+
+// --- Technician efficiency (D1) ---
+export interface TechnicianTypeMix {
+  type: string;
+  count: number;
+}
+export interface TechnicianEfficiency {
+  technicianId: string;
+  technicianName: string;
+  closedCount: number;
+  inProgressCount: number;
+  mttrHours: number | null;
+  adherencePercentage: number | null;
+  typeMix: TechnicianTypeMix[];
+}
+export interface TechnicianEfficiencyResult {
+  technicians: TechnicianEfficiency[];
+}
+
+export function getTechnicianEfficiency(token: string, filters: IndicatorsFilters = {}) {
+  return apiRequest<TechnicianEfficiencyResult>(`/indicators/technician-efficiency${query(filters)}`, { token });
+}

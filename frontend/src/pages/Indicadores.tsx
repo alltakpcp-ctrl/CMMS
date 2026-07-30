@@ -9,6 +9,7 @@ import {
   DistributionResult,
   LifecycleResult,
   Overview,
+  TechnicianEfficiency,
 } from "../api/indicators";
 import { WorkOrderStatus } from "../domain/enums";
 import { STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
@@ -21,6 +22,7 @@ import { useToast } from "../components/ToastProvider";
 import { formatHours, formatPercentage } from "../lib/format";
 import { BacklogChart } from "./indicators/BacklogChart";
 import { PhaseDurationChart, BarItem } from "./indicators/PhaseDurationChart";
+import { TechnicianEfficiencyPanel } from "./indicators/TechnicianEfficiencyPanel";
 
 type SortKey = "name" | "mttrHours" | "mtbfHours";
 
@@ -84,6 +86,7 @@ export default function Indicadores() {
   const [backlog, setBacklog] = useState<BacklogResult | null>(null);
   const [lifecycle, setLifecycle] = useState<LifecycleResult | null>(null);
   const [distribution, setDistribution] = useState<DistributionResult | null>(null);
+  const [technicians, setTechnicians] = useState<TechnicianEfficiency[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDesc, setSortDesc] = useState(false);
@@ -104,13 +107,15 @@ export default function Indicadores() {
       indicatorsApi.getBacklog(token, filters),
       indicatorsApi.getLifecycle(token, filters),
       indicatorsApi.getDistribution(token, filters),
+      indicatorsApi.getTechnicianEfficiency(token, filters),
     ])
-      .then(([overviewResult, byAssetResult, backlogResult, lifecycleResult, distributionResult]) => {
+      .then(([overviewResult, byAssetResult, backlogResult, lifecycleResult, distributionResult, technicianEfficiencyResult]) => {
         setOverview(overviewResult);
         setByAsset(byAssetResult);
         setBacklog(backlogResult);
         setLifecycle(lifecycleResult);
         setDistribution(distributionResult);
+        setTechnicians(technicianEfficiencyResult.technicians);
       })
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
@@ -152,15 +157,6 @@ export default function Indicadores() {
     : [];
 
   const byStatusOrdered = distribution ? orderByCanonicalStatus(distribution.distribution.byStatus) : [];
-
-  const technicianItems: BarItem[] = distribution
-    ? distribution.distribution.byTechnician.map((tech) => ({
-        key: tech.technicianId,
-        label: tech.technicianName || "—",
-        value: tech.closedCount,
-        displayValue: String(tech.closedCount),
-      }))
-    : [];
 
   const typeItems: BarItem[] = distribution
     ? [...distribution.distribution.byType]
@@ -335,17 +331,10 @@ export default function Indicadores() {
       )}
 
       {!loading && (
-        <Card>
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Produção por técnico</h2>
-          {technicianItems.length > 0 ? (
-            <PhaseDurationChart items={technicianItems} barColor="#1baf7a" />
-          ) : (
-            <EmptyState
-              title="Sem produção no período"
-              description="Nenhuma OS encerrada com técnico atribuído no período/setor filtrado."
-            />
-          )}
-        </Card>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Painel de Eficiência</h2>
+          <TechnicianEfficiencyPanel technicians={technicians} />
+        </div>
       )}
 
       {!loading && (
