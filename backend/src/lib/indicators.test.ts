@@ -4,7 +4,10 @@ import {
   calculateBacklog,
   calculateMtbf,
   calculateMttr,
+  calculatePhaseDurations,
+  calculateThroughput,
   WorkOrderForIndicators,
+  WorkOrderLifecycle,
 } from "./indicators";
 import { Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
@@ -18,6 +21,15 @@ function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators 
     priority: Priority.MEDIA,
     scheduledStart: null,
     executions: [],
+    ...overrides,
+  };
+}
+
+function woLc(overrides: Partial<WorkOrderLifecycle>): WorkOrderLifecycle {
+  return {
+    id: overrides.id ?? Math.random().toString(36),
+    status: WorkOrderStatus.ENCERRADA,
+    statusHistory: [],
     ...overrides,
   };
 }
@@ -128,5 +140,176 @@ describe("calculateBacklog", () => {
       (g) => g.targetSectorId === "sector-eletrica" && g.priority === Priority.ALTA
     );
     expect(eletricaAlta?.count).toBe(2);
+  });
+});
+
+describe("calculatePhaseDurations", () => {
+  it("retorna vazio sem dados", () => {
+    const result = calculatePhaseDurations([], new Date("2026-01-01T00:00:00Z"));
+    expect(result.byPhase).toEqual([]);
+    expect(result.oldestOpen).toEqual([]);
+  });
+
+  it("calcula duração média por fase para OS encerrada com sequência completa", () => {
+    // ABERTA: 00:00 -> 02:00 = 2h | TRIAGEM: 02:00 -> 05:00 = 3h | PLANEJADA: 05:00 -> 09:00 = 4h
+    const workOrders = [
+      woLc({
+        status: WorkOrderStatus.ENCERRADA,
+        statusHistory: [
+          { toStatus: WorkOrderStatus.ABERTA, changedAt: new Date("2026-01-01T00:00:00Z") },
+          { toStatus: WorkOrderStatus.TRIAGEM, changedAt: new Date("2026-01-01T02:00:00Z") },
+          { toStatus: WorkOrderStatus.PLANEJADA, changedAt: new Date("2026-01-01T05:00:00Z") },
+          { toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-01T09:00:00Z") },
+        ],
+      }),
+    ];
+    const result = calculatePhaseDurations(workOrders, new Date("2026-02-01T00:00:00Z"));
+
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.ABERTA)).toEqual({
+      status: WorkOrderStatus.ABERTA,
+      avgHours: 2,
+      sampleCount: 1,
+      openCount: 0,
+    });
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.TRIAGEM)).toEqual({
+      status: WorkOrderStatus.TRIAGEM,
+      avgHours: 3,
+      sampleCount: 1,
+      openCount: 0,
+    });
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.PLANEJADA)).toEqual({
+      status: WorkOrderStatus.PLANEJADA,
+      avgHours: 4,
+      sampleCount: 1,
+      openCount: 0,
+    });
+    // ENCERRADA é terminal: não gera intervalo (nem fechado — é o último registro
+    // sem próxima transição — nem aberto, pois a OS não está mais "parada").
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.ENCERRADA)).toBeUndefined();
+    expect(result.oldestOpen).toEqual([]);
+  });
+
+  it("conta intervalo aberto (gargalo em tempo real) para OS parada na fase atual", () => {
+    const now = new Date("2026-01-05T00:00:00Z");
+    const workOrders = [
+      woLc({
+        id: "wo-1",
+        status: WorkOrderStatus.PROGRAMADA,
+        statusHistory: [
+          { toStatus: WorkOrderStatus.ABERTA, changedAt: new Date("2026-01-01T00:00:00Z") },
+          { toStatus: WorkOrderStatus.PROGRAMADA, changedAt: new Date("2026-01-04T00:00:00Z") }, // aberto: 24h até `now`
+        ],
+      }),
+    ];
+    const result = calculatePhaseDurations(workOrders, now);
+
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.PROGRAMADA)).toEqual({
+      status: WorkOrderStatus.PROGRAMADA,
+      avgHours: 24,
+      sampleCount: 1,
+      openCount: 1,
+    });
+    expect(result.oldestOpen).toEqual([{ status: WorkOrderStatus.PROGRAMADA, workOrderId: "wo-1", hours: 24 }]);
+  });
+
+  it("ignora OS fechada com um único registro de histórico (sem duração)", () => {
+    const workOrders = [
+      woLc({
+        status: WorkOrderStatus.ENCERRADA,
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-01T00:00:00Z") }],
+      }),
+    ];
+    const result = calculatePhaseDurations(workOrders, new Date("2026-02-01T00:00:00Z"));
+    expect(result.byPhase).toEqual([]);
+    expect(result.oldestOpen).toEqual([]);
+  });
+
+  it("ordena o histórico por changedAt mesmo se a entrada vier fora de ordem", () => {
+    const workOrders = [
+      woLc({
+        status: WorkOrderStatus.ENCERRADA,
+        statusHistory: [
+          { toStatus: WorkOrderStatus.TRIAGEM, changedAt: new Date("2026-01-01T02:00:00Z") },
+          { toStatus: WorkOrderStatus.ABERTA, changedAt: new Date("2026-01-01T00:00:00Z") },
+          { toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-01T05:00:00Z") },
+        ],
+      }),
+    ];
+    const result = calculatePhaseDurations(workOrders, new Date("2026-02-01T00:00:00Z"));
+
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.ABERTA)?.avgHours).toBe(2);
+    expect(result.byPhase.find((p) => p.status === WorkOrderStatus.TRIAGEM)?.avgHours).toBe(3);
+  });
+
+  it("descarta intervalos com duração zero (timestamps duplicados)", () => {
+    const workOrders = [
+      woLc({
+        status: WorkOrderStatus.ENCERRADA,
+        statusHistory: [
+          { toStatus: WorkOrderStatus.ABERTA, changedAt: new Date("2026-01-01T00:00:00Z") },
+          { toStatus: WorkOrderStatus.TRIAGEM, changedAt: new Date("2026-01-01T00:00:00Z") }, // mesmo instante: intervalo ABERTA descartado
+          { toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-01T03:00:00Z") }, // TRIAGEM: 3h válido
+        ],
+      }),
+    ];
+    const result = calculatePhaseDurations(workOrders, new Date("2026-02-01T00:00:00Z"));
+    expect(result.byPhase).toEqual([
+      { status: WorkOrderStatus.TRIAGEM, avgHours: 3, sampleCount: 1, openCount: 0 },
+    ]);
+  });
+});
+
+describe("calculateThroughput", () => {
+  it("retorna total 0 sem transições para ENCERRADA", () => {
+    const workOrders = [
+      woLc({
+        statusHistory: [{ toStatus: WorkOrderStatus.ABERTA, changedAt: new Date("2026-01-01T00:00:00Z") }],
+      }),
+    ];
+    const result = calculateThroughput(workOrders, null, null);
+    expect(result).toEqual({ total: 0, byMonth: [] });
+  });
+
+  it("conta OS encerradas agrupando por mês em UTC", () => {
+    const workOrders = [
+      woLc({
+        id: "wo-1",
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-15T00:00:00Z") }],
+      }),
+      woLc({
+        id: "wo-2",
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-02-10T00:00:00Z") }],
+      }),
+      woLc({
+        id: "wo-3",
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-02-20T00:00:00Z") }],
+      }),
+    ];
+    const result = calculateThroughput(workOrders, null, null);
+    expect(result.total).toBe(3);
+    expect(result.byMonth).toEqual([
+      { month: "2026-01", count: 1 },
+      { month: "2026-02", count: 2 },
+    ]);
+  });
+
+  it("aplica filtro from/to sobre o changedAt da transição ENCERRADA", () => {
+    const workOrders = [
+      woLc({
+        id: "wo-1",
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-01-15T00:00:00Z") }],
+      }),
+      woLc({
+        id: "wo-2",
+        statusHistory: [{ toStatus: WorkOrderStatus.ENCERRADA, changedAt: new Date("2026-02-10T00:00:00Z") }],
+      }),
+    ];
+    const result = calculateThroughput(
+      workOrders,
+      new Date("2026-02-01T00:00:00Z"),
+      new Date("2026-02-28T23:59:59Z")
+    );
+    expect(result.total).toBe(1);
+    expect(result.byMonth).toEqual([{ month: "2026-02", count: 1 }]);
   });
 });

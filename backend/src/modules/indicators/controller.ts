@@ -16,3 +16,8 @@ export async function backlogController(req: Request, res: Response) {
   const query = indicatorsQuerySchema.parse(req.query);
   res.json(await indicatorsService.getBacklog(query));
 }
+
+export async function getLifecycleController(req: Request, res: Response) {
+  const query = indicatorsQuerySchema.parse(req.query);
+  res.json(await indicatorsService.getLifecycle(query));
+}

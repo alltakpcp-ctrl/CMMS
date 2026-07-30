@@ -5,7 +5,10 @@ import {
   calculateBacklog,
   calculateMtbf,
   calculateMttr,
+  calculatePhaseDurations,
+  calculateThroughput,
   WorkOrderForIndicators,
+  WorkOrderLifecycle,
 } from "../../lib/indicators";
 import { WorkOrderStatus, WorkOrderType, Priority } from "../../domain/enums";
 import { IndicatorsQuery } from "./schema";
@@ -89,4 +92,39 @@ export async function getByAsset(filters: IndicatorsQuery) {
 export async function getBacklog(filters: IndicatorsQuery) {
   const workOrders = await fetchWorkOrdersForIndicators(filters);
   return calculateBacklog(workOrders);
+}
+
+export async function getLifecycle(filters: IndicatorsQuery) {
+  const where: Prisma.WorkOrderWhereInput = {
+    ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
+    ...((filters.from || filters.to) && {
+      createdAt: {
+        ...(filters.from && { gte: filters.from }),
+        ...(filters.to && { lte: filters.to }),
+      },
+    }),
+  };
+
+  const workOrders = await prisma.workOrder.findMany({
+    where,
+    select: {
+      id: true,
+      status: true,
+      statusHistory: {
+        select: { toStatus: true, changedAt: true },
+        orderBy: { changedAt: "asc" },
+      },
+    },
+  });
+
+  const mapped: WorkOrderLifecycle[] = workOrders.map((wo) => ({
+    id: wo.id,
+    status: wo.status as WorkOrderStatus,
+    statusHistory: wo.statusHistory,
+  }));
+
+  return {
+    phaseDurations: calculatePhaseDurations(mapped, new Date()),
+    throughput: calculateThroughput(mapped, filters.from ?? null, filters.to ?? null),
+  };
 }

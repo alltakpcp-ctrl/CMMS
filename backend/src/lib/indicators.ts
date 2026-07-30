@@ -218,3 +218,119 @@ export function calculateBacklog(workOrders: WorkOrderForIndicators[]): {
 
   return { total: backlog.length, bySectorAndPriority: Array.from(groups.values()) };
 }
+
+// ---------------------------------------------------------------------------
+// Ciclo de vida (StatusHistory) — Fase B1: gargalos por fase e throughput.
+// Desacoplado do Prisma, como WorkOrderForIndicators acima.
+// ---------------------------------------------------------------------------
+export interface WorkOrderLifecycle {
+  id: string;
+  status: WorkOrderStatus;
+  statusHistory: { toStatus: string; changedAt: Date }[];
+}
+
+const TERMINAL_STATUSES: WorkOrderStatus[] = [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA];
+
+// Duração de fase (§ decisão de negócio): cada par consecutivo de StatusHistory
+// (ordenado por changedAt) atribui sua duração ao toStatus do primeiro elemento
+// do par — o status em que a OS estava durante aquele intervalo. Para OS ainda
+// não encerradas/canceladas, o intervalo da última transição até `now` também
+// conta, marcado como "aberto" (gargalo em tempo real). `now` é injetado pelo
+// chamador para manter a função determinística e testável.
+export interface PhaseDurationResult {
+  byPhase: Array<{
+    status: string;
+    avgHours: number | null;
+    sampleCount: number;
+    openCount: number;
+  }>;
+  oldestOpen: Array<{ status: string; workOrderId: string; hours: number }> | [];
+}
+
+export function calculatePhaseDurations(
+  workOrders: WorkOrderLifecycle[],
+  now: Date
+): PhaseDurationResult {
+  const intervalsByPhase = new Map<string, Array<{ hours: number; open: boolean }>>();
+  const oldestOpenByPhase = new Map<string, { workOrderId: string; hours: number }>();
+
+  for (const wo of workOrders) {
+    const history = [...wo.statusHistory].sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime());
+
+    for (let i = 0; i < history.length - 1; i++) {
+      const hours = hoursBetween(history[i].changedAt, history[i + 1].changedAt);
+      if (hours <= 0) continue;
+      const list = intervalsByPhase.get(history[i].toStatus) ?? [];
+      list.push({ hours, open: false });
+      intervalsByPhase.set(history[i].toStatus, list);
+    }
+
+    if (history.length >= 1 && !TERMINAL_STATUSES.includes(wo.status)) {
+      const last = history[history.length - 1];
+      const hours = hoursBetween(last.changedAt, now);
+      if (hours > 0) {
+        const list = intervalsByPhase.get(wo.status) ?? [];
+        list.push({ hours, open: true });
+        intervalsByPhase.set(wo.status, list);
+
+        const current = oldestOpenByPhase.get(wo.status);
+        if (!current || hours > current.hours) {
+          oldestOpenByPhase.set(wo.status, { workOrderId: wo.id, hours });
+        }
+      }
+    }
+  }
+
+  const byPhase = Array.from(intervalsByPhase.entries()).map(([status, intervals]) => ({
+    status,
+    avgHours: intervals.reduce((sum, i) => sum + i.hours, 0) / intervals.length,
+    sampleCount: intervals.length,
+    openCount: intervals.filter((i) => i.open).length,
+  }));
+
+  const oldestOpen = Array.from(oldestOpenByPhase.entries()).map(([status, entry]) => ({
+    status,
+    workOrderId: entry.workOrderId,
+    hours: entry.hours,
+  }));
+
+  return { byPhase, oldestOpen };
+}
+
+// Throughput (§ decisão de negócio): conta OS que possuem uma transição para
+// ENCERRADA cujo changedAt cai dentro de [from, to]. Agrupamento mensal em UTC
+// (getUTCFullYear/getUTCMonth) para não depender do fuso do servidor.
+export interface ThroughputResult {
+  total: number;
+  byMonth: Array<{ month: string; count: number }>;
+}
+
+export function calculateThroughput(
+  workOrders: WorkOrderLifecycle[],
+  from: Date | null,
+  to: Date | null
+): ThroughputResult {
+  const monthCounts = new Map<string, number>();
+  let total = 0;
+
+  for (const wo of workOrders) {
+    const history = [...wo.statusHistory].sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime());
+    const closedAt = history.find(
+      (entry) =>
+        entry.toStatus === WorkOrderStatus.ENCERRADA &&
+        (!from || entry.changedAt >= from) &&
+        (!to || entry.changedAt <= to)
+    );
+    if (!closedAt) continue;
+
+    total += 1;
+    const month = `${closedAt.changedAt.getUTCFullYear()}-${String(closedAt.changedAt.getUTCMonth() + 1).padStart(2, "0")}`;
+    monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1);
+  }
+
+  const byMonth = Array.from(monthCounts.entries())
+    .map(([month, count]) => ({ month, count }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  return { total, byMonth };
+}
