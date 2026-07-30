@@ -54,3 +54,67 @@ export function getByAsset(token: string, filters: IndicatorsFilters = {}) {
 export function getBacklog(token: string, filters: IndicatorsFilters = {}) {
   return apiRequest<BacklogResult>(`/indicators/backlog${query(filters)}`, { token });
 }
+
+// --- Lifecycle (B1) ---
+export interface PhaseDuration {
+  status: string;
+  avgHours: number | null;
+  sampleCount: number;
+  openCount: number;
+}
+export interface OldestOpen {
+  status: string;
+  workOrderId: string;
+  hours: number;
+}
+export interface ThroughputMonth {
+  month: string;
+  count: number;
+}
+export interface LifecycleResult {
+  phaseDurations: {
+    byPhase: PhaseDuration[];
+    oldestOpen: OldestOpen[];
+  };
+  throughput: {
+    total: number;
+    byMonth: ThroughputMonth[];
+  };
+}
+
+// --- Distribution (B2) ---
+export interface StatusCount {
+  status: string;
+  count: number;
+}
+export interface TypeCount {
+  type: string;
+  count: number;
+}
+export interface TechnicianProduction {
+  technicianId: string;
+  technicianName: string;
+  closedCount: number;
+}
+export interface DistributionData {
+  byStatus: StatusCount[];
+  byType: TypeCount[];
+  byTechnician: TechnicianProduction[];
+}
+export interface TrendData {
+  currentCount: number;
+  previousCount: number;
+  deltaPercent: number | null;
+}
+export interface DistributionResult {
+  distribution: DistributionData;
+  trend: TrendData | null;
+}
+
+export function getLifecycle(token: string, filters: IndicatorsFilters = {}) {
+  return apiRequest<LifecycleResult>(`/indicators/lifecycle${query(filters)}`, { token });
+}
+
+export function getDistribution(token: string, filters: IndicatorsFilters = {}) {
+  return apiRequest<DistributionResult>(`/indicators/distribution${query(filters)}`, { token });
+}
