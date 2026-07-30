@@ -665,7 +665,9 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
     // preenchido com o responsável do ciclo anterior e não reatribui a quem
     // de fato reinicia a execução (ver diagnóstico da OS-2026-000001).
     const resetsAssignment =
-      dto.toStatus === WorkOrderStatus.TRIAGEM || dto.toStatus === WorkOrderStatus.PLANEJADA;
+      dto.toStatus === WorkOrderStatus.ABERTA ||
+      dto.toStatus === WorkOrderStatus.TRIAGEM ||
+      dto.toStatus === WorkOrderStatus.PLANEJADA;
 
     await tx.workOrder.update({
       where: { id },
