@@ -660,9 +660,19 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
       throw new AppError(409, "NO_CHANGE", "A OS já está neste status.");
     }
 
+    // Devolver para uma fase pré-atribuição "renova" o ciclo: assignedToId
+    // some junto, senão o próximo iniciar() (isImmediateStart) vê o campo já
+    // preenchido com o responsável do ciclo anterior e não reatribui a quem
+    // de fato reinicia a execução (ver diagnóstico da OS-2026-000001).
+    const resetsAssignment =
+      dto.toStatus === WorkOrderStatus.TRIAGEM || dto.toStatus === WorkOrderStatus.PLANEJADA;
+
     await tx.workOrder.update({
       where: { id },
-      data: { status: dto.toStatus },
+      data: {
+        status: dto.toStatus,
+        ...(resetsAssignment && { assignedToId: null }),
+      },
     });
 
     // Override pode devolver a OS para antes de EM_EXECUCAO, deixando a
