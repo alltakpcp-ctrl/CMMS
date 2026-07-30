@@ -26,3 +26,8 @@ export async function getDistributionController(req: Request, res: Response) {
   const query = indicatorsQuerySchema.parse(req.query);
   res.json(await indicatorsService.getDistribution(query));
 }
+
+export async function getTechnicianEfficiencyController(req: Request, res: Response) {
+  const query = indicatorsQuerySchema.parse(req.query);
+  res.json(await indicatorsService.getTechnicianEfficiency(query));
+}

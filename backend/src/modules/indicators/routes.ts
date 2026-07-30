@@ -8,6 +8,7 @@ import {
   byAssetController,
   getDistributionController,
   getLifecycleController,
+  getTechnicianEfficiencyController,
   overviewController,
 } from "./controller";
 
@@ -24,3 +25,4 @@ indicatorsRoutes.get("/by-asset", asyncHandler(byAssetController));
 indicatorsRoutes.get("/backlog", asyncHandler(backlogController));
 indicatorsRoutes.get("/lifecycle", asyncHandler(getLifecycleController));
 indicatorsRoutes.get("/distribution", asyncHandler(getDistributionController));
+indicatorsRoutes.get("/technician-efficiency", asyncHandler(getTechnicianEfficiencyController));

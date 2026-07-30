@@ -6,8 +6,11 @@ import {
   calculateMtbf,
   calculateMttr,
   calculatePhaseDurations,
+  calculateTechnicianEfficiency,
   calculateThroughput,
   calculateTrend,
+  executionDurationHours,
+  isAdherent,
   WorkOrderDistribution,
   WorkOrderForIndicators,
   WorkOrderLifecycle,
@@ -23,6 +26,8 @@ function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators 
     targetSectorId: "sector-mecanica",
     priority: Priority.MEDIA,
     scheduledStart: null,
+    assignedToId: null,
+    assignedToName: null,
     executions: [],
     ...overrides,
   };
@@ -380,6 +385,132 @@ describe("calculateDistribution", () => {
       { technicianId: "user-3", technicianName: "Carla", closedCount: 1 },
       { technicianId: "user-4", technicianName: "Duda", closedCount: 1 },
     ]);
+  });
+});
+
+describe("executionDurationHours / isAdherent (predicados extraídos)", () => {
+  it("executionDurationHours só retorna horas para ENCERRADA com janela de execução completa", () => {
+    const closed = wo({
+      status: WorkOrderStatus.ENCERRADA,
+      executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") }],
+    });
+    expect(executionDurationHours(closed)).toBe(2);
+
+    const stillOpen = wo({
+      status: WorkOrderStatus.EM_EXECUCAO,
+      executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: null }],
+    });
+    expect(executionDurationHours(stillOpen)).toBeNull();
+
+    const closedWithoutExecution = wo({ status: WorkOrderStatus.ENCERRADA, executions: [] });
+    expect(executionDurationHours(closedWithoutExecution)).toBeNull();
+  });
+
+  it("isAdherent aplica o mesmo critério de calculateAdherence (mesmo dia calendário)", () => {
+    const onTime = wo({
+      scheduledStart: new Date("2026-01-05T08:00:00Z"),
+      executions: [{ startedAt: new Date("2026-01-05T09:30:00Z"), finishedAt: null }],
+    });
+    expect(isAdherent(onTime)).toBe(true);
+
+    const late = wo({
+      scheduledStart: new Date("2026-01-06T08:00:00Z"),
+      executions: [{ startedAt: new Date("2026-01-07T08:00:00Z"), finishedAt: null }],
+    });
+    expect(isAdherent(late)).toBe(false);
+
+    const notScheduled = wo({ scheduledStart: null });
+    expect(isAdherent(notScheduled)).toBe(false);
+  });
+});
+
+describe("calculateTechnicianEfficiency", () => {
+  it("retorna [] sem OS", () => {
+    expect(calculateTechnicianEfficiency([])).toEqual([]);
+  });
+
+  it("agrega closedCount, mttrHours e adherencePercentage por técnico, ordenando desc por closedCount", () => {
+    const workOrders = [
+      wo({
+        assignedToId: "user-1",
+        assignedToName: "Ana",
+        status: WorkOrderStatus.ENCERRADA,
+        scheduledStart: new Date("2026-01-01T08:00:00Z"),
+        executions: [{ startedAt: new Date("2026-01-01T08:00:00Z"), finishedAt: new Date("2026-01-01T10:00:00Z") }], // 2h, no prazo
+      }),
+      wo({
+        assignedToId: "user-1",
+        assignedToName: "Ana",
+        status: WorkOrderStatus.ENCERRADA,
+        scheduledStart: new Date("2026-01-02T08:00:00Z"),
+        executions: [{ startedAt: new Date("2026-01-02T08:00:00Z"), finishedAt: new Date("2026-01-02T12:00:00Z") }], // 4h, no prazo
+      }),
+      wo({
+        assignedToId: "user-2",
+        assignedToName: "Bruno",
+        status: WorkOrderStatus.ENCERRADA,
+        scheduledStart: new Date("2026-01-03T08:00:00Z"),
+        executions: [{ startedAt: new Date("2026-01-04T08:00:00Z"), finishedAt: new Date("2026-01-04T14:00:00Z") }], // 6h, atrasada
+      }),
+    ];
+
+    const result = calculateTechnicianEfficiency(workOrders);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ technicianId: "user-1", technicianName: "Ana", closedCount: 2 });
+    // média manual: (2h + 4h) / 2 = 3h
+    expect(result[0].mttrHours).toBe(3);
+    expect(result[0].adherencePercentage).toBe(100);
+
+    expect(result[1]).toMatchObject({ technicianId: "user-2", technicianName: "Bruno", closedCount: 1 });
+    expect(result[1].mttrHours).toBe(6);
+    expect(result[1].adherencePercentage).toBe(0);
+  });
+
+  it("conta inProgressCount para status não-terminal e exclui CANCELADA do typeMix", () => {
+    const workOrders = [
+      wo({ assignedToId: "user-1", assignedToName: "Ana", status: WorkOrderStatus.EM_EXECUCAO, type: WorkOrderType.MELHORIA }),
+      wo({ assignedToId: "user-1", assignedToName: "Ana", status: WorkOrderStatus.PROGRAMADA, type: WorkOrderType.PREVENTIVA }),
+      wo({ assignedToId: "user-1", assignedToName: "Ana", status: WorkOrderStatus.CANCELADA, type: WorkOrderType.CORRETIVA }),
+      wo({ assignedToId: "user-1", assignedToName: "Ana", status: WorkOrderStatus.ENCERRADA, type: WorkOrderType.CORRETIVA }),
+    ];
+
+    const result = calculateTechnicianEfficiency(workOrders);
+    const ana = result.find((t) => t.technicianId === "user-1")!;
+
+    expect(ana.inProgressCount).toBe(2); // EM_EXECUCAO + PROGRAMADA
+    expect(ana.closedCount).toBe(1);
+    expect(ana.typeMix).toHaveLength(3); // CANCELADA excluída do mix
+    expect(ana.typeMix).toEqual(
+      expect.arrayContaining([
+        { type: WorkOrderType.MELHORIA, count: 1 },
+        { type: WorkOrderType.PREVENTIVA, count: 1 },
+        { type: WorkOrderType.CORRETIVA, count: 1 }, // só a ENCERRADA; a CANCELADA do mesmo type fica de fora
+      ])
+    );
+  });
+
+  it("técnico sem OS encerrada mas com OS em andamento: mttr/adherence null, inProgressCount > 0", () => {
+    const workOrders = [
+      wo({ assignedToId: "user-3", assignedToName: "Carla", status: WorkOrderStatus.EM_EXECUCAO, executions: [] }),
+    ];
+    const result = calculateTechnicianEfficiency(workOrders);
+    expect(result).toEqual([
+      {
+        technicianId: "user-3",
+        technicianName: "Carla",
+        closedCount: 0,
+        inProgressCount: 1,
+        mttrHours: null,
+        adherencePercentage: null,
+        typeMix: [{ type: WorkOrderType.CORRETIVA, count: 1 }],
+      },
+    ]);
+  });
+
+  it("ignora OS sem assignedToId", () => {
+    const workOrders = [wo({ assignedToId: null, status: WorkOrderStatus.ENCERRADA })];
+    expect(calculateTechnicianEfficiency(workOrders)).toEqual([]);
   });
 });
 

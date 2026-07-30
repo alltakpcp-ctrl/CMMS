@@ -10,6 +10,8 @@ export interface WorkOrderForIndicators {
   targetSectorId: string | null;
   priority: Priority | null;
   scheduledStart: Date | null;
+  assignedToId: string | null;
+  assignedToName: string | null;
   executions: { startedAt: Date | null; finishedAt: Date | null }[];
 }
 
@@ -47,23 +49,29 @@ export interface MttrResult {
   sampleSize: number;
 }
 
+// Duração de reparo de uma OS individual: só OS ENCERRADA com janela agregada
+// de execução completa (startedAt e finishedAt), em horas. null caso
+// contrário — mesmo critério de qualificação usado por calculateMttr, extraído
+// para ser reaplicado por subconjunto (ex.: por técnico).
+export function executionDurationHours(wo: WorkOrderForIndicators): number | null {
+  if (wo.status !== WorkOrderStatus.ENCERRADA) return null;
+  const window = aggregatedExecutionWindow(wo);
+  if (!window.startedAt || !window.finishedAt) return null;
+  return hoursBetween(window.startedAt, window.finishedAt);
+}
+
 export function calculateMttr(workOrders: WorkOrderForIndicators[]): {
   overall: MttrResult;
   byAsset: Array<{ assetId: string } & MttrResult>;
 } {
   const qualifying = workOrders
-    .map((wo) => ({ wo, window: aggregatedExecutionWindow(wo) }))
-    .filter(
-      ({ wo, window }) => wo.status === WorkOrderStatus.ENCERRADA && window.startedAt && window.finishedAt
-    );
+    .map((wo) => ({ wo, hours: executionDurationHours(wo) }))
+    .filter((entry): entry is { wo: WorkOrderForIndicators; hours: number } => entry.hours !== null);
 
-  const overall = summarizeHours(
-    qualifying.map(({ window }) => hoursBetween(window.startedAt!, window.finishedAt!))
-  );
+  const overall = summarizeHours(qualifying.map(({ hours }) => hours));
 
   const byAssetMap = new Map<string, number[]>();
-  for (const { wo, window } of qualifying) {
-    const hours = hoursBetween(window.startedAt!, window.finishedAt!);
+  for (const { wo, hours } of qualifying) {
     const list = byAssetMap.get(wo.assetId) ?? [];
     list.push(hours);
     byAssetMap.set(wo.assetId, list);
@@ -168,12 +176,24 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+// OS "programada" = entra no denominador da aderência (scheduledStart
+// preenchido, independente do status atual).
+export function isScheduled(wo: WorkOrderForIndicators): boolean {
+  return wo.scheduledStart != null;
+}
+
+// OS "aderente" = programada E a execução iniciou no mesmo dia calendário do
+// scheduledStart. Extraído para reaplicar o mesmo critério por subconjunto
+// (ex.: por técnico) sem reescrever a definição.
+export function isAdherent(wo: WorkOrderForIndicators): boolean {
+  if (!isScheduled(wo)) return false;
+  const startedAt = aggregatedExecutionWindow(wo).startedAt;
+  return startedAt != null && isSameCalendarDay(startedAt, wo.scheduledStart!);
+}
+
 export function calculateAdherence(workOrders: WorkOrderForIndicators[]): AdherenceResult {
-  const scheduled = workOrders.filter((wo) => wo.scheduledStart);
-  const onTime = scheduled.filter((wo) => {
-    const startedAt = aggregatedExecutionWindow(wo).startedAt;
-    return startedAt && isSameCalendarDay(startedAt, wo.scheduledStart!);
-  });
+  const scheduled = workOrders.filter(isScheduled);
+  const onTime = scheduled.filter(isAdherent);
 
   return {
     percentage: scheduled.length === 0 ? null : (onTime.length / scheduled.length) * 100,
@@ -229,7 +249,7 @@ export interface WorkOrderLifecycle {
   statusHistory: { toStatus: string; changedAt: Date }[];
 }
 
-const TERMINAL_STATUSES: WorkOrderStatus[] = [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA];
+export const TERMINAL_STATUSES: WorkOrderStatus[] = [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA];
 
 // Duração de fase (§ decisão de negócio): cada par consecutivo de StatusHistory
 // (ordenado por changedAt) atribui sua duração ao toStatus do primeiro elemento
@@ -402,4 +422,62 @@ export function calculateTrend(currentCount: number, previousCount: number): Tre
     previousCount === 0 ? null : Math.round(((currentCount - previousCount) / previousCount) * 1000) / 10;
 
   return { currentCount, previousCount, deltaPercent };
+}
+
+// ---------------------------------------------------------------------------
+// Eficiência por técnico: MTTR, aderência e mix de tipos agrupados por
+// assignedToId, reusando os MESMOS predicados de calculateMttr/
+// calculateAdherence (executionDurationHours, isScheduled, isAdherent) sobre
+// o subconjunto de OS de cada técnico — sem duplicar as fórmulas. OS sem
+// assignedToId são ignoradas. inProgressCount conta status não-terminal
+// dentro do array recebido; o service decide se esse array é o período
+// filtrado ou o snapshot de carga atual (ver getTechnicianEfficiency).
+// ---------------------------------------------------------------------------
+export interface TechnicianEfficiency {
+  technicianId: string;
+  technicianName: string;
+  closedCount: number;
+  inProgressCount: number;
+  mttrHours: number | null;
+  adherencePercentage: number | null;
+  typeMix: Array<{ type: string; count: number }>;
+}
+
+export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators[]): TechnicianEfficiency[] {
+  const byTechnician = new Map<string, { name: string; workOrders: WorkOrderForIndicators[] }>();
+
+  for (const wo of workOrders) {
+    if (!wo.assignedToId) continue;
+    const existing = byTechnician.get(wo.assignedToId);
+    if (existing) {
+      existing.workOrders.push(wo);
+      if (!existing.name && wo.assignedToName) existing.name = wo.assignedToName;
+    } else {
+      byTechnician.set(wo.assignedToId, { name: wo.assignedToName ?? "", workOrders: [wo] });
+    }
+  }
+
+  const result = Array.from(byTechnician.entries()).map(([technicianId, { name, workOrders: list }]) => {
+    const closedCount = list.filter((wo) => wo.status === WorkOrderStatus.ENCERRADA).length;
+    const inProgressCount = list.filter((wo) => !TERMINAL_STATUSES.includes(wo.status)).length;
+
+    const mttrHours = summarizeHours(
+      list.map(executionDurationHours).filter((hours): hours is number => hours !== null)
+    ).hours;
+
+    const scheduled = list.filter(isScheduled);
+    const onTime = scheduled.filter(isAdherent);
+    const adherencePercentage = scheduled.length === 0 ? null : (onTime.length / scheduled.length) * 100;
+
+    const typeCounts = new Map<string, number>();
+    for (const wo of list) {
+      if (wo.status === WorkOrderStatus.CANCELADA) continue;
+      typeCounts.set(wo.type, (typeCounts.get(wo.type) ?? 0) + 1);
+    }
+    const typeMix = Array.from(typeCounts.entries()).map(([type, count]) => ({ type, count }));
+
+    return { technicianId, technicianName: name, closedCount, inProgressCount, mttrHours, adherencePercentage, typeMix };
+  });
+
+  return result.sort((a, b) => b.closedCount - a.closedCount || a.technicianName.localeCompare(b.technicianName));
 }

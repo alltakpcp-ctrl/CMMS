@@ -7,8 +7,10 @@ import {
   calculateMtbf,
   calculateMttr,
   calculatePhaseDurations,
+  calculateTechnicianEfficiency,
   calculateThroughput,
   calculateTrend,
+  TechnicianEfficiency,
   TrendResult,
   WorkOrderDistribution,
   WorkOrderForIndicators,
@@ -38,6 +40,8 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
       targetSectorId: true,
       priority: true,
       scheduledStart: true,
+      assignedToId: true,
+      assignedTo: { select: { name: true } },
       executions: { select: { startedAt: true, finishedAt: true } },
     },
   });
@@ -50,6 +54,8 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
     targetSectorId: wo.targetSectorId,
     priority: wo.priority as Priority | null,
     scheduledStart: wo.scheduledStart,
+    assignedToId: wo.assignedToId,
+    assignedToName: wo.assignedTo?.name ?? null,
     executions: wo.executions,
   }));
 }
@@ -187,4 +193,60 @@ export async function getDistribution(filters: IndicatorsQuery) {
   }
 
   return { distribution, trend };
+}
+
+export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
+  const periodWorkOrders = await fetchWorkOrdersForIndicators(filters);
+  const periodEfficiency = calculateTechnicianEfficiency(periodWorkOrders);
+
+  // inProgressCount deve refletir carga ATUAL, ignorando from/to (só respeita
+  // targetSectorId) — query separada, sem filtro de data, só com status
+  // não-terminal. Mescla por technicianId sobre o resultado do período:
+  // sobrescreve inProgressCount onde o técnico já aparece e adiciona quem só
+  // tem OS em aberto fora do período filtrado (com métricas de período
+  // zeradas/null).
+  const currentLoad = await prisma.workOrder.findMany({
+    where: {
+      status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
+      ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
+    },
+    select: {
+      assignedToId: true,
+      assignedTo: { select: { name: true } },
+    },
+  });
+
+  const inProgressByTechnician = new Map<string, { name: string; count: number }>();
+  for (const wo of currentLoad) {
+    if (!wo.assignedToId) continue;
+    const existing = inProgressByTechnician.get(wo.assignedToId);
+    inProgressByTechnician.set(wo.assignedToId, {
+      name: wo.assignedTo?.name ?? existing?.name ?? "",
+      count: (existing?.count ?? 0) + 1,
+    });
+  }
+
+  const byId = new Map(periodEfficiency.map((t) => [t.technicianId, { ...t }]));
+  for (const [technicianId, { name, count }] of inProgressByTechnician) {
+    const existing = byId.get(technicianId);
+    if (existing) {
+      existing.inProgressCount = count;
+    } else {
+      byId.set(technicianId, {
+        technicianId,
+        technicianName: name,
+        closedCount: 0,
+        inProgressCount: count,
+        mttrHours: null,
+        adherencePercentage: null,
+        typeMix: [],
+      });
+    }
+  }
+
+  const technicians: TechnicianEfficiency[] = Array.from(byId.values()).sort(
+    (a, b) => b.closedCount - a.closedCount || a.technicianName.localeCompare(b.technicianName)
+  );
+
+  return { technicians };
 }
