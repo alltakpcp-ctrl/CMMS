@@ -334,3 +334,72 @@ export function calculateThroughput(
 
   return { total, byMonth };
 }
+
+// ---------------------------------------------------------------------------
+// Distribuição (status / tipo / técnico) — Fase 3.B: shape desacoplado do
+// Prisma, como WorkOrderForIndicators acima. `assignedToName` é resolvido no
+// service via include e passado já pronto para manter esta função pura.
+// ---------------------------------------------------------------------------
+export interface WorkOrderDistribution {
+  id: string;
+  status: WorkOrderStatus;
+  type: WorkOrderType;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  createdAt: Date;
+}
+
+export interface DistributionResult {
+  byStatus: Array<{ status: string; count: number }>;
+  byType: Array<{ type: string; count: number }>;
+  byTechnician: Array<{ technicianId: string; technicianName: string; closedCount: number }>;
+}
+
+// byStatus/byType: só chaves com count > 0 (não emite zeros para status/tipos
+// ausentes no conjunto filtrado). byTechnician: técnico canônico é
+// WorkOrder.assignedToId (responsável principal) — WorkOrderAssignee (N:N de
+// apoio) não entra aqui; só conta OS ENCERRADA com assignedToId preenchido.
+export function calculateDistribution(workOrders: WorkOrderDistribution[]): DistributionResult {
+  const statusCounts = new Map<string, number>();
+  const typeCounts = new Map<string, number>();
+  const technicianCounts = new Map<string, { technicianName: string; closedCount: number }>();
+
+  for (const wo of workOrders) {
+    statusCounts.set(wo.status, (statusCounts.get(wo.status) ?? 0) + 1);
+    typeCounts.set(wo.type, (typeCounts.get(wo.type) ?? 0) + 1);
+
+    if (wo.status === WorkOrderStatus.ENCERRADA && wo.assignedToId) {
+      const existing = technicianCounts.get(wo.assignedToId);
+      technicianCounts.set(wo.assignedToId, {
+        technicianName: wo.assignedToName ?? existing?.technicianName ?? "",
+        closedCount: (existing?.closedCount ?? 0) + 1,
+      });
+    }
+  }
+
+  const byStatus = Array.from(statusCounts.entries()).map(([status, count]) => ({ status, count }));
+  const byType = Array.from(typeCounts.entries()).map(([type, count]) => ({ type, count }));
+  const byTechnician = Array.from(technicianCounts.entries())
+    .map(([technicianId, { technicianName, closedCount }]) => ({ technicianId, technicianName, closedCount }))
+    .sort((a, b) => b.closedCount - a.closedCount || a.technicianName.localeCompare(b.technicianName));
+
+  return { byStatus, byType, byTechnician };
+}
+
+// ---------------------------------------------------------------------------
+// Tendência (§ decisão de negócio): compara contagem de OS criadas no período
+// atual vs. período anterior de mesma largura. Recebe as contagens já
+// calculadas pelo service (mantém a função pura, sem refazer query).
+// ---------------------------------------------------------------------------
+export interface TrendResult {
+  currentCount: number;
+  previousCount: number;
+  deltaPercent: number | null;
+}
+
+export function calculateTrend(currentCount: number, previousCount: number): TrendResult {
+  const deltaPercent =
+    previousCount === 0 ? null : Math.round(((currentCount - previousCount) / previousCount) * 1000) / 10;
+
+  return { currentCount, previousCount, deltaPercent };
+}

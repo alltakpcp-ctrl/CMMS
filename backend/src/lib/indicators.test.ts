@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   calculateAdherence,
   calculateBacklog,
+  calculateDistribution,
   calculateMtbf,
   calculateMttr,
   calculatePhaseDurations,
   calculateThroughput,
+  calculateTrend,
+  WorkOrderDistribution,
   WorkOrderForIndicators,
   WorkOrderLifecycle,
 } from "./indicators";
@@ -30,6 +33,18 @@ function woLc(overrides: Partial<WorkOrderLifecycle>): WorkOrderLifecycle {
     id: overrides.id ?? Math.random().toString(36),
     status: WorkOrderStatus.ENCERRADA,
     statusHistory: [],
+    ...overrides,
+  };
+}
+
+function woDist(overrides: Partial<WorkOrderDistribution>): WorkOrderDistribution {
+  return {
+    id: overrides.id ?? Math.random().toString(36),
+    status: WorkOrderStatus.ENCERRADA,
+    type: WorkOrderType.CORRETIVA,
+    assignedToId: "user-1",
+    assignedToName: "Fulano",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -311,5 +326,76 @@ describe("calculateThroughput", () => {
     );
     expect(result.total).toBe(1);
     expect(result.byMonth).toEqual([{ month: "2026-02", count: 1 }]);
+  });
+});
+
+describe("calculateDistribution", () => {
+  it("retorna listas vazias sem dados", () => {
+    const result = calculateDistribution([]);
+    expect(result).toEqual({ byStatus: [], byType: [], byTechnician: [] });
+  });
+
+  it("conta byStatus só com chaves presentes, sem emitir zeros", () => {
+    const workOrders = [
+      woDist({ status: WorkOrderStatus.ABERTA }),
+      woDist({ status: WorkOrderStatus.ABERTA }),
+      woDist({ status: WorkOrderStatus.EM_EXECUCAO }),
+    ];
+    const result = calculateDistribution(workOrders);
+    expect(result.byStatus).toEqual([
+      { status: WorkOrderStatus.ABERTA, count: 2 },
+      { status: WorkOrderStatus.EM_EXECUCAO, count: 1 },
+    ]);
+  });
+
+  it("agrupa byType de forma data-driven, incluindo MELHORIA", () => {
+    const workOrders = [
+      woDist({ type: WorkOrderType.CORRETIVA }),
+      woDist({ type: WorkOrderType.PREVENTIVA }),
+      woDist({ type: WorkOrderType.MELHORIA }),
+      woDist({ type: WorkOrderType.MELHORIA }),
+    ];
+    const result = calculateDistribution(workOrders);
+    expect(result.byType).toEqual([
+      { type: WorkOrderType.CORRETIVA, count: 1 },
+      { type: WorkOrderType.PREVENTIVA, count: 1 },
+      { type: WorkOrderType.MELHORIA, count: 2 },
+    ]);
+  });
+
+  it("byTechnician só conta ENCERRADA com assignedToId, ordenando desc com desempate por nome", () => {
+    const workOrders = [
+      woDist({ status: WorkOrderStatus.ABERTA, assignedToId: "user-1", assignedToName: "Ana" }), // excluída: não encerrada
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: null, assignedToName: null }), // excluída: sem técnico
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: "user-1", assignedToName: "Ana" }),
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: "user-2", assignedToName: "Bruno" }),
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: "user-2", assignedToName: "Bruno" }),
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: "user-3", assignedToName: "Carla" }),
+      woDist({ status: WorkOrderStatus.ENCERRADA, assignedToId: "user-4", assignedToName: "Duda" }),
+    ];
+    const result = calculateDistribution(workOrders);
+    expect(result.byTechnician).toEqual([
+      { technicianId: "user-2", technicianName: "Bruno", closedCount: 2 },
+      { technicianId: "user-1", technicianName: "Ana", closedCount: 1 },
+      { technicianId: "user-3", technicianName: "Carla", closedCount: 1 },
+      { technicianId: "user-4", technicianName: "Duda", closedCount: 1 },
+    ]);
+  });
+});
+
+describe("calculateTrend", () => {
+  it("retorna deltaPercent null quando previousCount é 0", () => {
+    const result = calculateTrend(5, 0);
+    expect(result).toEqual({ currentCount: 5, previousCount: 0, deltaPercent: null });
+  });
+
+  it("calcula aumento percentual (12 vs 10 = +20%)", () => {
+    const result = calculateTrend(12, 10);
+    expect(result).toEqual({ currentCount: 12, previousCount: 10, deltaPercent: 20 });
+  });
+
+  it("calcula queda percentual (8 vs 10 = -20%)", () => {
+    const result = calculateTrend(8, 10);
+    expect(result).toEqual({ currentCount: 8, previousCount: 10, deltaPercent: -20 });
   });
 });

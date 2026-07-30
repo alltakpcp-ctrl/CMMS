@@ -3,7 +3,13 @@ import { Role } from "../../domain/enums";
 import { authenticate } from "../../middlewares/authenticate";
 import { authorize } from "../../middlewares/authorize";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { backlogController, byAssetController, getLifecycleController, overviewController } from "./controller";
+import {
+  backlogController,
+  byAssetController,
+  getDistributionController,
+  getLifecycleController,
+  overviewController,
+} from "./controller";
 
 export const indicatorsRoutes = Router();
 
@@ -17,3 +23,4 @@ indicatorsRoutes.get("/overview", asyncHandler(overviewController));
 indicatorsRoutes.get("/by-asset", asyncHandler(byAssetController));
 indicatorsRoutes.get("/backlog", asyncHandler(backlogController));
 indicatorsRoutes.get("/lifecycle", asyncHandler(getLifecycleController));
+indicatorsRoutes.get("/distribution", asyncHandler(getDistributionController));

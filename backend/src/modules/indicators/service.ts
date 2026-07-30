@@ -3,10 +3,14 @@ import { prisma } from "../../config/prisma";
 import {
   calculateAdherence,
   calculateBacklog,
+  calculateDistribution,
   calculateMtbf,
   calculateMttr,
   calculatePhaseDurations,
   calculateThroughput,
+  calculateTrend,
+  TrendResult,
+  WorkOrderDistribution,
   WorkOrderForIndicators,
   WorkOrderLifecycle,
 } from "../../lib/indicators";
@@ -127,4 +131,60 @@ export async function getLifecycle(filters: IndicatorsQuery) {
     phaseDurations: calculatePhaseDurations(mapped, new Date()),
     throughput: calculateThroughput(mapped, filters.from ?? null, filters.to ?? null),
   };
+}
+
+export async function getDistribution(filters: IndicatorsQuery) {
+  const where: Prisma.WorkOrderWhereInput = {
+    ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
+    ...((filters.from || filters.to) && {
+      createdAt: {
+        ...(filters.from && { gte: filters.from }),
+        ...(filters.to && { lte: filters.to }),
+      },
+    }),
+  };
+
+  const workOrders = await prisma.workOrder.findMany({
+    where,
+    select: {
+      id: true,
+      status: true,
+      type: true,
+      assignedToId: true,
+      createdAt: true,
+      assignedTo: { select: { name: true } },
+    },
+  });
+
+  const mapped: WorkOrderDistribution[] = workOrders.map((wo) => ({
+    id: wo.id,
+    status: wo.status as WorkOrderStatus,
+    type: wo.type as WorkOrderType,
+    assignedToId: wo.assignedToId,
+    assignedToName: wo.assignedTo?.name ?? null,
+    createdAt: wo.createdAt,
+  }));
+
+  const distribution = calculateDistribution(mapped);
+
+  let trend: TrendResult | null = null;
+  if (filters.from && filters.to) {
+    // Janela anterior de mesma largura, imediatamente antes de `from`. Topo
+    // exclusivo (lt prevTo) para não contar duas vezes uma OS criada
+    // exatamente em `from` — que já é contada na janela atual (gte from).
+    const span = filters.to.getTime() - filters.from.getTime();
+    const prevFrom = new Date(filters.from.getTime() - span);
+    const prevTo = filters.from;
+
+    const previousCount = await prisma.workOrder.count({
+      where: {
+        ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
+        createdAt: { gte: prevFrom, lt: prevTo },
+      },
+    });
+
+    trend = calculateTrend(mapped.length, previousCount);
+  }
+
+  return { distribution, trend };
 }

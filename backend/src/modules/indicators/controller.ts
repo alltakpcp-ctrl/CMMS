@@ -21,3 +21,8 @@ export async function getLifecycleController(req: Request, res: Response) {
   const query = indicatorsQuerySchema.parse(req.query);
   res.json(await indicatorsService.getLifecycle(query));
 }
+
+export async function getDistributionController(req: Request, res: Response) {
+  const query = indicatorsQuerySchema.parse(req.query);
+  res.json(await indicatorsService.getDistribution(query));
+}
