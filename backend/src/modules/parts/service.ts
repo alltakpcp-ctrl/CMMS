@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { CreatePartInput, UpdatePartInput } from "./schema";
@@ -25,5 +26,16 @@ export async function updatePart(id: string, input: UpdatePartInput) {
 
 export async function deletePart(id: string) {
   await getPartById(id);
-  await prisma.part.delete({ where: { id } });
+  try {
+    await prisma.part.delete({ where: { id } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      throw new AppError(
+        409,
+        "PART_HAS_MOVEMENTS",
+        "Peça possui histórico de movimentação e não pode ser excluída. Considere desativá-la (active=false)."
+      );
+    }
+    throw err;
+  }
 }

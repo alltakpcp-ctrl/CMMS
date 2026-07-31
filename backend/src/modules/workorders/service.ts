@@ -5,6 +5,7 @@ import { publicUserSelect } from "../../lib/publicUser";
 import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
+import { recordStockMovement } from "../stock/service";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
@@ -572,7 +573,14 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
         throw new AppError(422, "INSUFFICIENT_STOCK", `Saldo insuficiente para a peça ${part.description}.`);
       }
       await tx.workOrderPart.create({ data: { workOrderId: id, partId: item.partId, quantity: item.quantity } });
-      await tx.part.update({ where: { id: item.partId }, data: { stockQty: { decrement: item.quantity } } });
+      await recordStockMovement(tx, {
+        partId: item.partId,
+        type: "SAIDA",
+        quantity: item.quantity,
+        workOrderId: id,
+        userId: user.userId,
+        reason: "Baixa por execução de OS",
+      });
     }
 
     return tx.workOrder.findUniqueOrThrow({ where: { id }, include: workOrderInclude });
