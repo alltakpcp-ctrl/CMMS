@@ -34,6 +34,7 @@ model User {
   purchaseOrdersReviewed PurchaseOrder[] @relation("purchaseOrdersReviewed")
   assigneeOf          WorkOrderAssignee[]
   executionLogs       ExecutionLog[]
+  stockMovements      StockMovement[]
 }
 
 model Sector {
@@ -47,6 +48,7 @@ model Sector {
   assetSectors AssetSector[]
   workOrders   WorkOrder[]
   users        User[]
+  parts        Part[]
 }
 
 model Asset {
@@ -90,9 +92,18 @@ model Part {
   stockQty    Int      @default(0)
   createdAt   DateTime @default(now())
 
-  workOrderParts WorkOrderPart[]
-  partRequests   PartRequest[]
+  minStock    Int?
+  unitCost    Decimal? @db.Decimal(12, 2)
+  location    String?
+  sectorId    String?
+  sector      Sector?  @relation(fields: [sectorId], references: [id])
+  active      Boolean  @default(true)
+  updatedAt   DateTime @updatedAt @default(now())
+
+  workOrderParts   WorkOrderPart[]
+  partRequests     PartRequest[]
   plannedPartItems WorkOrderPlannedPart[]
+  stockMovements   StockMovement[]
 }
 
 model WorkOrder {
@@ -138,6 +149,7 @@ model WorkOrder {
   partRequests   PartRequest[]
   plannedPartItems WorkOrderPlannedPart[]
   assignees        WorkOrderAssignee[]
+  stockMovements   StockMovement[]
 }
 
 // Manutentores de apoio (N:N), distintos do responsável principal
@@ -200,6 +212,26 @@ model WorkOrderPart {
   quantity    Int
 }
 
+model StockMovement {
+  id           String   @id @default(cuid())
+  partId       String
+  part         Part     @relation(fields: [partId], references: [id])
+  type         String
+  quantity     Int
+  balanceAfter Int
+  unitCost     Decimal? @db.Decimal(12, 2)
+  workOrderId  String?
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  partRequestId String?
+  partRequest  PartRequest? @relation(fields: [partRequestId], references: [id])
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([partId, createdAt])
+}
+
 model WorkOrderPlannedPart {
   id          String    @id @default(cuid())
   workOrderId String
@@ -242,6 +274,8 @@ model PartRequest {
   rejectedReason  String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  stockMovements  StockMovement[]
 }
 
 model PurchaseOrder {
