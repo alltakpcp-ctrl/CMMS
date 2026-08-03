@@ -11,6 +11,7 @@ import { indicatorsRoutes } from "./modules/indicators/routes";
 import { sectorsRoutes } from "./modules/sectors/routes";
 import { partRequestsRoutes } from "./modules/part-requests/routes";
 import { purchaseOrdersRoutes } from "./modules/purchase-orders/routes";
+import { stockRoutes } from "./modules/stock/routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 export const app = express();
@@ -36,5 +37,6 @@ app.use("/indicators", indicatorsRoutes);
 app.use("/sectors", sectorsRoutes);
 app.use("/part-requests", partRequestsRoutes);
 app.use("/purchase-orders", purchaseOrdersRoutes);
+app.use("/stock", stockRoutes);
 
 app.use(errorHandler);
