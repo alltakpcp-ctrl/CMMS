@@ -163,7 +163,7 @@ async function main() {
     assetCode: string;
     createdAt: Date;
     finalStatus: WorkOrderStatus;
-    priority?: Priority;
+    priority: Priority;
     targetSectorId?: string;
     plan?: string;
     scheduledStart?: Date;
@@ -254,6 +254,7 @@ async function main() {
     assetCode: "AT-004",
     createdAt: daysAgo(2),
     finalStatus: WorkOrderStatus.ABERTA,
+    priority: Priority.BAIXA,
     history: linearHistory(WorkOrderStatus.ABERTA, daysAgo(2), 0),
   });
   specs.push({
@@ -263,6 +264,7 @@ async function main() {
     assetCode: "AT-009",
     createdAt: daysAgo(1),
     finalStatus: WorkOrderStatus.ABERTA,
+    priority: Priority.BAIXA,
     history: linearHistory(WorkOrderStatus.ABERTA, daysAgo(1), 0),
   });
 
