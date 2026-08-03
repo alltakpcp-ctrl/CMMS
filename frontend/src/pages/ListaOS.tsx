@@ -124,6 +124,7 @@ export default function ListaOS() {
           onRowClick={(wo) => navigate(`/ordens/${wo.id}`)}
           columns={[
             { header: "Número", cell: (wo) => <span className="font-medium text-slate-900">{wo.number}</span> },
+            { header: "Título", cell: (wo) => wo.title },
             { header: "Ativo", cell: (wo) => wo.asset.name },
             { header: "Tipo", cell: (wo) => TYPE_LABELS[wo.type] },
             {
@@ -137,7 +138,7 @@ export default function ListaOS() {
             },
             { header: "Setor", cell: (wo) => wo.targetSector?.name ?? "—" },
             { header: "Responsável", cell: (wo) => wo.assignedTo?.name ?? "—" },
-            { header: "Data", cell: (wo) => formatDate(wo.createdAt) },
+            { header: "Prazo", cell: (wo) => (wo.scheduledEnd ? formatDate(wo.scheduledEnd) : "—") },
           ]}
         />
       )}
