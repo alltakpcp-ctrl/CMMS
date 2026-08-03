@@ -29,6 +29,7 @@ export const updateUserSchema = z
     active: z.boolean().optional(),
     sectorId: z.string().nullable().optional(),
     canReceivePartRequests: z.boolean().optional(),
+    canManageStock: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     // role pode não vir no payload (o resultante depende do usuário existente) —

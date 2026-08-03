@@ -19,6 +19,7 @@ export interface PublicUser {
   createdAt: string;
   sector: { id: string; name: string } | null;
   canReceivePartRequests: boolean;
+  canManageStock: boolean;
 }
 
 export interface Asset {
