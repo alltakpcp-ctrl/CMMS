@@ -12,6 +12,11 @@ export async function listTecnicosController(req: Request, res: Response) {
   res.json(await usersService.listTecnicos(query.excludeUserId));
 }
 
+export async function listAssignableForSubtaskController(req: Request, res: Response) {
+  const query = listTecnicosQuerySchema.parse(req.query);
+  res.json(await usersService.listAssignableForSubtask(query.excludeUserId));
+}
+
 export async function createUserController(req: Request, res: Response) {
   const input = createUserSchema.parse(req.body);
   res.status(201).json(await usersService.createUser(input));

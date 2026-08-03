@@ -25,6 +25,21 @@ export async function listTecnicos(excludeUserId?: string) {
   });
 }
 
+// Lista de TECNICO + SUPERVISOR ativos — usada para atribuir/reatribuir
+// subtarefas (dono pode ser qualquer um dos dois papéis, diferente de
+// listTecnicos, restrita a TECNICO).
+export async function listAssignableForSubtask(excludeUserId?: string) {
+  return prisma.user.findMany({
+    where: {
+      role: { in: [Role.TECNICO, Role.SUPERVISOR] },
+      active: true,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: publicUserSelect,
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function createUser(input: CreateUserInput) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) {

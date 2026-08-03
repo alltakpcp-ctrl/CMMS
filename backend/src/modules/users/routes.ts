@@ -4,6 +4,7 @@ import {
   changePasswordController,
   createUserController,
   deleteUserController,
+  listAssignableForSubtaskController,
   listTecnicosController,
   listUsersController,
   updateUserController,
@@ -22,6 +23,16 @@ usersRoutes.get(
   authenticate,
   authorize(Role.TECNICO, Role.SUPERVISOR),
   asyncHandler(listTecnicosController)
+);
+
+// Lista de apoio para atribuir/reatribuir subtarefas (TECNICO + SUPERVISOR
+// ativos) — mesma exceção do /tecnicos acima, registrada antes do gate global
+// de SUPERVISOR, senão TECNICO receberia 403.
+usersRoutes.get(
+  "/assignable-subtask",
+  authenticate,
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(listAssignableForSubtaskController)
 );
 
 usersRoutes.use(authenticate, authorize(Role.SUPERVISOR));
