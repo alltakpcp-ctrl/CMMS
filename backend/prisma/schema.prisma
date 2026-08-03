@@ -36,6 +36,8 @@ model User {
   assigneeOf          WorkOrderAssignee[]
   executionLogs       ExecutionLog[]
   stockMovements      StockMovement[]
+  subtasksCreated     Subtask[]       @relation("SubtaskCreatedBy")
+  subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
 }
 
 model Sector {
@@ -152,6 +154,7 @@ model WorkOrder {
   plannedPartItems WorkOrderPlannedPart[]
   assignees        WorkOrderAssignee[]
   stockMovements   StockMovement[]
+  subtasks         Subtask[]
 }
 
 // Manutentores de apoio (N:N), distintos do responsável principal
@@ -168,6 +171,30 @@ model WorkOrderAssignee {
   @@unique([workOrderId, userId])
   @@index([workOrderId])
   @@index([userId])
+}
+
+// status é String validada via zod (ABERTA | CONCLUIDA | CANCELADA), mesma
+// decisão de §2 do CLAUDE.md aplicada aos demais campos do schema. Ortogonal
+// a Execution: subtarefas registram partes concluídas do trabalho dentro de
+// uma OS, sem relação com o ciclo de execução/registro de reparo.
+model Subtask {
+  id               String    @id @default(cuid())
+  workOrderId      String
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  status           String    @default("ABERTA")
+  estimatedMinutes Int
+  createdById      String
+  createdBy        User      @relation("SubtaskCreatedBy", fields: [createdById], references: [id])
+  assignedToId     String
+  assignedTo       User      @relation("SubtaskAssignedTo", fields: [assignedToId], references: [id])
+  finishedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([workOrderId])
+  @@index([assignedToId])
 }
 
 model Execution {
