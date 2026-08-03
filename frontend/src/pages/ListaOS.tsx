@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
 import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "../domain/labels";
@@ -20,11 +20,17 @@ export default function ListaOS() {
   const { token, user } = useAuth();
   const { showError } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<WorkOrderStatus | "">("");
+  const initialStatus = searchParams.get("status");
+  const [status, setStatus] = useState<WorkOrderStatus | "">(
+    initialStatus && (Object.values(WorkOrderStatus) as string[]).includes(initialStatus)
+      ? (initialStatus as WorkOrderStatus)
+      : ""
+  );
   const [type, setType] = useState<WorkOrderType | "">("");
   const [assetId, setAssetId] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
@@ -59,6 +65,14 @@ export default function ListaOS() {
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [token, user, status, type, assetId, onlyMine, showError]);
+
+  useEffect(() => {
+    if (status) {
+      setSearchParams({ status }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  }, [status, setSearchParams]);
 
   return (
     <div className="space-y-4">

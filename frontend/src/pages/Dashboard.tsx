@@ -114,10 +114,12 @@ export default function Dashboard() {
       {!loading && counts && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {STATUS_ORDER.map((status) => (
-            <Card key={status}>
-              <p className="text-2xl font-semibold text-slate-900">{counts[status] ?? 0}</p>
-              <p className="text-sm text-slate-500">{STATUS_LABELS[status]}</p>
-            </Card>
+            <Link key={status} to={`/ordens?status=${status}`}>
+              <Card>
+                <p className="text-2xl font-semibold text-slate-900">{counts[status] ?? 0}</p>
+                <p className="text-sm text-slate-500">{STATUS_LABELS[status]}</p>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
