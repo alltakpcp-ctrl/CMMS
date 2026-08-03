@@ -2,8 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as stockApi from "../../api/stock";
 import * as partsApi from "../../api/parts";
-import { Part } from "../../types";
+import { Part, StockMovement } from "../../types";
 import { Role } from "../../domain/enums";
+import { STOCK_MOVEMENT_TYPE_COLORS, STOCK_MOVEMENT_TYPE_LABELS } from "../../domain/labels";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
@@ -12,8 +13,10 @@ import { Select } from "../../components/Select";
 import { Textarea } from "../../components/Textarea";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { EmptyState } from "../../components/EmptyState";
+import { Badge } from "../../components/Badge";
 import { useToast } from "../../components/ToastProvider";
 import { getErrorMessage } from "../../lib/errors";
+import { formatDateTime } from "../../lib/format";
 
 type ModalType = "entry" | "adjust" | "return" | null;
 
@@ -26,6 +29,8 @@ export default function Estoque() {
   const { showError, showSuccess } = useToast();
   const podeMovimentar = user?.role === Role.SUPERVISOR || user?.canManageStock === true;
 
+  const [tab, setTab] = useState<"movimentacao" | "extrato">("movimentacao");
+
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalType>(null);
@@ -34,6 +39,10 @@ export default function Estoque() {
   const [entryForm, setEntryForm] = useState(emptyEntryForm);
   const [adjustForm, setAdjustForm] = useState(emptyAdjustForm);
   const [returnForm, setReturnForm] = useState(emptyReturnForm);
+
+  const [selectedPartId, setSelectedPartId] = useState("");
+  const [ledger, setLedger] = useState<StockMovement[]>([]);
+  const [loadingLedger, setLoadingLedger] = useState(false);
 
   function reload() {
     if (!token) return;
@@ -135,6 +144,21 @@ export default function Estoque() {
 
   const partOptions = parts.map((p) => ({ value: p.id, label: `${p.code} — ${p.description}` }));
 
+  function handleSelectLedgerPart(partId: string) {
+    setSelectedPartId(partId);
+    if (partId === "") {
+      setLedger([]);
+      return;
+    }
+    if (!token) return;
+    setLoadingLedger(true);
+    stockApi
+      .getLedger(token, partId)
+      .then(setLedger)
+      .catch((err) => showError(getErrorMessage(err)))
+      .finally(() => setLoadingLedger(false));
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -142,35 +166,97 @@ export default function Estoque() {
         <p className="text-sm text-slate-500">Controle de estoque e movimentações.</p>
       </div>
 
-      {podeMovimentar && (
-        <div className="flex gap-2">
-          <Button onClick={() => openModal("entry")}>Entrada</Button>
-          <Button variant="secondary" onClick={() => openModal("adjust")}>
-            Ajuste
-          </Button>
-          <Button variant="secondary" onClick={() => openModal("return")}>
-            Devolução
-          </Button>
+      <div className="flex gap-1 border-b border-slate-200">
+        <button
+          onClick={() => setTab("movimentacao")}
+          className={`px-4 py-2 text-sm font-medium ${
+            tab === "movimentacao" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Movimentação
+        </button>
+        <button
+          onClick={() => setTab("extrato")}
+          className={`px-4 py-2 text-sm font-medium ${
+            tab === "extrato" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Extrato
+        </button>
+      </div>
+
+      {tab === "movimentacao" && (
+        <div className="space-y-4">
+          {podeMovimentar && (
+            <div className="flex gap-2">
+              <Button onClick={() => openModal("entry")}>Entrada</Button>
+              <Button variant="secondary" onClick={() => openModal("adjust")}>
+                Ajuste
+              </Button>
+              <Button variant="secondary" onClick={() => openModal("return")}>
+                Devolução
+              </Button>
+            </div>
+          )}
+
+          {loading && <p className="text-sm text-slate-500">Carregando…</p>}
+
+          {!loading && parts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
+
+          {!loading && parts.length > 0 && (
+            <Table
+              rows={parts}
+              rowKey={(p) => p.id}
+              columns={[
+                { header: "Código", cell: (p) => p.code },
+                { header: "Descrição", cell: (p) => p.description },
+                { header: "Unidade", cell: (p) => p.unit },
+                { header: "Saldo", cell: (p) => p.stockQty },
+                { header: "Mínimo", cell: (p) => p.minStock ?? "—" },
+                { header: "Localização", cell: (p) => p.location ?? "—" },
+              ]}
+            />
+          )}
         </div>
       )}
 
-      {loading && <p className="text-sm text-slate-500">Carregando…</p>}
+      {tab === "extrato" && (
+        <div className="space-y-4">
+          <SearchableSelect
+            label="Peça"
+            value={selectedPartId}
+            onChange={handleSelectLedgerPart}
+            options={partOptions}
+          />
 
-      {!loading && parts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
+          {!selectedPartId && <EmptyState title="Selecione uma peça para ver o extrato" />}
 
-      {!loading && parts.length > 0 && (
-        <Table
-          rows={parts}
-          rowKey={(p) => p.id}
-          columns={[
-            { header: "Código", cell: (p) => p.code },
-            { header: "Descrição", cell: (p) => p.description },
-            { header: "Unidade", cell: (p) => p.unit },
-            { header: "Saldo", cell: (p) => p.stockQty },
-            { header: "Mínimo", cell: (p) => p.minStock ?? "—" },
-            { header: "Localização", cell: (p) => p.location ?? "—" },
-          ]}
-        />
+          {selectedPartId && loadingLedger && <p className="text-sm text-slate-500">Carregando…</p>}
+
+          {selectedPartId && !loadingLedger && ledger.length === 0 && (
+            <EmptyState title="Nenhuma movimentação para esta peça" />
+          )}
+
+          {selectedPartId && !loadingLedger && ledger.length > 0 && (
+            <Table
+              rows={ledger}
+              rowKey={(m) => m.id}
+              columns={[
+                { header: "Data", cell: (m) => formatDateTime(m.createdAt) },
+                {
+                  header: "Tipo",
+                  cell: (m) => (
+                    <Badge color={STOCK_MOVEMENT_TYPE_COLORS[m.type]}>{STOCK_MOVEMENT_TYPE_LABELS[m.type]}</Badge>
+                  ),
+                },
+                { header: "Quantidade", cell: (m) => m.quantity },
+                { header: "Saldo após", cell: (m) => m.balanceAfter },
+                { header: "Observação", cell: (m) => m.reason ?? "—" },
+                { header: "OS", cell: (m) => m.workOrderId ?? "—" },
+              ]}
+            />
+          )}
+        </div>
       )}
 
       {modal === "entry" && (

@@ -5,6 +5,7 @@ import {
   Priority,
   PurchaseOrderStatus,
   Role,
+  StockMovementType,
   WorkOrderStatus,
   WorkOrderType,
 } from "./enums";
@@ -96,4 +97,18 @@ export const PURCHASE_ORDER_STATUS_COLORS: Record<PurchaseOrderStatus, "slate" |
   ENVIADO: "amber",
   APROVADO: "green",
   REJEITADO: "red",
+};
+
+export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
+  ENTRADA: "Entrada",
+  SAIDA: "Saída",
+  AJUSTE: "Ajuste",
+  DEVOLUCAO: "Devolução",
+};
+
+export const STOCK_MOVEMENT_TYPE_COLORS: Record<StockMovementType, "slate" | "blue" | "amber" | "green" | "red"> = {
+  ENTRADA: "green",
+  SAIDA: "red",
+  AJUSTE: "amber",
+  DEVOLUCAO: "blue",
 };
