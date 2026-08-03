@@ -287,6 +287,7 @@ export default function Estoque() {
             <Table
               rows={visibleParts}
               rowKey={(p) => p.id}
+              onRowClick={podeMovimentar ? openEditPart : undefined}
               columns={[
                 { header: "Código", cell: (p) => p.code },
                 { header: "Descrição", cell: (p) => p.description },
@@ -299,15 +300,6 @@ export default function Estoque() {
                   cell: (p) => (isLowStock(p) ? <Badge color="red">Repor</Badge> : null),
                 },
                 { header: "Localização", cell: (p) => p.location ?? "—" },
-                {
-                  header: "",
-                  cell: (p) =>
-                    podeMovimentar ? (
-                      <Button variant="secondary" onClick={() => openEditPart(p)}>
-                        Editar
-                      </Button>
-                    ) : null,
-                },
               ]}
             />
           )}
