@@ -14,11 +14,14 @@ import { Textarea } from "../../components/Textarea";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { EmptyState } from "../../components/EmptyState";
 import { Badge } from "../../components/Badge";
+import { Checkbox } from "../../components/Checkbox";
 import { useToast } from "../../components/ToastProvider";
 import { getErrorMessage } from "../../lib/errors";
 import { formatDateTime } from "../../lib/format";
 
 type ModalType = "entry" | "adjust" | "return" | null;
+
+const isLowStock = (p: Part) => p.minStock !== null && p.stockQty <= p.minStock;
 
 const emptyEntryForm = { partId: "", quantity: 1, unitCost: "", reason: "" };
 const emptyAdjustForm = { partId: "", quantity: 1, direction: "increase" as "increase" | "decrease", reason: "" };
@@ -30,6 +33,7 @@ export default function Estoque() {
   const podeMovimentar = user?.role === Role.SUPERVISOR || user?.canManageStock === true;
 
   const [tab, setTab] = useState<"movimentacao" | "extrato">("movimentacao");
+  const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +147,7 @@ export default function Estoque() {
   }
 
   const partOptions = parts.map((p) => ({ value: p.id, label: `${p.code} — ${p.description}` }));
+  const visibleParts = onlyLowStock ? parts.filter(isLowStock) : parts;
 
   function handleSelectLedgerPart(partId: string) {
     setSelectedPartId(partId);
@@ -199,13 +204,19 @@ export default function Estoque() {
             </div>
           )}
 
+          <Checkbox
+            label="Só peças em reposição"
+            checked={onlyLowStock}
+            onChange={(e) => setOnlyLowStock(e.target.checked)}
+          />
+
           {loading && <p className="text-sm text-slate-500">Carregando…</p>}
 
-          {!loading && parts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
+          {!loading && visibleParts.length === 0 && <EmptyState title="Nenhuma peça cadastrada" />}
 
-          {!loading && parts.length > 0 && (
+          {!loading && visibleParts.length > 0 && (
             <Table
-              rows={parts}
+              rows={visibleParts}
               rowKey={(p) => p.id}
               columns={[
                 { header: "Código", cell: (p) => p.code },
@@ -213,6 +224,10 @@ export default function Estoque() {
                 { header: "Unidade", cell: (p) => p.unit },
                 { header: "Saldo", cell: (p) => p.stockQty },
                 { header: "Mínimo", cell: (p) => p.minStock ?? "—" },
+                {
+                  header: "Status",
+                  cell: (p) => (isLowStock(p) ? <Badge color="red">Repor</Badge> : null),
+                },
                 { header: "Localização", cell: (p) => p.location ?? "—" },
               ]}
             />
