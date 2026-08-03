@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NovaSolicitacao from "./pages/NovaSolicitacao";
@@ -10,7 +10,6 @@ import Agenda from "./pages/Agenda";
 import MinhasOS from "./pages/MinhasOS";
 import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
-import Pecas from "./pages/cadastros/Pecas";
 import Usuarios from "./pages/cadastros/Usuarios";
 import Estoque from "./pages/estoque/Estoque";
 import MontarPedido from "./pages/pedidos/MontarPedido";
@@ -102,14 +101,7 @@ export default function App() {
             </RequireRole>
           }
         />
-        <Route
-          path="/cadastros/pecas"
-          element={
-            <RequireRole roles={[Role.TECNICO, Role.SUPERVISOR]}>
-              <Pecas />
-            </RequireRole>
-          }
-        />
+        <Route path="/cadastros/pecas" element={<Navigate to="/estoque" replace />} />
         <Route
           path="/estoque"
           element={

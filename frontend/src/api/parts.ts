@@ -5,7 +5,9 @@ export interface PartInput {
   code: string;
   description: string;
   unit: string;
-  stockQty: number;
+  minStock?: number | null;
+  maxStock?: number | null;
+  location?: string | null;
 }
 
 export function listParts(token: string) {

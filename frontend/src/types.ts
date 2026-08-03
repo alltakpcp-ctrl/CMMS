@@ -44,6 +44,7 @@ export interface Part {
   unit: string;
   stockQty: number;
   minStock: number | null;
+  maxStock: number | null;
   unitCost: number | null;
   location: string | null;
   sectorId: string | null;

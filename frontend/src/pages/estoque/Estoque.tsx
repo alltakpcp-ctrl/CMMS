@@ -19,13 +19,21 @@ import { useToast } from "../../components/ToastProvider";
 import { getErrorMessage } from "../../lib/errors";
 import { formatDateTime } from "../../lib/format";
 
-type ModalType = "entry" | "adjust" | "return" | null;
+type ModalType = "entry" | "adjust" | "return" | "part" | null;
 
 const isLowStock = (p: Part) => p.minStock !== null && p.stockQty <= p.minStock;
 
 const emptyEntryForm = { partId: "", quantity: 1, unitCost: "", reason: "" };
 const emptyAdjustForm = { partId: "", quantity: 1, direction: "increase" as "increase" | "decrease", reason: "" };
 const emptyReturnForm = { partId: "", quantity: 1, workOrderId: "", reason: "" };
+const emptyPartForm = {
+  code: "",
+  description: "",
+  unit: "",
+  minStock: "" as string,
+  maxStock: "" as string,
+  location: "",
+};
 
 export default function Estoque() {
   const { token, user } = useAuth();
@@ -43,6 +51,8 @@ export default function Estoque() {
   const [entryForm, setEntryForm] = useState(emptyEntryForm);
   const [adjustForm, setAdjustForm] = useState(emptyAdjustForm);
   const [returnForm, setReturnForm] = useState(emptyReturnForm);
+  const [partForm, setPartForm] = useState(emptyPartForm);
+  const [editingPart, setEditingPart] = useState<Part | null>(null);
 
   const [selectedPartId, setSelectedPartId] = useState("");
   const [ledger, setLedger] = useState<StockMovement[]>([]);
@@ -64,11 +74,26 @@ export default function Estoque() {
     setEntryForm(emptyEntryForm);
     setAdjustForm(emptyAdjustForm);
     setReturnForm(emptyReturnForm);
+    setPartForm(emptyPartForm);
+    setEditingPart(null);
     setModal(type);
   }
 
   function closeModal() {
     setModal(null);
+  }
+
+  function openEditPart(part: Part) {
+    setEditingPart(part);
+    setPartForm({
+      code: part.code,
+      description: part.description,
+      unit: part.unit,
+      minStock: part.minStock === null ? "" : String(part.minStock),
+      maxStock: part.maxStock === null ? "" : String(part.maxStock),
+      location: part.location ?? "",
+    });
+    setModal("part");
   }
 
   async function handleEntrySubmit(e: FormEvent) {
@@ -146,6 +171,47 @@ export default function Estoque() {
     }
   }
 
+  async function handlePartSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    if (!editingPart && !partForm.code.trim()) return showError("Código é obrigatório.");
+    if (!editingPart && !partForm.description.trim()) return showError("Descrição é obrigatória.");
+    if (!partForm.unit.trim()) return showError("Unidade é obrigatória.");
+
+    const minStock = partForm.minStock === "" ? undefined : Number(partForm.minStock);
+    const maxStock = partForm.maxStock === "" ? undefined : Number(partForm.maxStock);
+    const location = partForm.location.trim() === "" ? undefined : partForm.location.trim();
+
+    setSubmitting(true);
+    try {
+      if (editingPart) {
+        await partsApi.updatePart(token, editingPart.id, {
+          unit: partForm.unit,
+          minStock,
+          maxStock,
+          location,
+        });
+        showSuccess("Peça atualizada.");
+      } else {
+        await partsApi.createPart(token, {
+          code: partForm.code,
+          description: partForm.description,
+          unit: partForm.unit,
+          minStock,
+          maxStock,
+          location,
+        });
+        showSuccess("Peça criada.");
+      }
+      closeModal();
+      reload();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const partOptions = parts.map((p) => ({ value: p.id, label: `${p.code} — ${p.description}` }));
   const visibleParts = onlyLowStock ? parts.filter(isLowStock) : parts;
 
@@ -201,6 +267,9 @@ export default function Estoque() {
               <Button variant="secondary" onClick={() => openModal("return")}>
                 Devolução
               </Button>
+              <Button variant="secondary" onClick={() => openModal("part")}>
+                Nova peça
+              </Button>
             </div>
           )}
 
@@ -224,11 +293,21 @@ export default function Estoque() {
                 { header: "Unidade", cell: (p) => p.unit },
                 { header: "Saldo", cell: (p) => p.stockQty },
                 { header: "Mínimo", cell: (p) => p.minStock ?? "—" },
+                { header: "Máximo", cell: (p) => p.maxStock ?? "—" },
                 {
                   header: "Status",
                   cell: (p) => (isLowStock(p) ? <Badge color="red">Repor</Badge> : null),
                 },
                 { header: "Localização", cell: (p) => p.location ?? "—" },
+                {
+                  header: "",
+                  cell: (p) =>
+                    podeMovimentar ? (
+                      <Button variant="secondary" onClick={() => openEditPart(p)}>
+                        Editar
+                      </Button>
+                    ) : null,
+                },
               ]}
             />
           )}
@@ -395,6 +474,67 @@ export default function Estoque() {
               required
             />
 
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={closeModal}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modal === "part" && (
+        <Modal title={editingPart ? "Editar peça" : "Nova peça"} onClose={closeModal}>
+          <form onSubmit={handlePartSubmit} className="space-y-4">
+            {!editingPart && (
+              <>
+                <Input
+                  label="Código"
+                  value={partForm.code}
+                  onChange={(e) => setPartForm({ ...partForm, code: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Descrição"
+                  value={partForm.description}
+                  onChange={(e) => setPartForm({ ...partForm, description: e.target.value })}
+                  required
+                />
+              </>
+            )}
+            {editingPart && (
+              <div className="text-sm text-slate-500">
+                {editingPart.code} — {editingPart.description}
+              </div>
+            )}
+            <Input
+              label="Unidade"
+              value={partForm.unit}
+              onChange={(e) => setPartForm({ ...partForm, unit: e.target.value })}
+              required
+            />
+            <Input
+              label="Estoque mínimo (opcional)"
+              type="number"
+              min={0}
+              value={partForm.minStock}
+              onChange={(e) => setPartForm({ ...partForm, minStock: e.target.value })}
+            />
+            <Input
+              label="Estoque máximo (opcional)"
+              type="number"
+              min={0}
+              value={partForm.maxStock}
+              onChange={(e) => setPartForm({ ...partForm, maxStock: e.target.value })}
+            />
+            <Input
+              label="Localização (opcional)"
+              value={partForm.location}
+              onChange={(e) => setPartForm({ ...partForm, location: e.target.value })}
+            />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={closeModal}>
                 Cancelar
