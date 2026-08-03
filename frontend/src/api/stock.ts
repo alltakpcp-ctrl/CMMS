@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { StockMovement } from "../types";
+import { Part, StockMovement } from "../types";
 
 export interface StockEntryInput {
   partId: string;
@@ -36,4 +36,8 @@ export function stockReturn(token: string, input: StockReturnInput) {
 
 export function getLedger(token: string, partId: string) {
   return apiRequest<StockMovement[]>(`/stock/ledger/${partId}`, { token });
+}
+
+export function getLowStock(token: string) {
+  return apiRequest<Part[]>("/stock/low-stock", { token });
 }

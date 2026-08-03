@@ -89,6 +89,18 @@ export function stockAdjust(input: StockAdjustInput, userId: string) {
   );
 }
 
+export function listLowStockParts() {
+  return prisma.part
+    .findMany({
+      where: {
+        active: true,
+        minStock: { not: null },
+      },
+      orderBy: { code: "asc" },
+    })
+    .then((parts) => parts.filter((p) => p.minStock !== null && p.stockQty <= p.minStock));
+}
+
 export async function getPartLedger(partId: string) {
   const part = await prisma.part.findUnique({ where: { id: partId } });
   if (!part) {

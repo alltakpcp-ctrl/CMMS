@@ -20,3 +20,7 @@ export async function stockReturnController(req: Request, res: Response) {
 export async function getPartLedgerController(req: Request, res: Response) {
   res.json(await stockService.getPartLedger(req.params.partId));
 }
+
+export async function listLowStockController(_req: Request, res: Response) {
+  res.json(await stockService.listLowStockParts());
+}
