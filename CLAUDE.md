@@ -48,9 +48,16 @@ Setores de destino: **Mecânica**, **Elétrica**, **Predial**.
   `backend/src/domain/enums.ts` e validados via zod. Onde este documento diz "enum",
   leia "String restrita aos valores de `domain/enums.ts`". A migração futura para
   Postgres pode converter esses campos em enums nativos, se desejado.
-- **Almoxarifado = cadastro simples.** Peças têm saldo de estoque; a baixa é
-  **manual** pelo técnico/supervisor ao registrar a execução. **NÃO** há fluxo de
-  aprovação de retirada nem perfil de almoxarife.
+- **Almoxarifado = controle de estoque com kardex.** Peças têm saldo (`stockQty`,
+  fonte de verdade cacheada) e campos de controle (`minStock`, `unitCost`,
+  `location`, `sectorId` opcional, `active`). Toda alteração de saldo grava um
+  `StockMovement` (kardex auditável) na MESMA transação, via helper
+  `recordStockMovement(tx, input)` — nunca increment/decrement, sempre valor
+  absoluto; saldo negativo é bloqueado (422 `INSUFFICIENT_STOCK`). A baixa por
+  execução de OS é automática (tipo `SAIDA`). Movimentação manual (entrada, ajuste,
+  devolução) é permitida a SUPERVISOR ou a TÉCNICO com a flag `canManageStock`, com
+  observação (`reason`) obrigatória. **NÃO** há fluxo de aprovação de retirada nem
+  perfil de almoxarife dedicado.
 - **Preventiva = abertura manual** no MVP. Deixar um campo/gancho no modelo
   (`Asset.preventivePeriodicityDays`, opcional) preparado para futura automação,
   mas **NÃO** implementar agendador/cron agora.
@@ -147,7 +154,9 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
 
 ### Part (Peça / item de almoxarifado)
 - `id`, `code` (único), `description`, `unit` (ex.: "un", "m", "L"),
-  `stockQty` (int), `createdAt`.
+  `stockQty` (int, saldo cacheado), `minStock` (int?), `unitCost` (Decimal?),
+  `location` (string?), `sectorId` (→ Sector, opcional), `active` (bool, default
+  true), `createdAt`, `updatedAt`.
 
 ### WorkOrder (OS)
 - `id`, `number` (string única, auto-gerada — ver §7),
@@ -176,7 +185,25 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
 
 ### WorkOrderPart (peças usadas na OS)
 - `id`, `workOrderId` (→ WorkOrder), `partId` (→ Part), `quantity` (int).
-- Ao registrar, dar baixa em `Part.stockQty` (validar saldo suficiente).
+- Ao registrar, a baixa em `Part.stockQty` é feita via `recordStockMovement` (tipo
+  `SAIDA`), que valida saldo e grava um `StockMovement` na mesma transação.
+
+### StockMovement (kardex / livro-razão de estoque)
+- `id`, `partId` (→ Part), `type` (string: `ENTRADA` | `SAIDA` | `AJUSTE` |
+  `DEVOLUCAO`; Zod, não enum Prisma), `quantity` (int, sempre positivo),
+  `balanceAfter` (int, saldo após o movimento), `unitCost` (Decimal?),
+  `workOrderId` (→ WorkOrder, opcional), `partRequestId` (→ PartRequest,
+  opcional), `userId` (→ User, quem executou), `reason` (string?), `createdAt`.
+  Índice em `(partId, createdAt)`.
+
+**Endpoints (módulo `stock`, prefixo `/stock`):**
+- `POST /stock/entry` — entrada de estoque (tipo ENTRADA). Gate: SUPERVISOR ou
+  TÉCNICO com `canManageStock`. `reason` obrigatório.
+- `POST /stock/adjust` — ajuste de saldo (`direction: increase|decrease`;
+  increase→ENTRADA, decrease→AJUSTE). Mesmo gate. `reason` obrigatório.
+- `POST /stock/return` — devolução (tipo DEVOLUCAO, credita; `workOrderId` opcional
+  de referência, sem validação cruzada contra a baixa). Mesmo gate. `reason` obrigatório.
+- `GET /stock/ledger/:partId` — extrato do kardex de uma peça. Gate: SUPERVISOR + TÉCNICO.
 
 ### StatusHistory (auditoria de transições)
 - `id`, `workOrderId` (→ WorkOrder), `fromStatus`, `toStatus`,
@@ -271,7 +298,9 @@ Endpoints de indicadores retornam JSON agregado; o dashboard consome e plota.
 2. Ao **terminar cada fase**, PARAR e apresentar um resumo do que foi feito +
    como testar. **Não** iniciar a próxima fase sem confirmação do usuário.
 3. Respeitar rigorosamente as decisões de MVP do §2 (não implementar cron de
-   preventiva, não criar fluxo de almoxarife).
+   preventiva, não criar fluxo de aprovação de retirada nem perfil de almoxarife
+   dedicado — a permissão de movimentar estoque é a flag `canManageStock`, não um
+   perfil novo).
 4. Se algo na spec conflitar com este CLAUDE.md, **este arquivo prevalece** —
    sinalizar o conflito ao usuário antes de prosseguir.
 5. Sempre que criar/alterar o schema, rodar migração e atualizar o seed.
