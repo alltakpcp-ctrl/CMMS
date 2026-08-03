@@ -254,6 +254,13 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       throw new AppError(status, result.code ?? "INVALID_TRANSITION", result.reason ?? "Transição inválida.");
     }
 
+    if (to === WorkOrderStatus.ENCERRADA) {
+      const openSubtask = await tx.subtask.findFirst({ where: { workOrderId: id, status: "ABERTA" } });
+      if (openSubtask) {
+        throw new AppError(422, "HAS_OPEN_SUBTASKS", "Existem subtarefas abertas nesta OS.");
+      }
+    }
+
     const extraData = (await mutate?.(tx, workOrder)) ?? {};
 
     const updated = await tx.workOrder.update({
