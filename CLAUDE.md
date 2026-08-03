@@ -173,15 +173,49 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
 - `assignedToId` (→ User TECNICO, opcional — etapa 3),
 - `createdAt`, `updatedAt`.
 
-### Execution (registro de execução — 1:1 com WorkOrder)
-- `id`, `workOrderId` (único → WorkOrder),
+### Execution (registro de execução — 1:N com WorkOrder)
+- `id`, `workOrderId` (→ WorkOrder, **sem** unique — uma OS pode ter mais de um
+  ciclo de execução, ex.: reprovação na validação que volta pra `EM_EXECUCAO`),
 - `riskAnalysis` (texto — análise de risco, etapa 4),
-- `rootCause` (texto — causa raiz constatada),
-- `repairDescription` (texto — o que foi feito),
+- `rootCause` (texto — causa raiz constatada, registro legado; ver `ExecutionLog`),
+- `repairDescription` (texto — o que foi feito, registro legado; ver `ExecutionLog`),
 - `startedAt` (datetime — preenchido automaticamente ao iniciar execução),
 - `finishedAt` (datetime — preenchido automaticamente no encerramento técnico),
 - `testNotes` (texto — testes com a operação, etapa 5),
 - `cleanupDone` (bool — 5S, etapa 5).
+- `logs` (→ `ExecutionLog[]`) — histórico de registros de causa raiz + reparo
+  dentro do mesmo ciclo de `Execution`; cada chamada a `registrar()` cria uma
+  entrada nova em vez de sobrescrever `rootCause`/`repairDescription`.
+
+### Subtask (subtarefa dentro da OS — ortogonal a Execution)
+- `id`, `workOrderId` (→ WorkOrder, `onDelete: Cascade`),
+  `title`, `description` (opcional), `estimatedMinutes` (int, obrigatório na
+  abertura, min. 1 — estimativa que o técnico digita ao abrir),
+  `createdById` (→ User), `assignedToId` (→ User, obrigatório — dono atual da
+  subtask), `finishedAt` (datetime, opcional), `createdAt`, `updatedAt`.
+- `status` (string validada via zod, nunca enum nativo — mesma decisão do §2):
+  `ABERTA` (default) → `CONCLUIDA` | `CANCELADA`. Transição só é permitida a
+  partir de `ABERTA`.
+- Técnicos registram partes concluídas do trabalho dentro de uma OS sem
+  depender do ciclo de `Execution`. **Hard-block:** a OS não pode ir para
+  `ENCERRADA` (transição `validar()` → `applyTransition`) enquanto houver
+  subtask `ABERTA` — verificado em `workorders/service.ts#applyTransition`,
+  logo antes do `mutate` da transição, erro `422 HAS_OPEN_SUBTASKS`. Esse
+  código **não** entra no union `TransitionErrorCode` de
+  `lib/workOrderStateMachine.ts` — é lançado direto via `AppError`, no mesmo
+  padrão de `INSUFFICIENT_STOCK` (stock/service.ts).
+- **Ownership guard** (módulo `subtasks`, checado no service — não em
+  middleware, pois depende do `assignedToId` da subtask, não do papel do
+  usuário): TECNICO só fecha/cancela/reatribui (`PATCH`) a subtask onde é
+  `assignedToId`; SUPERVISOR pode em qualquer uma. Violação → `403
+  SUBTASK_FORBIDDEN`. Abrir subtask é livre para TECNICO/SUPERVISOR.
+- Ao abrir, `assignedToId` default é `createdById`, mas o criador pode já
+  atribuir a outro técnico. Cancelar segue a mesma regra de fechar (dono ou
+  SUPERVISOR).
+- **Endpoints** (módulo `subtasks`, ver `app.ts`):
+  `GET/POST /workorders/:workOrderId/subtasks` (nested, listar/abrir),
+  `PATCH /subtasks/:id` (editar/reatribuir), `POST /subtasks/:id/finish`,
+  `POST /subtasks/:id/cancel`. Todas exigem `authorize(TECNICO, SUPERVISOR)`.
 
 ### WorkOrderPart (peças usadas na OS)
 - `id`, `workOrderId` (→ WorkOrder), `partId` (→ Part), `quantity` (int).
