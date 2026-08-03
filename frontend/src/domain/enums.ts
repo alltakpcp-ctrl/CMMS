@@ -75,3 +75,10 @@ export const StockMovementType = {
   DEVOLUCAO: "DEVOLUCAO",
 } as const;
 export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
+
+export const SubtaskStatus = {
+  ABERTA: "ABERTA",
+  CONCLUIDA: "CONCLUIDA",
+  CANCELADA: "CANCELADA",
+} as const;
+export type SubtaskStatus = (typeof SubtaskStatus)[keyof typeof SubtaskStatus];

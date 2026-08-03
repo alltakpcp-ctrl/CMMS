@@ -6,6 +6,7 @@ import {
   PurchaseOrderStatus,
   Role,
   StockMovementType,
+  SubtaskStatus,
   WorkOrderStatus,
   WorkOrderType,
 } from "./domain/enums";
@@ -73,6 +74,26 @@ export interface Execution {
   testNotes: string | null;
   cleanupDone: boolean;
   logs: ExecutionLog[];
+}
+
+// GET /workorders/:id/subtasks retorna só campos escalares (sem include de
+// relação) — createdBy/assignedTo ficam opcionais e hoje nunca vêm
+// populados; o nome do responsável é resolvido no componente via a lista de
+// usuários atribuíveis (useAssignableUsers).
+export interface Subtask {
+  id: string;
+  workOrderId: string;
+  title: string;
+  description: string | null;
+  status: SubtaskStatus;
+  estimatedMinutes: number;
+  createdById: string;
+  assignedToId: string;
+  createdBy?: PublicUser;
+  assignedTo?: PublicUser;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkOrderPart {

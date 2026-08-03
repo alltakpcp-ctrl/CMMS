@@ -31,6 +31,13 @@ export function listTecnicos(token: string, excludeUserId?: string) {
   return apiRequest<PublicUser[]>(`/users/tecnicos${qs}`, { token });
 }
 
+// Lista restrita a TECNICO + SUPERVISOR ativos — usada para atribuir/reatribuir
+// subtarefas (dono pode ser qualquer um dos dois papéis).
+export function listAssignableForSubtask(token: string, excludeUserId?: string) {
+  const qs = excludeUserId ? `?excludeUserId=${encodeURIComponent(excludeUserId)}` : "";
+  return apiRequest<PublicUser[]>(`/users/assignable-subtask${qs}`, { token });
+}
+
 export function createUser(token: string, input: CreateUserInput) {
   return apiRequest<PublicUser>("/users", { method: "POST", token, body: input });
 }

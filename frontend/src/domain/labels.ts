@@ -6,6 +6,7 @@ import {
   PurchaseOrderStatus,
   Role,
   StockMovementType,
+  SubtaskStatus,
   WorkOrderStatus,
   WorkOrderType,
 } from "./enums";
@@ -111,4 +112,16 @@ export const STOCK_MOVEMENT_TYPE_COLORS: Record<StockMovementType, "slate" | "bl
   SAIDA: "red",
   AJUSTE: "amber",
   DEVOLUCAO: "blue",
+};
+
+export const SUBTASK_STATUS_LABELS: Record<SubtaskStatus, string> = {
+  ABERTA: "Aberta",
+  CONCLUIDA: "Concluída",
+  CANCELADA: "Cancelada",
+};
+
+export const SUBTASK_STATUS_COLORS: Record<SubtaskStatus, "amber" | "green" | "red"> = {
+  ABERTA: "amber",
+  CONCLUIDA: "green",
+  CANCELADA: "red",
 };
