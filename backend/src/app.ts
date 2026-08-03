@@ -12,6 +12,7 @@ import { sectorsRoutes } from "./modules/sectors/routes";
 import { partRequestsRoutes } from "./modules/part-requests/routes";
 import { purchaseOrdersRoutes } from "./modules/purchase-orders/routes";
 import { stockRoutes } from "./modules/stock/routes";
+import { subtaskNestedRoutes, subtaskRoutes } from "./modules/subtasks/routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 export const app = express();
@@ -33,10 +34,12 @@ app.use("/users", usersRoutes);
 app.use("/assets", assetsRoutes);
 app.use("/parts", partsRoutes);
 app.use("/workorders", workOrdersRoutes);
+app.use("/workorders", subtaskNestedRoutes);
 app.use("/indicators", indicatorsRoutes);
 app.use("/sectors", sectorsRoutes);
 app.use("/part-requests", partRequestsRoutes);
 app.use("/purchase-orders", purchaseOrdersRoutes);
 app.use("/stock", stockRoutes);
+app.use("/subtasks", subtaskRoutes);
 
 app.use(errorHandler);
