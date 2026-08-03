@@ -22,6 +22,7 @@ model User {
   sectorId     String?
   sector       Sector?  @relation(fields: [sectorId], references: [id])
   canReceivePartRequests Boolean @default(false)
+  canManageStock Boolean @default(false)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
