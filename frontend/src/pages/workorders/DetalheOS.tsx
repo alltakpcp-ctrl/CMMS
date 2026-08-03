@@ -27,6 +27,7 @@ import { EncerramentoForm } from "./actions/EncerramentoForm";
 import { ValidarForm } from "./actions/ValidarForm";
 import { CancelarForm } from "./actions/CancelarForm";
 import { MoverFaseForm } from "./actions/MoverFaseForm";
+import { SubtaskPanel } from "./subtasks/SubtaskPanel";
 
 type ActionKey =
   | "triagem"
@@ -210,6 +211,8 @@ export default function DetalheOS() {
               </div>
             )}
           </Card>
+
+          {workOrder.status === WorkOrderStatus.EM_EXECUCAO && <SubtaskPanel workOrder={workOrder} />}
 
           {workOrder.executions.length > 0 &&
             workOrder.executions.map((execution, index) => (
