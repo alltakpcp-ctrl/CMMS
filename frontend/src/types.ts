@@ -5,6 +5,7 @@ import {
   Priority,
   PurchaseOrderStatus,
   Role,
+  StockMovementType,
   WorkOrderStatus,
   WorkOrderType,
 } from "./domain/enums";
@@ -42,7 +43,13 @@ export interface Part {
   description: string;
   unit: string;
   stockQty: number;
+  minStock: number | null;
+  unitCost: number | null;
+  location: string | null;
+  sectorId: string | null;
+  active: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ExecutionLog {
@@ -159,6 +166,20 @@ export interface PartRequest {
   rejectedReason: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StockMovement {
+  id: string;
+  partId: string;
+  type: StockMovementType;
+  quantity: number;
+  balanceAfter: number;
+  unitCost: number | null;
+  workOrderId: string | null;
+  partRequestId: string | null;
+  userId: string | null;
+  reason: string | null;
+  createdAt: string;
 }
 
 export interface PurchaseOrder {

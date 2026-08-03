@@ -67,3 +67,11 @@ export const PurchaseOrderStatus = {
   REJEITADO: "REJEITADO",
 } as const;
 export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
+
+export const StockMovementType = {
+  ENTRADA: "ENTRADA",
+  SAIDA: "SAIDA",
+  AJUSTE: "AJUSTE",
+  DEVOLUCAO: "DEVOLUCAO",
+} as const;
+export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
