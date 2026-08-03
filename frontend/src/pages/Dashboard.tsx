@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Role, WorkOrderStatus } from "../domain/enums";
 import { STATUS_LABELS } from "../domain/labels";
 import * as workOrdersApi from "../api/workorders";
+import * as stockApi from "../api/stock";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const { showError } = useToast();
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -47,6 +49,15 @@ export default function Dashboard() {
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [token, user, showError]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (user?.role !== Role.SUPERVISOR && user?.role !== Role.TECNICO) return;
+    stockApi
+      .getLowStock(token)
+      .then((parts) => setLowStockCount(parts.length))
+      .catch((err) => showError(getErrorMessage(err)));
+  }, [token, user?.role]);
 
   return (
     <div className="space-y-6">
@@ -86,6 +97,17 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
+
+      {lowStockCount > 0 && (
+        <Link to="/estoque" className="block">
+          <Card className="border-red-200 bg-red-50 hover:bg-red-100 transition-colors">
+            <p className="text-2xl font-semibold text-red-700">{lowStockCount}</p>
+            <p className="text-sm text-red-600">
+              {lowStockCount === 1 ? "peça em reposição" : "peças em reposição"}
+            </p>
+          </Card>
+        </Link>
+      )}
 
       {loading && <p className="text-sm text-slate-500">Carregando indicadores…</p>}
 
