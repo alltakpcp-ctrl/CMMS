@@ -11,3 +11,8 @@ prisma/test.db-journal
 *.log
 CREDENCIAL-ADMIN.local.txt
 *.local.txt
+
+# Scripts pontuais one-off (não versionados; mantidos localmente p/ referência)
+scripts/delete-cancelada.ts
+scripts/diag-cancelada.ts
+scripts/fix-orphan-execution.ts
