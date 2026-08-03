@@ -12,6 +12,7 @@ import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
 import Pecas from "./pages/cadastros/Pecas";
 import Usuarios from "./pages/cadastros/Usuarios";
+import Estoque from "./pages/estoque/Estoque";
 import MontarPedido from "./pages/pedidos/MontarPedido";
 import RevisaoPedidos from "./pages/pedidos/RevisaoPedidos";
 import { RequireAuth } from "./auth/RequireAuth";
@@ -106,6 +107,14 @@ export default function App() {
           element={
             <RequireRole roles={[Role.TECNICO, Role.SUPERVISOR]}>
               <Pecas />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/estoque"
+          element={
+            <RequireRole roles={[Role.SUPERVISOR, Role.TECNICO]}>
+              <Estoque />
             </RequireRole>
           }
         />
