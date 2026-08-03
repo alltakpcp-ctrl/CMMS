@@ -13,6 +13,7 @@ function toPublicUser(user: {
   active: boolean;
   sectorId: string | null;
   canReceivePartRequests: boolean;
+  canManageStock: boolean;
 }) {
   return {
     id: user.id,
@@ -22,6 +23,7 @@ function toPublicUser(user: {
     active: user.active,
     sectorId: user.sectorId,
     canReceivePartRequests: user.canReceivePartRequests,
+    canManageStock: user.canManageStock,
   };
 }
 
