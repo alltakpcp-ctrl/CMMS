@@ -8,19 +8,24 @@ export const rejectPartRequestSchema = z.object({
   rejectedReason: z.string().min(1, "Motivo da rejeição é obrigatório."),
 });
 
-export const reviewPurchaseOrderItemSchema = z.object({
-  itemId: z.string().min(1),
-  quantity: z.number().int().positive("Quantidade deve ser maior que zero."),
-});
+export const reviewPurchaseOrderItemSchema = z
+  .object({
+    itemId: z.string().min(1),
+    approvedQuantity: z.number().int().nonnegative(),
+    deferredQuantity: z.number().int().nonnegative(),
+  })
+  .refine((d) => d.approvedQuantity + d.deferredQuantity >= 1, {
+    message: "Cada item deve ter ao menos 1 unidade aprovada ou postergada.",
+  });
 
 export const reviewPurchaseOrderSchema = z
   .object({
-    action: z.enum(["APROVAR", "REJEITAR"]),
+    action: z.enum(["APROVAR", "DEVOLVER"]),
     reviewNotes: z.string().optional(),
     items: z.array(reviewPurchaseOrderItemSchema).optional(),
   })
   .refine((data) => data.action === "APROVAR" || Boolean(data.reviewNotes), {
-    message: "Nota é obrigatória ao rejeitar o pedido.",
+    message: "Nota é obrigatória ao devolver o pedido.",
     path: ["reviewNotes"],
   });
 

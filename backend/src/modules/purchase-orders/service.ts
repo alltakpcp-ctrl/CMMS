@@ -41,7 +41,7 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user:
     const purchaseOrder = await tx.purchaseOrder.create({
       data: {
         number,
-        status: PurchaseOrderStatus.ENVIADO,
+        status: PurchaseOrderStatus.EM_ANALISE,
         createdById: user.userId,
       },
     });
@@ -76,7 +76,7 @@ export async function rejectPartRequest(id: string, input: RejectPartRequestInpu
 
 export function listForSupervisor() {
   return prisma.purchaseOrder.findMany({
-    where: { status: PurchaseOrderStatus.ENVIADO },
+    where: { status: PurchaseOrderStatus.EM_ANALISE },
     include: purchaseOrderInclude,
     orderBy: { createdAt: "asc" },
   });
@@ -96,39 +96,118 @@ export async function reviewPurchaseOrder(id: string, input: ReviewPurchaseOrder
     if (!purchaseOrder) {
       throw new AppError(404, "PURCHASE_ORDER_NOT_FOUND", "Pedido de compra não encontrado.");
     }
-    if (purchaseOrder.status !== PurchaseOrderStatus.ENVIADO) {
-      throw new AppError(409, "INVALID_TRANSITION", "Só é possível revisar pedidos com status ENVIADO.");
+    if (purchaseOrder.status !== PurchaseOrderStatus.EM_ANALISE) {
+      throw new AppError(409, "INVALID_TRANSITION", "Só é possível revisar pedidos em análise.");
     }
 
-    for (const item of input.items ?? []) {
-      const belongsToOrder = purchaseOrder.items.some((partRequest) => partRequest.id === item.itemId);
-      if (!belongsToOrder) {
-        throw new AppError(422, "ITEM_NOT_IN_ORDER", `Item ${item.itemId} não pertence a este pedido.`);
-      }
-      await tx.partRequest.update({ where: { id: item.itemId }, data: { quantity: item.quantity } });
-    }
-
-    if (input.action === "REJEITAR") {
+    if (input.action === "DEVOLVER") {
       // Indicações voltam para DEVOLVIDA (não PENDENTE) — mantêm o
-      // purchaseOrderId deste pedido rejeitado para rastreabilidade, mas
+      // purchaseOrderId deste pedido devolvido para rastreabilidade, mas
       // ficam elegíveis para entrar em um novo pedido (ver listPending/create).
       await tx.partRequest.updateMany({
         where: { purchaseOrderId: id },
         data: { status: PartRequestStatus.DEVOLVIDA },
       });
-    } else {
-      // ATENDIDA é terminal: mantém o purchaseOrderId, mas não volta pra fila
-      // nem pode entrar em novo pedido (ver listPending/create).
-      await tx.partRequest.updateMany({
-        where: { purchaseOrderId: id },
-        data: { status: PartRequestStatus.ATENDIDA },
+
+      await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          status: PurchaseOrderStatus.DEVOLVIDO,
+          reviewedById: user.userId,
+          reviewedAt: new Date(),
+          reviewNotes: input.reviewNotes,
+        },
       });
+
+      return tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: purchaseOrderInclude });
+    }
+
+    // action === "APROVAR"
+    const itemsById = new Map(purchaseOrder.items.map((item) => [item.id, item]));
+    const decisions = input.items ?? [];
+    const decisionsById = new Map(decisions.map((decision) => [decision.itemId, decision]));
+
+    for (const decision of decisions) {
+      const item = itemsById.get(decision.itemId);
+      if (!item) {
+        throw new AppError(422, "ITEM_NOT_IN_ORDER", `Item ${decision.itemId} não pertence a este pedido.`);
+      }
+      if (decision.approvedQuantity + decision.deferredQuantity > item.quantity) {
+        throw new AppError(
+          422,
+          "QUANTITY_EXCEEDS_REQUESTED",
+          `Aprovado + postergado excede o solicitado no item ${decision.itemId}.`
+        );
+      }
+    }
+
+    for (const item of purchaseOrder.items) {
+      if (!decisionsById.has(item.id)) {
+        throw new AppError(422, "MISSING_ITEM_DECISION", `Decisão ausente para o item ${item.id}.`);
+      }
+    }
+
+    const totalApproved = decisions.reduce((sum, decision) => sum + decision.approvedQuantity, 0);
+    const totalDeferred = decisions.reduce((sum, decision) => sum + decision.deferredQuantity, 0);
+
+    if (totalApproved === 0) {
+      throw new AppError(
+        422,
+        "NOTHING_APPROVED",
+        "Nenhum item aprovado. Use Devolver se não pretende aprovar nada."
+      );
+    }
+
+    for (const decision of decisions) {
+      if (decision.approvedQuantity > 0) {
+        await tx.partRequest.update({
+          where: { id: decision.itemId },
+          data: { quantity: decision.approvedQuantity, status: PartRequestStatus.ATENDIDA },
+        });
+      } else if (decision.deferredQuantity > 0) {
+        // Não atendido neste pedido — a sobra é rastreada só pelo clone no
+        // pedido-filho (ver bloco abaixo); a quantity original não é alterada.
+        await tx.partRequest.update({
+          where: { id: decision.itemId },
+          data: { status: PartRequestStatus.DEVOLVIDA },
+        });
+      }
+    }
+
+    if (totalDeferred > 0) {
+      const childNumber = await generatePurchaseOrderNumber(tx);
+      const child = await tx.purchaseOrder.create({
+        data: {
+          number: childNumber,
+          status: PurchaseOrderStatus.EM_ANALISE,
+          createdById: user.userId,
+          parentPurchaseOrderId: id,
+        },
+      });
+
+      for (const decision of decisions) {
+        if (decision.deferredQuantity <= 0) continue;
+        const original = itemsById.get(decision.itemId)!;
+        await tx.partRequest.create({
+          data: {
+            itemType: original.itemType,
+            partId: original.partId,
+            description: original.description,
+            quantity: decision.deferredQuantity,
+            notes: original.notes,
+            osId: original.osId,
+            requestedById: original.requestedById,
+            status: PartRequestStatus.INCLUIDA,
+            purchaseOrderId: child.id,
+          },
+        });
+      }
     }
 
     await tx.purchaseOrder.update({
       where: { id },
       data: {
-        status: input.action === "APROVAR" ? PurchaseOrderStatus.APROVADO : PurchaseOrderStatus.REJEITADO,
+        status: totalDeferred > 0 ? PurchaseOrderStatus.APROVADO_PARCIAL : PurchaseOrderStatus.APROVADO,
         reviewedById: user.userId,
         reviewedAt: new Date(),
         reviewNotes: input.reviewNotes,
