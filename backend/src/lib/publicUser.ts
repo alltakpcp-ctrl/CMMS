@@ -8,5 +8,6 @@ export const publicUserSelect = {
   createdAt: true,
   canReceivePartRequests: true,
   canManageStock: true,
+  canPurchase: true,
   sector: { select: { id: true, name: true } },
 } as const;

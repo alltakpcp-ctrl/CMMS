@@ -34,6 +34,7 @@ interface EditFormState {
   sectorId: string | null;
   canReceivePartRequests: boolean;
   canManageStock: boolean;
+  canPurchase: boolean;
 }
 
 const emptyCreateForm: CreateFormState = {
@@ -72,6 +73,7 @@ export default function Usuarios() {
     sectorId: null,
     canReceivePartRequests: false,
     canManageStock: false,
+    canPurchase: false,
   });
   const [editEmailError, setEditEmailError] = useState<string | null>(null);
 
@@ -127,6 +129,7 @@ export default function Usuarios() {
       sectorId: user.sector?.id ?? null,
       canReceivePartRequests: user.canReceivePartRequests,
       canManageStock: user.canManageStock,
+      canPurchase: user.canPurchase,
     });
     setEditEmailError(null);
   }
@@ -379,6 +382,11 @@ export default function Usuarios() {
               label="Pode movimentar estoque"
               checked={editForm.canManageStock}
               onChange={(e) => setEditForm({ ...editForm, canManageStock: e.target.checked })}
+            />
+            <Checkbox
+              label="Pode comprar"
+              checked={editForm.canPurchase}
+              onChange={(e) => setEditForm({ ...editForm, canPurchase: e.target.checked })}
             />
 
             <p className="text-xs text-slate-500">

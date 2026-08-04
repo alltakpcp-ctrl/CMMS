@@ -18,6 +18,7 @@ export interface UpdateUserInput {
   sectorId?: string | null;
   canReceivePartRequests?: boolean;
   canManageStock?: boolean;
+  canPurchase?: boolean;
 }
 
 export function listUsers(token: string) {

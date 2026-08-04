@@ -22,6 +22,7 @@ export interface PublicUser {
   sector: { id: string; name: string } | null;
   canReceivePartRequests: boolean;
   canManageStock: boolean;
+  canPurchase: boolean;
 }
 
 export interface Asset {

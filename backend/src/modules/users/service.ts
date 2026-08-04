@@ -106,6 +106,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUserI
       sectorId,
       canReceivePartRequests: input.canReceivePartRequests,
       canManageStock: input.canManageStock,
+      canPurchase: input.canPurchase,
     },
     select: publicUserSelect,
   });

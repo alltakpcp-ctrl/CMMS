@@ -11,6 +11,7 @@ export interface AuthUser {
   sectorId: string | null;
   canReceivePartRequests: boolean;
   canManageStock: boolean;
+  canPurchase: boolean;
 }
 
 interface AuthContextValue {
