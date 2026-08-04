@@ -89,15 +89,21 @@ export const PART_REQUEST_STATUS_COLORS: Record<PartRequestStatus, "slate" | "bl
 };
 
 export const PURCHASE_ORDER_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
-  ENVIADO: "Enviado",
+  EM_ANALISE: "Em análise",
   APROVADO: "Aprovado",
+  APROVADO_PARCIAL: "Aprovado parcial",
+  DEVOLVIDO: "Devolvido",
   REJEITADO: "Rejeitado",
+  ENVIADO_COMPRAS: "Enviado a compras",
 };
 
 export const PURCHASE_ORDER_STATUS_COLORS: Record<PurchaseOrderStatus, "slate" | "blue" | "amber" | "green" | "red"> = {
-  ENVIADO: "amber",
+  EM_ANALISE: "amber",
   APROVADO: "green",
+  APROVADO_PARCIAL: "blue",
+  DEVOLVIDO: "slate",
   REJEITADO: "red",
+  ENVIADO_COMPRAS: "green",
 };
 
 export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {

@@ -62,9 +62,12 @@ export const PartRequestStatus = {
 export type PartRequestStatus = (typeof PartRequestStatus)[keyof typeof PartRequestStatus];
 
 export const PurchaseOrderStatus = {
-  ENVIADO: "ENVIADO",
+  EM_ANALISE: "EM_ANALISE",
   APROVADO: "APROVADO",
+  APROVADO_PARCIAL: "APROVADO_PARCIAL",
+  DEVOLVIDO: "DEVOLVIDO",
   REJEITADO: "REJEITADO",
+  ENVIADO_COMPRAS: "ENVIADO_COMPRAS",
 } as const;
 export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
 

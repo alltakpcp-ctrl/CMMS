@@ -23,6 +23,7 @@ model User {
   sector       Sector?  @relation(fields: [sectorId], references: [id])
   canReceivePartRequests Boolean @default(false)
   canManageStock Boolean @default(false)
+  canPurchase  Boolean @default(false)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
@@ -310,7 +311,7 @@ model PartRequest {
 model PurchaseOrder {
   id           String    @id @default(cuid())
   number       String    @unique
-  status       String    @default("ENVIADO") // ENVIADO | APROVADO | REJEITADO
+  status       String    @default("EM_ANALISE") // EM_ANALISE | APROVADO | APROVADO_PARCIAL | DEVOLVIDO | REJEITADO | ENVIADO_COMPRAS
   createdById  String
   createdBy    User      @relation("purchaseOrdersCreated", fields: [createdById], references: [id])
   reviewedById String?
@@ -318,6 +319,9 @@ model PurchaseOrder {
   reviewedAt   DateTime?
   reviewNotes  String?
   items        PartRequest[]
+  parentPurchaseOrderId String?
+  parent       PurchaseOrder?  @relation("PurchaseOrderChildren", fields: [parentPurchaseOrderId], references: [id])
+  children     PurchaseOrder[] @relation("PurchaseOrderChildren")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
