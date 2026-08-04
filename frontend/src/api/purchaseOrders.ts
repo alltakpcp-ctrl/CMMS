@@ -1,8 +1,13 @@
 import { apiRequest } from "./client";
 import { PartRequest, PurchaseOrder } from "../types";
 
+export interface PurchaseOrderItemInput {
+  partId: string;
+  quantity: number;
+}
+
 export interface CreatePurchaseOrderInput {
-  partRequestIds: string[];
+  items: PurchaseOrderItemInput[];
 }
 
 export interface RejectPartRequestInput {
