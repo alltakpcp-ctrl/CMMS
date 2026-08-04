@@ -8,6 +8,8 @@ export interface PublicOpenWorkOrder {
   priority: Priority;
   disciplina: Disciplina;
   createdAt: string;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
   targetSector: { name: string } | null;
   requester: { name: string };
   assignedTo: { name: string } | null;

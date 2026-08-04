@@ -19,6 +19,8 @@ const publicWorkOrderSelect = {
   priority: true,
   disciplina: true,
   createdAt: true,
+  scheduledStart: true,
+  scheduledEnd: true,
   targetSector: { select: { name: true } },
   requester: { select: { name: true } },
   assignedTo: { select: { name: true } },

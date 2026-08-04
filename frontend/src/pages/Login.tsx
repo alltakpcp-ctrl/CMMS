@@ -18,7 +18,7 @@ const PRIORITY_BG: Record<Priority, string> = {
   URGENTE: "#fee2e2", // red-100 (vermelho)
 };
 
-function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
+function WorkOrderCard({ wo, showSchedule }: { wo: PublicOpenWorkOrder; showSchedule?: boolean }) {
   return (
     <div
       className="rounded-xl border border-white/40 p-4 shadow-md backdrop-blur-sm"
@@ -44,7 +44,14 @@ function WorkOrderCard({ wo }: { wo: PublicOpenWorkOrder }) {
         <p>
           <span className="font-medium">Técnico:</span> {wo.assignedTo?.name ?? "Não designado"}
         </p>
-        <p className="text-slate-500">{formatDateTime(wo.createdAt)}</p>
+        {showSchedule ? (
+          <>
+            <p className="text-slate-500">Início: {wo.scheduledStart ? formatDateTime(wo.scheduledStart) : "—"}</p>
+            <p className="text-slate-500">Fim: {wo.scheduledEnd ? formatDateTime(wo.scheduledEnd) : "—"}</p>
+          </>
+        ) : (
+          <p className="text-slate-500">{formatDateTime(wo.createdAt)}</p>
+        )}
       </div>
     </div>
   );
@@ -56,12 +63,14 @@ function BoardColumn({
   items,
   loading,
   emptyLabel,
+  showSchedule,
 }: {
   title: string;
   subtitle: string;
   items: PublicOpenWorkOrder[];
   loading: boolean;
   emptyLabel: string;
+  showSchedule?: boolean;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -78,7 +87,7 @@ function BoardColumn({
       ) : (
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {items.map((wo) => (
-            <WorkOrderCard key={wo.number} wo={wo} />
+            <WorkOrderCard key={wo.number} wo={wo} showSchedule={showSchedule} />
           ))}
         </div>
       )}
@@ -127,6 +136,7 @@ function NovasSolicitacoesBoard() {
         items={board.programadas}
         loading={loading}
         emptyLabel="Nenhuma OS programada."
+        showSchedule
       />
     </div>
   );
