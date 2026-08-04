@@ -217,3 +217,33 @@ export async function reviewPurchaseOrder(id: string, input: ReviewPurchaseOrder
     return tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: purchaseOrderInclude });
   });
 }
+
+export async function closePurchaseOrder(id: string, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const purchaseOrder = await tx.purchaseOrder.findUnique({ where: { id } });
+    if (!purchaseOrder) {
+      throw new AppError(404, "PURCHASE_ORDER_NOT_FOUND", "Pedido de compra não encontrado.");
+    }
+    if (
+      purchaseOrder.status !== PurchaseOrderStatus.APROVADO &&
+      purchaseOrder.status !== PurchaseOrderStatus.APROVADO_PARCIAL
+    ) {
+      throw new AppError(409, "INVALID_TRANSITION", "Só pedidos aprovados podem ser enviados a compras.");
+    }
+
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: { status: PurchaseOrderStatus.ENVIADO_COMPRAS },
+    });
+
+    return tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: purchaseOrderInclude });
+  });
+}
+
+export function listForPurchasing() {
+  return prisma.purchaseOrder.findMany({
+    where: { status: PurchaseOrderStatus.ENVIADO_COMPRAS },
+    include: purchaseOrderInclude,
+    orderBy: { reviewedAt: "desc" },
+  });
+}

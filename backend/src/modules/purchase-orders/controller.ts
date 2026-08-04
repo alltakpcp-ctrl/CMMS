@@ -28,3 +28,11 @@ export async function reviewPurchaseOrderController(req: Request, res: Response)
   const input = reviewPurchaseOrderSchema.parse(req.body);
   res.json(await purchaseOrdersService.reviewPurchaseOrder(req.params.id, input, req.user!));
 }
+
+export async function closePurchaseOrderController(req: Request, res: Response) {
+  res.json(await purchaseOrdersService.closePurchaseOrder(req.params.id, req.user!));
+}
+
+export async function listPurchasingController(_req: Request, res: Response) {
+  res.json(await purchaseOrdersService.listForPurchasing());
+}
