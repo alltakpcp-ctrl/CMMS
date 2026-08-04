@@ -1,7 +1,12 @@
 import { z } from "zod";
 
+export const purchaseOrderItemInputSchema = z.object({
+  partId: z.string().min(1),
+  quantity: z.number().int().positive("Quantidade deve ser maior que zero."),
+});
+
 export const createPurchaseOrderSchema = z.object({
-  partRequestIds: z.array(z.string().min(1)).min(1, "Selecione ao menos uma indicação."),
+  items: z.array(purchaseOrderItemInputSchema).min(1, "Adicione ao menos um item."),
 });
 
 export const rejectPartRequestSchema = z.object({

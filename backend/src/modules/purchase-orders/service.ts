@@ -3,7 +3,7 @@ import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { publicUserSelect } from "../../lib/publicUser";
 import { generatePurchaseOrderNumber } from "../../lib/purchaseOrderNumber";
-import { PartRequestStatus, PurchaseOrderStatus } from "../../domain/enums";
+import { PartRequestItemType, PartRequestStatus, PurchaseOrderStatus } from "../../domain/enums";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { partRequestInclude } from "../part-requests/service";
 import { CreatePurchaseOrderInput, RejectPartRequestInput, ReviewPurchaseOrderInput } from "./schema";
@@ -17,25 +17,14 @@ const purchaseOrderInclude = {
 
 export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
-    const partRequests = await tx.partRequest.findMany({
-      where: { id: { in: input.partRequestIds } },
-    });
+    const partIds = [...new Set(input.items.map((item) => item.partId))];
+    const parts = await tx.part.findMany({ where: { id: { in: partIds } } });
 
-    if (partRequests.length !== input.partRequestIds.length) {
-      throw new AppError(404, "PART_REQUEST_NOT_FOUND", "Uma ou mais indicações não foram encontradas.");
+    if (parts.length !== partIds.length) {
+      throw new AppError(404, "PART_NOT_FOUND", "Uma ou mais peças não foram encontradas.");
     }
 
-    const notEligible = partRequests.find(
-      (partRequest) =>
-        partRequest.status !== PartRequestStatus.PENDENTE && partRequest.status !== PartRequestStatus.DEVOLVIDA
-    );
-    if (notEligible) {
-      throw new AppError(
-        409,
-        "INVALID_PART_REQUEST_STATUS",
-        `Indicação ${notEligible.id} não está PENDENTE nem DEVOLVIDA.`
-      );
-    }
+    const partsById = new Map(parts.map((part) => [part.id, part]));
 
     const number = await generatePurchaseOrderNumber(tx);
 
@@ -47,10 +36,22 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user:
       },
     });
 
-    await tx.partRequest.updateMany({
-      where: { id: { in: input.partRequestIds } },
-      data: { purchaseOrderId: purchaseOrder.id, status: PartRequestStatus.INCLUIDA },
-    });
+    for (const item of input.items) {
+      const part = partsById.get(item.partId)!;
+      await tx.partRequest.create({
+        data: {
+          itemType: PartRequestItemType.PECA,
+          partId: item.partId,
+          description: part.description,
+          quantity: item.quantity,
+          notes: null,
+          osId: null,
+          requestedById: user.userId,
+          status: PartRequestStatus.INCLUIDA,
+          purchaseOrderId: purchaseOrder.id,
+        },
+      });
+    }
 
     return tx.purchaseOrder.findUniqueOrThrow({
       where: { id: purchaseOrder.id },
