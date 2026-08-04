@@ -3,6 +3,8 @@ import { NavLink, Outlet } from "react-router-dom";
 import { AuthUser, useAuth } from "../auth/AuthContext";
 import { Role } from "../domain/enums";
 import { ROLE_LABELS } from "../domain/labels";
+import { useIdleLogout } from "../hooks/useIdleLogout";
+import { IdleWarningModal } from "../components/IdleWarningModal";
 
 type BooleanFlagKey = { [K in keyof AuthUser]: AuthUser[K] extends boolean ? K : never }[keyof AuthUser];
 
@@ -34,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 export function AppLayout() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const { warningVisible, secondsLeft, stayConnected } = useIdleLogout(logout);
 
   const items = NAV_ITEMS.filter((item) => {
     if (item.roles && (!user || !item.roles.includes(user.role))) return false;
@@ -53,6 +56,8 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-slate-100">
+      {warningVisible && <IdleWarningModal secondsLeft={secondsLeft} onStay={stayConnected} />}
+
       {open && (
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
