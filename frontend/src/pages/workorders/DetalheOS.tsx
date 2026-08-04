@@ -54,7 +54,9 @@ const ACTION_LABELS: Record<ActionKey, string> = {
 
 function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionKey[] {
   const actions: ActionKey[] = [];
-  const isAssignedTech = role === Role.TECNICO && userId === wo.assignedToId;
+  const isAssignedTech =
+    role === Role.TECNICO &&
+    (userId === wo.assignedToId || wo.assignees.some((a) => a.userId === userId));
 
   if (wo.status === WorkOrderStatus.ABERTA && (role === Role.TECNICO || role === Role.SUPERVISOR)) {
     actions.push("triagem");
