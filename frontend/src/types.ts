@@ -216,6 +216,7 @@ export interface PurchaseOrder {
   reviewedAt: string | null;
   reviewNotes: string | null;
   items: PartRequest[];
+  children?: Array<{ id: string; number: string }>;
   createdAt: string;
   updatedAt: string;
 }

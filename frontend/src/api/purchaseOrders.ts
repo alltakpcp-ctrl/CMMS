@@ -9,16 +9,24 @@ export interface RejectPartRequestInput {
   rejectedReason: string;
 }
 
+export interface ReviewPurchaseOrderItemInput {
+  itemId: string;
+  approvedQuantity: number;
+  deferredQuantity: number;
+}
+
 export interface ReviewPurchaseOrderInput {
-  action: "APROVAR" | "REJEITAR";
+  action: "APROVAR" | "DEVOLVER";
   reviewNotes?: string;
-  // NOTA: o backend (purchase-orders/schema.ts#reviewPurchaseOrderItemSchema)
-  // espera `itemId`, não `id` — mantido fiel ao contrato real implementado.
-  items?: Array<{ itemId: string; quantity: number }>;
+  items?: ReviewPurchaseOrderItemInput[];
 }
 
 export function listPurchaseOrders(token: string) {
   return apiRequest<PurchaseOrder[]>("/purchase-orders", { token });
+}
+
+export function listPurchasing(token: string) {
+  return apiRequest<PurchaseOrder[]>("/purchase-orders/purchasing", { token });
 }
 
 export function getPurchaseOrder(token: string, id: string) {

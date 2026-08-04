@@ -14,6 +14,7 @@ import Usuarios from "./pages/cadastros/Usuarios";
 import Estoque from "./pages/estoque/Estoque";
 import MontarPedido from "./pages/pedidos/MontarPedido";
 import RevisaoPedidos from "./pages/pedidos/RevisaoPedidos";
+import Compras from "./pages/pedidos/Compras";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireRole } from "./auth/RequireRole";
 import { RequireFlag } from "./auth/RequireFlag";
@@ -83,6 +84,14 @@ export default function App() {
             <RequireRole roles={[Role.SUPERVISOR]}>
               <RevisaoPedidos />
             </RequireRole>
+          }
+        />
+        <Route
+          path="/pedidos/compras"
+          element={
+            <RequireFlag flag="canPurchase">
+              <Compras />
+            </RequireFlag>
           }
         />
         <Route

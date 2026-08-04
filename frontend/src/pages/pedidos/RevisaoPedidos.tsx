@@ -13,6 +13,11 @@ import { useToast } from "../../components/ToastProvider";
 import { formatDateTime } from "../../lib/format";
 import { PART_REQUEST_ITEM_TYPE_LABELS } from "../../domain/labels";
 
+interface ItemDecision {
+  approved: number;
+  deferred: number;
+}
+
 export default function RevisaoPedidos() {
   const { token } = useAuth();
   const { showError, showSuccess } = useToast();
@@ -20,7 +25,7 @@ export default function RevisaoPedidos() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState<PurchaseOrder | null>(null);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
   const [reviewNotes, setReviewNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,30 +44,71 @@ export default function RevisaoPedidos() {
   function openReview(order: PurchaseOrder) {
     setReviewing(order);
     setReviewNotes("");
-    setQuantities(Object.fromEntries(order.items.map((item) => [item.id, item.quantity])));
+    setDecisions(
+      Object.fromEntries(order.items.map((item) => [item.id, { approved: item.quantity, deferred: 0 }]))
+    );
   }
 
-  function changedItems(order: PurchaseOrder) {
-    return order.items
-      .filter((item) => quantities[item.id] !== item.quantity)
-      .map((item) => ({ itemId: item.id, quantity: quantities[item.id] }));
-  }
-
-  async function handleReview(action: "APROVAR" | "REJEITAR") {
+  async function handleReview(action: "APROVAR" | "DEVOLVER") {
     if (!token || !reviewing) return;
-    if (action === "REJEITAR" && !reviewNotes.trim()) {
-      showError("Nota é obrigatória ao rejeitar o pedido.");
+
+    if (action === "DEVOLVER") {
+      if (!reviewNotes.trim()) {
+        showError("Nota é obrigatória ao devolver o pedido.");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await purchaseOrdersApi.reviewPurchaseOrder(token, reviewing.id, {
+          action: "DEVOLVER",
+          reviewNotes,
+        });
+        showSuccess("Pedido devolvido.");
+        setReviewing(null);
+        reload();
+      } catch (err) {
+        showError(getErrorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
+
+    // action === "APROVAR"
+    for (const item of reviewing.items) {
+      const decision = decisions[item.id] ?? { approved: 0, deferred: 0 };
+      if (decision.approved + decision.deferred > item.quantity) {
+        showError(`Aprovado + postergado excede o solicitado no item "${item.description}".`);
+        return;
+      }
+      if (decision.approved + decision.deferred < 1) {
+        showError(`Informe ao menos 1 unidade aprovada ou postergada no item "${item.description}".`);
+        return;
+      }
+    }
+
+    const totalApproved = reviewing.items.reduce(
+      (sum, item) => sum + (decisions[item.id]?.approved ?? 0),
+      0
+    );
+    if (totalApproved < 1) {
+      showError("Nenhum item aprovado. Use Devolver se não pretende aprovar nada.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const items = action === "APROVAR" ? changedItems(reviewing) : undefined;
+      const items = reviewing.items.map((item) => ({
+        itemId: item.id,
+        approvedQuantity: decisions[item.id]?.approved ?? 0,
+        deferredQuantity: decisions[item.id]?.deferred ?? 0,
+      }));
       await purchaseOrdersApi.reviewPurchaseOrder(token, reviewing.id, {
-        action,
+        action: "APROVAR",
         reviewNotes: reviewNotes || undefined,
-        items: items && items.length > 0 ? items : undefined,
+        items,
       });
-      showSuccess(action === "APROVAR" ? "Pedido aprovado." : "Pedido rejeitado.");
+      showSuccess("Pedido aprovado e enviado a compras.");
       setReviewing(null);
       reload();
     } catch (err) {
@@ -102,25 +148,47 @@ export default function RevisaoPedidos() {
           <div className="space-y-4">
             <div className="space-y-2">
               {reviewing.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {PART_REQUEST_ITEM_TYPE_LABELS[item.itemType]} — {item.description}
-                    </p>
-                    <p className="text-xs text-slate-500">Indicado por {item.requestedBy.name}</p>
+                <div key={item.id} className="rounded border border-slate-200 p-2">
+                  <p className="text-sm font-medium text-slate-900">
+                    {PART_REQUEST_ITEM_TYPE_LABELS[item.itemType]} — {item.description}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Indicado por {item.requestedBy.name} — solicitado: {item.quantity}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input
+                      label="Aprovar"
+                      type="number"
+                      min={0}
+                      className="w-24"
+                      value={decisions[item.id]?.approved ?? 0}
+                      onChange={(e) =>
+                        setDecisions((current) => ({
+                          ...current,
+                          [item.id]: {
+                            approved: Number(e.target.value),
+                            deferred: current[item.id]?.deferred ?? 0,
+                          },
+                        }))
+                      }
+                    />
+                    <Input
+                      label="Postergar"
+                      type="number"
+                      min={0}
+                      className="w-24"
+                      value={decisions[item.id]?.deferred ?? 0}
+                      onChange={(e) =>
+                        setDecisions((current) => ({
+                          ...current,
+                          [item.id]: {
+                            approved: current[item.id]?.approved ?? 0,
+                            deferred: Number(e.target.value),
+                          },
+                        }))
+                      }
+                    />
                   </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    className="w-24"
-                    value={quantities[item.id] ?? item.quantity}
-                    onChange={(e) =>
-                      setQuantities((current) => ({ ...current, [item.id]: Number(e.target.value) }))
-                    }
-                  />
                 </div>
               ))}
             </div>
@@ -131,8 +199,8 @@ export default function RevisaoPedidos() {
               <Button type="button" variant="secondary" onClick={() => setReviewing(null)}>
                 Cancelar
               </Button>
-              <Button type="button" variant="danger" disabled={submitting} onClick={() => handleReview("REJEITAR")}>
-                Rejeitar
+              <Button type="button" variant="danger" disabled={submitting} onClick={() => handleReview("DEVOLVER")}>
+                Devolver
               </Button>
               <Button type="button" disabled={submitting} onClick={() => handleReview("APROVAR")}>
                 Aprovar
