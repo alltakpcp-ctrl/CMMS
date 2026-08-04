@@ -230,7 +230,10 @@ interface ApplyTransitionParams {
 
 async function applyTransition({ id, to, role, userId, note, context, mutate }: ApplyTransitionParams) {
   return prisma.$transaction(async (tx) => {
-    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id },
+      include: { assignees: { select: { userId: true } } },
+    });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
     }
@@ -243,6 +246,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         userId,
         role,
         assignedToId: workOrder.assignedToId,
+        assigneeIds: workOrder.assignees.map((a) => a.userId),
         note,
         priority: workOrder.priority,
         ...context,
@@ -521,7 +525,10 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
 // Por isso não passa pela máquina de estados nem grava StatusHistory.
 export async function registrar(id: string, input: RegistrarInput, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
-    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id },
+      include: { assignees: { select: { userId: true } } },
+    });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
     }
@@ -535,7 +542,9 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
     }
 
     const isSupervisor = user.role === Role.SUPERVISOR;
-    const isAssignedTecnico = user.role === Role.TECNICO && user.userId === workOrder.assignedToId;
+    const isAssignedTecnico =
+      user.role === Role.TECNICO &&
+      (user.userId === workOrder.assignedToId || workOrder.assignees.some((a) => a.userId === user.userId));
     if (!isSupervisor && !isAssignedTecnico) {
       throw new AppError(
         403,

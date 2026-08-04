@@ -44,24 +44,44 @@ export function listSubtasks(workOrderId: string) {
 }
 
 export async function createSubtask(workOrderId: string, input: CreateSubtaskInput, user: AuthPayload) {
-  const workOrder = await prisma.workOrder.findUnique({ where: { id: workOrderId }, select: { id: true } });
-  if (!workOrder) {
-    throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
-  }
-
   if (input.assignedToId) {
     await assertValidAssignee(input.assignedToId);
   }
 
-  return prisma.subtask.create({
-    data: {
-      workOrderId,
-      title: input.title,
-      description: input.description,
-      estimatedMinutes: input.estimatedMinutes,
-      createdById: user.userId,
-      assignedToId: input.assignedToId ?? user.userId,
-    },
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: { id: true, assignedToId: true },
+    });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    const assignedToId = input.assignedToId ?? user.userId;
+
+    const subtask = await tx.subtask.create({
+      data: {
+        workOrderId,
+        title: input.title,
+        description: input.description,
+        estimatedMinutes: input.estimatedMinutes,
+        createdById: user.userId,
+        assignedToId,
+      },
+    });
+
+    // O responsável da subtask vira coresponsável da OS na pivot de apoio,
+    // salvo se já for o responsável principal (mesma regra de exclusão de
+    // resolveAssigneeIds em workorders/service.ts). createMany+skipDuplicates
+    // mantém a operação idempotente sem tocar nos vínculos já existentes.
+    if (assignedToId !== workOrder.assignedToId) {
+      await tx.workOrderAssignee.createMany({
+        data: [{ workOrderId, userId: assignedToId }],
+        skipDuplicates: true,
+      });
+    }
+
+    return subtask;
   });
 }
 

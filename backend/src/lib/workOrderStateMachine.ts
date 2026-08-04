@@ -18,6 +18,7 @@ export interface TransitionContext {
   userId: string;
   role?: Role;
   assignedToId?: string | null;
+  assigneeIds?: string[];
   note?: string | null;
   hasScheduledStart?: boolean;
   hasScheduledEnd?: boolean;
@@ -137,7 +138,8 @@ export function canTransition(params: {
   if (
     rule.requireAssignedTechnician &&
     context.role === Role.TECNICO &&
-    context.userId !== context.assignedToId
+    context.userId !== context.assignedToId &&
+    !(context.assigneeIds ?? []).includes(context.userId)
   ) {
     return {
       ok: false,
