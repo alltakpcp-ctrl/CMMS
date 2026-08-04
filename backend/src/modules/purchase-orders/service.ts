@@ -12,6 +12,7 @@ const purchaseOrderInclude = {
   createdBy: { select: publicUserSelect },
   reviewedBy: { select: publicUserSelect },
   items: { include: partRequestInclude },
+  children: { select: { id: true, number: true } },
 } satisfies Prisma.PurchaseOrderInclude;
 
 export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user: AuthPayload) {
@@ -207,7 +208,7 @@ export async function reviewPurchaseOrder(id: string, input: ReviewPurchaseOrder
     await tx.purchaseOrder.update({
       where: { id },
       data: {
-        status: totalDeferred > 0 ? PurchaseOrderStatus.APROVADO_PARCIAL : PurchaseOrderStatus.APROVADO,
+        status: PurchaseOrderStatus.ENVIADO_COMPRAS,
         reviewedById: user.userId,
         reviewedAt: new Date(),
         reviewNotes: input.reviewNotes,
