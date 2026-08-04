@@ -173,6 +173,7 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
     ...(rest.assetId && { assetId: rest.assetId }),
     ...(rest.assignedToId && { assignedToId: rest.assignedToId }),
     ...(rest.requesterId && { requesterId: rest.requesterId }),
+    ...(rest.asSupport && { assignees: { some: { userId: user.userId } } }),
     ...(sectorFilter.sectorId && { asset: { sectorId: sectorFilter.sectorId } }),
   };
 

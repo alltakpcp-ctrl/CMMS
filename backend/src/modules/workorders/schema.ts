@@ -17,6 +17,7 @@ export const listWorkOrdersQuerySchema = z.object({
   assetId: z.string().optional(),
   assignedToId: z.string().optional(),
   requesterId: z.string().optional(),
+  asSupport: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });

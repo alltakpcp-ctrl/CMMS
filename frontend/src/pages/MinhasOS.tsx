@@ -7,6 +7,7 @@ import * as workOrdersApi from "../api/workorders";
 import { WorkOrder } from "../types";
 import { Card } from "../components/Card";
 import { Badge } from "../components/Badge";
+import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
 import { formatDateTime } from "../lib/format";
 import { getErrorMessage } from "../lib/errors";
@@ -34,16 +35,21 @@ export default function MinhasOS() {
 
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"principal" | "apoio">("principal");
 
   useEffect(() => {
     if (!token || !user) return;
     setLoading(true);
+    const filters =
+      mode === "apoio"
+        ? { asSupport: true, pageSize: 100 }
+        : { assignedToId: user.id, pageSize: 100 };
     workOrdersApi
-      .listWorkOrders(token, { assignedToId: user.id, pageSize: 100 })
+      .listWorkOrders(token, filters)
       .then((result) => setItems(result.items))
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [token, user, showError]);
+  }, [token, user, mode, showError]);
 
   if (loading) return <p className="text-sm text-slate-500">Carregando…</p>;
 
@@ -58,10 +64,40 @@ export default function MinhasOS() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Minhas OS</h1>
-        <p className="text-sm text-slate-500">Ordens de serviço atribuídas a você, por status.</p>
+        <p className="text-sm text-slate-500">
+          {mode === "apoio"
+            ? "Ordens de serviço onde você é manutentor de apoio, por status."
+            : "Ordens de serviço atribuídas a você, por status."}
+        </p>
       </div>
 
-      {!hasAny && <EmptyState title="Nenhuma OS atribuída" description="Você ainda não tem OS sob responsabilidade." />}
+      <div className="flex gap-2">
+        <Button
+          variant={mode === "principal" ? "primary" : "secondary"}
+          type="button"
+          onClick={() => setMode("principal")}
+        >
+          Minhas OS
+        </Button>
+        <Button
+          variant={mode === "apoio" ? "primary" : "secondary"}
+          type="button"
+          onClick={() => setMode("apoio")}
+        >
+          OS como apoio
+        </Button>
+      </div>
+
+      {!hasAny && (
+        <EmptyState
+          title={mode === "apoio" ? "Nenhuma OS como apoio" : "Nenhuma OS atribuída"}
+          description={
+            mode === "apoio"
+              ? "Você não é manutentor de apoio em nenhuma OS no momento."
+              : "Você ainda não tem OS sob responsabilidade."
+          }
+        />
+      )}
 
       {hasAny &&
         grouped.map(

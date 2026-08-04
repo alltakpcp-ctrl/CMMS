@@ -18,6 +18,7 @@ export interface ListWorkOrdersFilters {
   assetId?: string;
   assignedToId?: string;
   requesterId?: string;
+  asSupport?: boolean;
   page?: number;
   pageSize?: number;
 }
