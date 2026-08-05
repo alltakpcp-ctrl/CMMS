@@ -39,6 +39,7 @@ model User {
   stockMovements      StockMovement[]
   subtasksCreated     Subtask[]       @relation("SubtaskCreatedBy")
   subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
+  purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
 }
 
 model Sector {
@@ -329,4 +330,16 @@ model PurchaseOrder {
   children     PurchaseOrder[] @relation("PurchaseOrderChildren")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  comments     PurchaseOrderComment[]
+}
+
+model PurchaseOrderComment {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          User          @relation("purchaseOrderComments", fields: [authorId], references: [id])
+  body            String
+  supplierName    String?
+  createdAt       DateTime      @default(now())
 }
