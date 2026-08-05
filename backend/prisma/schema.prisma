@@ -76,6 +76,7 @@ model Asset {
 
   workOrders WorkOrder[]
   sectors    AssetSector[]
+  partRequests PartRequest[]
 }
 
 model AssetSector {
@@ -297,6 +298,10 @@ model PartRequest {
   status          String         @default("PENDENTE") // PENDENTE | INCLUIDA | REJEITADA
   osId            String?
   workOrder       WorkOrder?     @relation(fields: [osId], references: [id])
+  assetId         String?
+  asset           Asset?         @relation(fields: [assetId], references: [id])
+  criticality     Int?
+  supplierName    String?
   requestedById   String
   requestedBy     User           @relation("partRequestsCreated", fields: [requestedById], references: [id])
   purchaseOrderId String?
