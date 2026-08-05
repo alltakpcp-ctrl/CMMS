@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  createPurchaseOrderCommentSchema,
   createPurchaseOrderSchema,
   rejectPartRequestSchema,
   reviewPurchaseOrderSchema,
@@ -39,4 +40,13 @@ export async function closePurchaseOrderController(req: Request, res: Response) 
 
 export async function listPurchasingController(_req: Request, res: Response) {
   res.json(await purchaseOrdersService.listForPurchasing());
+}
+
+export async function createPurchaseOrderCommentController(req: Request, res: Response) {
+  const input = createPurchaseOrderCommentSchema.parse(req.body);
+  res.status(201).json(await purchaseOrdersService.createPurchaseOrderComment(req.params.id, input, req.user!));
+}
+
+export async function listPurchaseOrderCommentsController(req: Request, res: Response) {
+  res.json(await purchaseOrdersService.listPurchaseOrderComments(req.params.id));
 }

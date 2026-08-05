@@ -36,6 +36,12 @@ export const reviewPurchaseOrderSchema = z
     path: ["reviewNotes"],
   });
 
+export const createPurchaseOrderCommentSchema = z.object({
+  body: z.string().min(1, "Comentário não pode ser vazio."),
+  supplierName: z.string().min(1).optional(),
+});
+
 export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>;
 export type RejectPartRequestInput = z.infer<typeof rejectPartRequestSchema>;
 export type ReviewPurchaseOrderInput = z.infer<typeof reviewPurchaseOrderSchema>;
+export type CreatePurchaseOrderCommentInput = z.infer<typeof createPurchaseOrderCommentSchema>;

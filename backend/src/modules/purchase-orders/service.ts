@@ -6,7 +6,12 @@ import { generatePurchaseOrderNumber } from "../../lib/purchaseOrderNumber";
 import { PartRequestItemType, PartRequestStatus, PurchaseOrderStatus } from "../../domain/enums";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { partRequestInclude } from "../part-requests/service";
-import { CreatePurchaseOrderInput, RejectPartRequestInput, ReviewPurchaseOrderInput } from "./schema";
+import {
+  CreatePurchaseOrderCommentInput,
+  CreatePurchaseOrderInput,
+  RejectPartRequestInput,
+  ReviewPurchaseOrderInput,
+} from "./schema";
 
 const purchaseOrderInclude = {
   createdBy: { select: publicUserSelect },
@@ -316,5 +321,54 @@ export function listForPurchasing() {
     where: { status: PurchaseOrderStatus.ENVIADO_COMPRAS },
     include: purchaseOrderInclude,
     orderBy: { reviewedAt: "desc" },
+  });
+}
+
+export async function createPurchaseOrderComment(
+  purchaseOrderId: string,
+  input: CreatePurchaseOrderCommentInput,
+  user: AuthPayload
+) {
+  const purchaseOrder = await prisma.purchaseOrder.findUnique({
+    where: { id: purchaseOrderId },
+    select: { id: true, status: true },
+  });
+
+  if (!purchaseOrder) {
+    throw new AppError(404, "PURCHASE_ORDER_NOT_FOUND", "Pedido de compra não encontrado.");
+  }
+
+  if (
+    purchaseOrder.status !== PurchaseOrderStatus.EM_ANALISE &&
+    purchaseOrder.status !== PurchaseOrderStatus.DEVOLVIDO
+  ) {
+    throw new AppError(409, "ORDER_NOT_EDITABLE", "Não é possível comentar em um pedido finalizado.");
+  }
+
+  return prisma.purchaseOrderComment.create({
+    data: {
+      purchaseOrderId,
+      authorId: user.userId,
+      body: input.body,
+      supplierName: input.supplierName ?? null,
+    },
+    include: { author: { select: publicUserSelect } },
+  });
+}
+
+export async function listPurchaseOrderComments(purchaseOrderId: string) {
+  const purchaseOrder = await prisma.purchaseOrder.findUnique({
+    where: { id: purchaseOrderId },
+    select: { id: true },
+  });
+
+  if (!purchaseOrder) {
+    throw new AppError(404, "PURCHASE_ORDER_NOT_FOUND", "Pedido de compra não encontrado.");
+  }
+
+  return prisma.purchaseOrderComment.findMany({
+    where: { purchaseOrderId },
+    include: { author: { select: publicUserSelect } },
+    orderBy: { createdAt: "asc" },
   });
 }

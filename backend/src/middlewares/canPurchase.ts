@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prisma";
 import { AppError } from "../lib/AppError";
+import { Role } from "../domain/enums";
 
 // Permissão de acessar a fila de compras NÃO é role — é a flag
 // canPurchase no User. O JWT só carrega userId/role (ver
@@ -20,6 +21,27 @@ export function canPurchase() {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       next(new AppError(401, "UNAUTHENTICATED", "Token de autenticação ausente."));
+      return;
+    }
+
+    assertCanPurchase(req.user.userId)
+      .then(() => next())
+      .catch(next);
+  };
+}
+
+// Leitura da thread de comentários do pedido: além de quem tem a flag
+// canPurchase (escrita), o SUPERVISOR também precisa ler a discussão com o
+// fornecedor para decidir na revisão do pedido (POST /:id/review).
+export function canPurchaseOrSupervisor() {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      next(new AppError(401, "UNAUTHENTICATED", "Token de autenticação ausente."));
+      return;
+    }
+
+    if (req.user.role === Role.SUPERVISOR) {
+      next();
       return;
     }
 
