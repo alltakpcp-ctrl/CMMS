@@ -26,6 +26,18 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user:
 
     const partsById = new Map(parts.map((part) => [part.id, part]));
 
+    const assetIds = [...new Set(input.items.map((item) => item.assetId).filter((id): id is string => Boolean(id)))];
+    const assets = await tx.asset.findMany({
+      where: { id: { in: assetIds } },
+      select: { id: true, criticality: true },
+    });
+
+    if (assets.length !== assetIds.length) {
+      throw new AppError(422, "ASSET_NOT_FOUND", "Ativo informado não encontrado.");
+    }
+
+    const criticalityByAssetId = new Map(assets.map((asset) => [asset.id, asset.criticality]));
+
     const number = await generatePurchaseOrderNumber(tx);
 
     const purchaseOrder = await tx.purchaseOrder.create({
@@ -46,6 +58,9 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user:
           quantity: item.quantity,
           notes: null,
           osId: null,
+          assetId: item.assetId ?? null,
+          criticality: item.assetId ? criticalityByAssetId.get(item.assetId)! : null,
+          supplierName: item.supplierName ?? null,
           requestedById: user.userId,
           status: PartRequestStatus.INCLUIDA,
           purchaseOrderId: purchaseOrder.id,

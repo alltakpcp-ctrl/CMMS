@@ -3,6 +3,8 @@ import { z } from "zod";
 export const purchaseOrderItemInputSchema = z.object({
   partId: z.string().min(1),
   quantity: z.number().int().positive("Quantidade deve ser maior que zero."),
+  assetId: z.string().min(1).optional(),
+  supplierName: z.string().min(1).optional(),
 });
 
 export const createPurchaseOrderSchema = z.object({
