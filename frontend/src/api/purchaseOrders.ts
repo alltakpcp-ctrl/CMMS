@@ -1,9 +1,11 @@
 import { apiRequest } from "./client";
-import { PartRequest, PurchaseOrder } from "../types";
+import { PartRequest, PurchaseOrder, PurchaseOrderComment } from "../types";
 
 export interface PurchaseOrderItemInput {
   partId: string;
   quantity: number;
+  assetId?: string;
+  supplierName?: string;
 }
 
 export interface CreatePurchaseOrderInput {
@@ -52,4 +54,33 @@ export function rejectPartRequest(token: string, id: string, input: RejectPartRe
 
 export function reviewPurchaseOrder(token: string, id: string, input: ReviewPurchaseOrderInput) {
   return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/review`, { method: "POST", token, body: input });
+}
+
+export interface DeletePartRequestItemResult {
+  orderDeleted: boolean;
+  purchaseOrder?: PurchaseOrder;
+}
+
+export function deletePartRequestItem(token: string, itemId: string) {
+  return apiRequest<DeletePartRequestItemResult>(`/purchase-orders/items/${itemId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export interface CreatePurchaseOrderCommentInput {
+  body: string;
+  supplierName?: string;
+}
+
+export function createPurchaseOrderComment(token: string, id: string, input: CreatePurchaseOrderCommentInput) {
+  return apiRequest<PurchaseOrderComment>(`/purchase-orders/${id}/comments`, {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export function listPurchaseOrderComments(token: string, id: string) {
+  return apiRequest<PurchaseOrderComment[]>(`/purchase-orders/${id}/comments`, { token });
 }

@@ -183,6 +183,9 @@ export interface PartRequest {
   status: PartRequestStatus;
   osId: string | null;
   workOrder: { id: string; number: string } | null;
+  assetId: string | null;
+  criticality: number | null;
+  supplierName: string | null;
   requestedById: string;
   requestedBy: PublicUser;
   purchaseOrderId: string | null;
@@ -205,6 +208,16 @@ export interface StockMovement {
   createdAt: string;
 }
 
+export interface PurchaseOrderComment {
+  id: string;
+  purchaseOrderId: string;
+  authorId: string;
+  author: PublicUser;
+  body: string;
+  supplierName: string | null;
+  createdAt: string;
+}
+
 export interface PurchaseOrder {
   id: string;
   number: string;
@@ -217,6 +230,7 @@ export interface PurchaseOrder {
   reviewNotes: string | null;
   items: PartRequest[];
   children?: Array<{ id: string; number: string }>;
+  comments?: PurchaseOrderComment[];
   createdAt: string;
   updatedAt: string;
 }
