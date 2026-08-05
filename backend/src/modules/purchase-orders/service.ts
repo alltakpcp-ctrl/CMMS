@@ -75,6 +75,60 @@ export async function createPurchaseOrder(input: CreatePurchaseOrderInput, user:
   });
 }
 
+export async function deletePartRequestItem(itemId: string) {
+  return prisma.$transaction(async (tx) => {
+    const item = await tx.partRequest.findUnique({
+      where: { id: itemId },
+      include: { purchaseOrder: { select: { id: true, status: true } } },
+    });
+
+    if (!item) {
+      throw new AppError(404, "ITEM_NOT_FOUND", "Item não encontrado.");
+    }
+
+    if (!item.purchaseOrderId || !item.purchaseOrder) {
+      throw new AppError(422, "ITEM_NOT_IN_ORDER", "Item não pertence a um pedido de compra.");
+    }
+
+    if (
+      item.purchaseOrder.status !== PurchaseOrderStatus.EM_ANALISE &&
+      item.purchaseOrder.status !== PurchaseOrderStatus.DEVOLVIDO
+    ) {
+      throw new AppError(409, "ORDER_NOT_EDITABLE", "Não é possível excluir itens de um pedido finalizado.");
+    }
+
+    const purchaseOrderId = item.purchaseOrder.id;
+
+    const movements = await tx.stockMovement.count({ where: { partRequestId: itemId } });
+    if (movements > 0) {
+      throw new AppError(409, "ITEM_HAS_MOVEMENTS", "Item já possui movimentação de estoque e não pode ser excluído.");
+    }
+
+    try {
+      await tx.partRequest.delete({ where: { id: itemId } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new AppError(409, "ITEM_HAS_MOVEMENTS", "Item já possui movimentação e não pode ser excluído.");
+      }
+      throw error;
+    }
+
+    const remaining = await tx.partRequest.count({ where: { purchaseOrderId } });
+
+    if (remaining === 0) {
+      await tx.purchaseOrder.delete({ where: { id: purchaseOrderId } });
+      return { orderDeleted: true as const };
+    }
+
+    const purchaseOrder = await tx.purchaseOrder.findUniqueOrThrow({
+      where: { id: purchaseOrderId },
+      include: purchaseOrderInclude,
+    });
+
+    return { orderDeleted: false as const, purchaseOrder };
+  });
+}
+
 export async function rejectPartRequest(id: string, input: RejectPartRequestInput) {
   const partRequest = await prisma.partRequest.findUnique({ where: { id } });
   if (!partRequest) {

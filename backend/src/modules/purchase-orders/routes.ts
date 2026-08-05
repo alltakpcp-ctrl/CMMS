@@ -8,6 +8,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import {
   closePurchaseOrderController,
   createPurchaseOrderController,
+  deletePartRequestItemController,
   getPurchaseOrderController,
   listPurchaseOrdersController,
   listPurchasingController,
@@ -26,6 +27,11 @@ purchaseOrdersRoutes.post(
   "/reject-request/:id",
   canReceivePartRequests(),
   asyncHandler(rejectPartRequestController)
+);
+purchaseOrdersRoutes.delete(
+  "/items/:itemId",
+  canReceivePartRequests(),
+  asyncHandler(deletePartRequestItemController)
 );
 
 purchaseOrdersRoutes.get("/", authorize(Role.SUPERVISOR), asyncHandler(listPurchaseOrdersController));

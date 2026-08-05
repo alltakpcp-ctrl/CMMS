@@ -16,6 +16,10 @@ export async function rejectPartRequestController(req: Request, res: Response) {
   res.json(await purchaseOrdersService.rejectPartRequest(req.params.id, input));
 }
 
+export async function deletePartRequestItemController(req: Request, res: Response) {
+  res.json(await purchaseOrdersService.deletePartRequestItem(req.params.itemId));
+}
+
 export async function listPurchaseOrdersController(_req: Request, res: Response) {
   res.json(await purchaseOrdersService.listForSupervisor());
 }
