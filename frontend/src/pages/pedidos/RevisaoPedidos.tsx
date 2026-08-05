@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as purchaseOrdersApi from "../../api/purchaseOrders";
-import { PurchaseOrder } from "../../types";
+import { PurchaseOrder, PurchaseOrderComment } from "../../types";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { Input } from "../../components/Input";
 import { Textarea } from "../../components/Textarea";
 import { EmptyState } from "../../components/EmptyState";
+import { Badge } from "../../components/Badge";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { formatDateTime } from "../../lib/format";
@@ -29,6 +30,11 @@ export default function RevisaoPedidos() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [comments, setComments] = useState<PurchaseOrderComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [newCommentSupplier, setNewCommentSupplier] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   function reload() {
     if (!token) return;
@@ -42,12 +48,50 @@ export default function RevisaoPedidos() {
 
   useEffect(reload, [token]);
 
+  function loadComments(orderId: string) {
+    if (!token) return;
+    setCommentsLoading(true);
+    purchaseOrdersApi
+      .listPurchaseOrderComments(token, orderId)
+      .then(setComments)
+      .catch((err) => showError(getErrorMessage(err)))
+      .finally(() => setCommentsLoading(false));
+  }
+
   function openReview(order: PurchaseOrder) {
     setReviewing(order);
     setReviewNotes("");
     setDecisions(
       Object.fromEntries(order.items.map((item) => [item.id, { approved: item.quantity, deferred: 0 }]))
     );
+    setComments([]);
+    setNewComment("");
+    setNewCommentSupplier("");
+    loadComments(order.id);
+  }
+
+  async function handlePostComment() {
+    if (!token || !reviewing) return;
+
+    if (!newComment.trim()) {
+      showError("Escreva um comentário.");
+      return;
+    }
+
+    setPostingComment(true);
+    try {
+      await purchaseOrdersApi.createPurchaseOrderComment(token, reviewing.id, {
+        body: newComment.trim(),
+        ...(newCommentSupplier.trim() ? { supplierName: newCommentSupplier.trim() } : {}),
+      });
+      setNewComment("");
+      setNewCommentSupplier("");
+      loadComments(reviewing.id);
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setPostingComment(false);
+    }
   }
 
   async function handleDeleteItem(itemId: string) {
@@ -244,6 +288,56 @@ export default function RevisaoPedidos() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="space-y-2 border-t border-slate-200 pt-3">
+              <p className="text-sm font-medium text-slate-900">Discussão / Sugestões de fornecedor</p>
+
+              {commentsLoading && <p className="text-sm text-slate-500">Carregando comentários…</p>}
+
+              {!commentsLoading && comments.length === 0 && (
+                <p className="text-sm text-slate-500">Nenhum comentário ainda.</p>
+              )}
+
+              {!commentsLoading && comments.length > 0 && (
+                <div className="space-y-2">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="rounded border border-slate-200 p-2">
+                      <p className="text-xs text-slate-500">
+                        {comment.author.name} — {formatDateTime(comment.createdAt)}
+                      </p>
+                      <p className="text-sm text-slate-900">{comment.body}</p>
+                      {comment.supplierName && (
+                        <div className="mt-1">
+                          <Badge color="sky">Fornecedor sugerido: {comment.supplierName}</Badge>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {user?.canPurchase && (
+                <div className="space-y-2">
+                  <Textarea
+                    label="Novo comentário"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Escreva um comentário ou sugestão…"
+                  />
+                  <Input
+                    label="Fornecedor sugerido"
+                    value={newCommentSupplier}
+                    onChange={(e) => setNewCommentSupplier(e.target.value)}
+                    placeholder="Fornecedor sugerido (opcional)"
+                  />
+                  <div className="flex justify-end">
+                    <Button type="button" disabled={postingComment} onClick={handlePostComment}>
+                      {postingComment ? "Enviando…" : "Comentar"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Textarea label="Notas da revisão" value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} />
