@@ -19,7 +19,7 @@ interface ItemDecision {
 }
 
 export default function RevisaoPedidos() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
 
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -28,6 +28,7 @@ export default function RevisaoPedidos() {
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
   const [reviewNotes, setReviewNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   function reload() {
     if (!token) return;
@@ -47,6 +48,39 @@ export default function RevisaoPedidos() {
     setDecisions(
       Object.fromEntries(order.items.map((item) => [item.id, { approved: item.quantity, deferred: 0 }]))
     );
+  }
+
+  async function handleDeleteItem(itemId: string) {
+    if (!token || !reviewing) return;
+
+    if (!window.confirm("Excluir este item do pedido? Se for o último item, o pedido inteiro será excluído.")) {
+      return;
+    }
+
+    setDeletingItemId(itemId);
+    try {
+      const result = await purchaseOrdersApi.deletePartRequestItem(token, itemId);
+      if (result.orderDeleted) {
+        showSuccess("Item excluído. O pedido ficou sem itens e foi removido.");
+        setReviewing(null);
+        reload();
+      } else {
+        showSuccess("Item excluído.");
+        if (result.purchaseOrder) {
+          setReviewing(result.purchaseOrder);
+          setDecisions(
+            Object.fromEntries(
+              result.purchaseOrder.items.map((item) => [item.id, { approved: item.quantity, deferred: 0 }])
+            )
+          );
+        }
+        reload();
+      }
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeletingItemId(null);
+    }
   }
 
   async function handleReview(action: "APROVAR" | "DEVOLVER") {
@@ -149,12 +183,31 @@ export default function RevisaoPedidos() {
             <div className="space-y-2">
               {reviewing.items.map((item) => (
                 <div key={item.id} className="rounded border border-slate-200 p-2">
-                  <p className="text-sm font-medium text-slate-900">
-                    {PART_REQUEST_ITEM_TYPE_LABELS[item.itemType]} — {item.description}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-900">
+                      {PART_REQUEST_ITEM_TYPE_LABELS[item.itemType]} — {item.description}
+                    </p>
+                    {user?.canReceivePartRequests && (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        className="shrink-0"
+                        disabled={deletingItemId === item.id}
+                        onClick={() => handleDeleteItem(item.id)}
+                      >
+                        {deletingItemId === item.id ? "Excluindo…" : "Excluir"}
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500">
                     Indicado por {item.requestedBy.name} — solicitado: {item.quantity}
                   </p>
+                  {item.supplierName && (
+                    <p className="text-xs text-slate-500">Fornecedor sugerido: {item.supplierName}</p>
+                  )}
+                  {item.criticality != null && (
+                    <p className="text-xs text-slate-500">Criticidade: {item.criticality}</p>
+                  )}
                   <div className="mt-2 flex items-center gap-2">
                     <Input
                       label="Aprovar"
