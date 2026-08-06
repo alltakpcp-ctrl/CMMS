@@ -100,10 +100,6 @@ export function TechnicianEfficiencyPanel({ technicians }: Props) {
                   {tech.asApoioCount} OS · {formatHours(tech.mttrAsApoioHours)}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Tempo de apoio</span>
-                <span className="tabular-nums font-medium text-slate-900">{formatHours(tech.supportTimeHours)}</span>
-              </div>
             </div>
 
             <div className="mt-4">

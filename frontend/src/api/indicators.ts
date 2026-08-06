@@ -136,7 +136,6 @@ export interface TechnicianEfficiency {
   mttrAsApoioHours: number | null;
   asPrincipalCount: number;
   asApoioCount: number;
-  supportTimeHours: number;
 }
 export interface TechnicianEfficiencyResult {
   technicians: TechnicianEfficiency[];

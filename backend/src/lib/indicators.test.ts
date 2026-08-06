@@ -510,7 +510,6 @@ describe("calculateTechnicianEfficiency", () => {
         mttrAsApoioHours: null,
         asPrincipalCount: 0,
         asApoioCount: 0,
-        supportTimeHours: 0,
       },
     ]);
   });

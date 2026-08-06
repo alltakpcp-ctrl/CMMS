@@ -447,7 +447,6 @@ export interface TechnicianEfficiency {
   mttrAsApoioHours: number | null;
   asPrincipalCount: number;
   asApoioCount: number;
-  supportTimeHours: number;
 }
 
 export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators[]): TechnicianEfficiency[] {
@@ -495,7 +494,6 @@ export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators
       mttrAsApoioHours: null,
       asPrincipalCount: 0,
       asApoioCount: 0,
-      supportTimeHours: 0,
     };
   });
 
@@ -505,8 +503,7 @@ export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators
 // ---------------------------------------------------------------------------
 // Participação por papel (principal vs apoio) — separa o MTTR e a contagem de
 // OS entre o responsável principal (assignedToId) e os manutentores de apoio
-// (WorkOrderAssignee + Subtask CONCLUIDA), e mede o tempo de apoio via
-// subtask independentemente do status da OS-mãe.
+// (WorkOrderAssignee + Subtask CONCLUIDA).
 //
 // Rateio por OS ENCERRADA com janela de execução completa (decisão de
 // negócio documentada aqui):
@@ -521,9 +518,6 @@ export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators
 //   - fatia = executionDurationHours(wo) × peso, acumulada como principal ou
 //     apoio conforme o papel do técnico NESSA OS; mttrAsPrincipal/ApoioHours
 //     é a média das fatias (mesmo padrão de summarizeHours).
-//
-// supportTimeHours é independente do rateio acima: soma de todo tempo de
-// subtask CONCLUIDA do técnico, em QUALQUER OS (mesmo ainda aberta).
 // ---------------------------------------------------------------------------
 export interface TechnicianParticipation {
   technicianId: string;
@@ -532,7 +526,6 @@ export interface TechnicianParticipation {
   mttrAsApoioHours: number | null;
   asPrincipalCount: number;
   asApoioCount: number;
-  supportTimeHours: number;
 }
 
 function subtaskHours(s: { createdAt: Date; finishedAt: Date | null }): number {
@@ -545,7 +538,7 @@ export function calculateTechnicianParticipation(workOrders: WorkOrderForIndicat
   const apoioSlices = new Map<string, number[]>();
   const principalCounts = new Map<string, number>();
   const apoioCounts = new Map<string, number>();
-  const supportHours = new Map<string, number>();
+  const subtaskAssigneeIds = new Set<string>();
 
   const rememberName = (id: string, name: string | null) => {
     if (name && !names.get(id)) names.set(id, name);
@@ -558,7 +551,7 @@ export function calculateTechnicianParticipation(workOrders: WorkOrderForIndicat
 
     for (const s of wo.subtasks) {
       if (s.status !== "CONCLUIDA") continue;
-      supportHours.set(s.assignedToId, (supportHours.get(s.assignedToId) ?? 0) + subtaskHours(s));
+      subtaskAssigneeIds.add(s.assignedToId);
     }
 
     if (wo.status !== WorkOrderStatus.ENCERRADA) continue;
@@ -608,7 +601,7 @@ export function calculateTechnicianParticipation(workOrders: WorkOrderForIndicat
     }
   }
 
-  const allIds = new Set<string>([...principalSlices.keys(), ...apoioSlices.keys(), ...supportHours.keys()]);
+  const allIds = new Set<string>([...principalSlices.keys(), ...apoioSlices.keys(), ...subtaskAssigneeIds]);
 
   return Array.from(allIds).map((technicianId) => ({
     technicianId,
@@ -617,6 +610,5 @@ export function calculateTechnicianParticipation(workOrders: WorkOrderForIndicat
     mttrAsApoioHours: summarizeHours(apoioSlices.get(technicianId) ?? []).hours,
     asPrincipalCount: principalCounts.get(technicianId) ?? 0,
     asApoioCount: apoioCounts.get(technicianId) ?? 0,
-    supportTimeHours: supportHours.get(technicianId) ?? 0,
   }));
 }

@@ -263,7 +263,6 @@ export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
         mttrAsApoioHours: null,
         asPrincipalCount: 0,
         asApoioCount: 0,
-        supportTimeHours: 0,
       });
     }
   }
@@ -281,7 +280,6 @@ export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
       existing.mttrAsApoioHours = p.mttrAsApoioHours;
       existing.asPrincipalCount = p.asPrincipalCount;
       existing.asApoioCount = p.asApoioCount;
-      existing.supportTimeHours = p.supportTimeHours;
     } else {
       byId.set(p.technicianId, {
         technicianId: p.technicianId,
@@ -295,7 +293,6 @@ export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
         mttrAsApoioHours: p.mttrAsApoioHours,
         asPrincipalCount: p.asPrincipalCount,
         asApoioCount: p.asApoioCount,
-        supportTimeHours: p.supportTimeHours,
       });
     }
   }
