@@ -86,6 +86,26 @@ export function TechnicianEfficiencyPanel({ technicians }: Props) {
               </div>
             </div>
 
+            <div className="mt-4 space-y-1.5 text-sm">
+              <p className="mb-1 text-xs font-medium uppercase text-slate-500">Participação</p>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Como principal</span>
+                <span className="tabular-nums font-medium text-slate-900">
+                  {tech.asPrincipalCount} OS · {formatHours(tech.mttrAsPrincipalHours)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Como apoio</span>
+                <span className="tabular-nums font-medium text-slate-900">
+                  {tech.asApoioCount} OS · {formatHours(tech.mttrAsApoioHours)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Tempo de apoio</span>
+                <span className="tabular-nums font-medium text-slate-900">{formatHours(tech.supportTimeHours)}</span>
+              </div>
+            </div>
+
             <div className="mt-4">
               <p className="mb-1.5 text-xs font-medium uppercase text-slate-500">Mix de OS</p>
               {mixTotal > 0 ? (
