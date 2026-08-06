@@ -3,8 +3,13 @@ import { useAuth } from "../../auth/AuthContext";
 import * as stockApi from "../../api/stock";
 import * as partsApi from "../../api/parts";
 import { Part, StockMovement } from "../../types";
-import { Role } from "../../domain/enums";
-import { STOCK_MOVEMENT_TYPE_COLORS, STOCK_MOVEMENT_TYPE_LABELS } from "../../domain/labels";
+import { Role, StockStatus } from "../../domain/enums";
+import {
+  STOCK_MOVEMENT_TYPE_COLORS,
+  STOCK_MOVEMENT_TYPE_LABELS,
+  STOCK_STATUS_COLORS,
+  STOCK_STATUS_LABELS,
+} from "../../domain/labels";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
@@ -30,7 +35,14 @@ const normalize = (s: string) =>
   s.normalize("NFD").replace(DIACRITICS_PATTERN, "").toLowerCase().trim();
 
 const emptyEntryForm = { partId: "", quantity: 1, unitCost: "", reason: "" };
-const emptyAdjustForm = { partId: "", quantity: 1, direction: "increase" as "increase" | "decrease", reason: "" };
+const emptyAdjustForm = {
+  partId: "",
+  quantity: 1,
+  direction: "increase" as "increase" | "decrease",
+  reason: "",
+  stockStatusOverride: "" as "" | StockStatus, // "" = automático
+  orderRef: "",
+};
 const emptyReturnForm = { partId: "", quantity: 1, workOrderId: "", reason: "" };
 const emptyPartForm = {
   code: "",
@@ -142,6 +154,8 @@ export default function Estoque() {
         quantity: Number(adjustForm.quantity),
         direction: adjustForm.direction,
         reason: adjustForm.reason,
+        stockStatusOverride: adjustForm.stockStatusOverride === "" ? null : adjustForm.stockStatusOverride,
+        orderRef: adjustForm.orderRef.trim() || undefined,
       });
       showSuccess("Ajuste registrado.");
       closeModal();
@@ -318,7 +332,9 @@ export default function Estoque() {
                 { header: "Máximo", cell: (p) => p.maxStock ?? "—" },
                 {
                   header: "Status",
-                  cell: (p) => (isLowStock(p) ? <Badge color="red">Repor</Badge> : null),
+                  cell: (p) => (
+                    <Badge color={STOCK_STATUS_COLORS[p.stockStatus]}>{STOCK_STATUS_LABELS[p.stockStatus]}</Badge>
+                  ),
                 },
                 { header: "Localização", cell: (p) => p.location ?? "—" },
               ]}
@@ -443,6 +459,26 @@ export default function Estoque() {
               value={adjustForm.reason}
               onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
               required
+            />
+            <Select
+              label="Status (opcional — automático se vazio)"
+              value={adjustForm.stockStatusOverride}
+              onChange={(e) =>
+                setAdjustForm((f) => ({ ...f, stockStatusOverride: e.target.value as "" | StockStatus }))
+              }
+            >
+              <option value="">Automático</option>
+              {Object.values(StockStatus).map((s) => (
+                <option key={s} value={s}>
+                  {STOCK_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Nº do pedido (opcional)"
+              value={adjustForm.orderRef}
+              onChange={(e) => setAdjustForm((f) => ({ ...f, orderRef: e.target.value }))}
+              placeholder="Ex.: PC-2026-0142"
             />
 
             <div className="flex justify-end gap-2">

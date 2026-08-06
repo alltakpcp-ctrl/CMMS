@@ -6,6 +6,7 @@ import {
   PurchaseOrderStatus,
   Role,
   StockMovementType,
+  StockStatus,
   SubtaskStatus,
   WorkOrderStatus,
   WorkOrderType,
@@ -118,6 +119,20 @@ export const STOCK_MOVEMENT_TYPE_COLORS: Record<StockMovementType, "slate" | "bl
   SAIDA: "red",
   AJUSTE: "amber",
   DEVOLUCAO: "blue",
+};
+
+export const STOCK_STATUS_LABELS: Record<StockStatus, string> = {
+  URGENTE: "Urgente",
+  ALERTA: "Alerta",
+  BOM: "Bom",
+  EXCESSO: "Excesso",
+};
+
+export const STOCK_STATUS_COLORS: Record<StockStatus, "slate" | "blue" | "amber" | "green" | "red"> = {
+  URGENTE: "red",
+  ALERTA: "amber",
+  BOM: "green",
+  EXCESSO: "blue",
 };
 
 export const SUBTASK_STATUS_LABELS: Record<SubtaskStatus, string> = {

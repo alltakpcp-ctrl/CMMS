@@ -79,6 +79,14 @@ export const StockMovementType = {
 } as const;
 export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
 
+export const StockStatus = {
+  URGENTE: "URGENTE",
+  ALERTA: "ALERTA",
+  BOM: "BOM",
+  EXCESSO: "EXCESSO",
+} as const;
+export type StockStatus = (typeof StockStatus)[keyof typeof StockStatus];
+
 export const SubtaskStatus = {
   ABERTA: "ABERTA",
   CONCLUIDA: "CONCLUIDA",

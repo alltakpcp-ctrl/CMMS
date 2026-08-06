@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import { Part, StockMovement } from "../types";
+import { StockStatus } from "../domain/enums";
 
 export interface StockEntryInput {
   partId: string;
@@ -13,6 +14,8 @@ export interface StockAdjustInput {
   quantity: number;
   direction: "increase" | "decrease";
   reason: string;
+  stockStatusOverride?: StockStatus | null;
+  orderRef?: string;
 }
 
 export interface StockReturnInput {

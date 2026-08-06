@@ -6,6 +6,7 @@ import {
   PurchaseOrderStatus,
   Role,
   StockMovementType,
+  StockStatus,
   SubtaskStatus,
   WorkOrderStatus,
   WorkOrderType,
@@ -52,6 +53,8 @@ export interface Part {
   location: string | null;
   sectorId: string | null;
   active: boolean;
+  stockStatusOverride: string | null;
+  stockStatus: StockStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -206,6 +209,8 @@ export interface StockMovement {
   partRequestId: string | null;
   userId: string | null;
   reason: string | null;
+  statusSnapshot: string | null;
+  orderRef: string | null;
   createdAt: string;
 }
 
