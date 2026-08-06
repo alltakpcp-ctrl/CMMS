@@ -10,4 +10,5 @@ export const publicUserSelect = {
   canManageStock: true,
   canPurchase: true,
   sector: { select: { id: true, name: true } },
+  shift: { select: { id: true, name: true, startTime: true, endTime: true } },
 } as const;

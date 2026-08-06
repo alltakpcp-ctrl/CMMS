@@ -58,7 +58,14 @@ export async function createUser(input: CreateUserInput) {
   const passwordHash = await bcrypt.hash(input.password, 10);
 
   return prisma.user.create({
-    data: { name: input.name, email: input.email, role: input.role, passwordHash, sectorId },
+    data: {
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      passwordHash,
+      sectorId,
+      shiftId: input.shiftId ?? null,
+    },
     select: publicUserSelect,
   });
 }
@@ -104,6 +111,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actingUserI
       role: input.role,
       active: input.active,
       sectorId,
+      shiftId: input.shiftId,
       canReceivePartRequests: input.canReceivePartRequests,
       canManageStock: input.canManageStock,
       canPurchase: input.canPurchase,

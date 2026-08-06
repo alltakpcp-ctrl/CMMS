@@ -8,6 +8,7 @@ export const createUserSchema = z
     password: z.string().min(6, "Senha deve ter ao menos 6 caracteres."),
     role: z.nativeEnum(Role),
     sectorId: z.string().nullable().optional(),
+    shiftId: z.string().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === Role.OPERADOR && !data.sectorId) {
@@ -28,6 +29,7 @@ export const updateUserSchema = z
     role: z.nativeEnum(Role).optional(),
     active: z.boolean().optional(),
     sectorId: z.string().nullable().optional(),
+    shiftId: z.string().nullable().optional(),
     canReceivePartRequests: z.boolean().optional(),
     canManageStock: z.boolean().optional(),
     canPurchase: z.boolean().optional(),
