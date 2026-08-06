@@ -20,6 +20,7 @@ export interface PublicUser {
   active: boolean;
   createdAt: string;
   sector: { id: string; name: string } | null;
+  shift: { id: string; name: string; startTime: string; endTime: string } | null;
   canReceivePartRequests: boolean;
   canManageStock: boolean;
   canPurchase: boolean;

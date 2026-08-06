@@ -6,6 +6,7 @@ import { ROLE_LABELS } from "../../domain/labels";
 import * as usersApi from "../../api/users";
 import { PublicUser } from "../../types";
 import { useSectors } from "../../hooks/useSectors";
+import { useShifts } from "../../hooks/useShifts";
 import { Table } from "../../components/Table";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
@@ -24,6 +25,7 @@ interface CreateFormState {
   password: string;
   role: Role;
   sectorId: string | null;
+  shiftId: string | null;
 }
 
 interface EditFormState {
@@ -32,6 +34,7 @@ interface EditFormState {
   role: Role;
   active: boolean;
   sectorId: string | null;
+  shiftId: string | null;
   canReceivePartRequests: boolean;
   canManageStock: boolean;
   canPurchase: boolean;
@@ -43,6 +46,7 @@ const emptyCreateForm: CreateFormState = {
   password: "",
   role: Role.OPERADOR,
   sectorId: null,
+  shiftId: null,
 };
 
 function validatePasswordRule(value: string): string | null {
@@ -57,6 +61,7 @@ export default function Usuarios() {
   const { token, user: currentUser } = useAuth();
   const { showError, showSuccess } = useToast();
   const { sectors } = useSectors(token);
+  const { shifts } = useShifts(token);
 
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +76,7 @@ export default function Usuarios() {
     role: Role.OPERADOR,
     active: true,
     sectorId: null,
+    shiftId: null,
     canReceivePartRequests: false,
     canManageStock: false,
     canPurchase: false,
@@ -127,6 +133,7 @@ export default function Usuarios() {
       role: user.role,
       active: user.active,
       sectorId: user.sector?.id ?? null,
+      shiftId: user.shift?.id ?? null,
       canReceivePartRequests: user.canReceivePartRequests,
       canManageStock: user.canManageStock,
       canPurchase: user.canPurchase,
@@ -301,6 +308,20 @@ export default function Usuarios() {
               />
             )}
 
+            <SearchableSelect
+              label="Turno"
+              value={createForm.shiftId ?? ""}
+              onChange={(shiftId) => setCreateForm({ ...createForm, shiftId: shiftId || null })}
+              options={[
+                { value: "", label: "Sem turno" },
+                ...shifts.map((shift) => ({
+                  value: shift.id,
+                  label: `${shift.name} (${shift.startTime}–${shift.endTime})`,
+                })),
+              ]}
+              placeholder="Selecione um turno"
+            />
+
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setShowCreateForm(false)}>
                 Cancelar
@@ -363,6 +384,20 @@ export default function Usuarios() {
                 required
               />
             )}
+
+            <SearchableSelect
+              label="Turno"
+              value={editForm.shiftId ?? ""}
+              onChange={(shiftId) => setEditForm({ ...editForm, shiftId: shiftId || null })}
+              options={[
+                { value: "", label: "Sem turno" },
+                ...shifts.map((shift) => ({
+                  value: shift.id,
+                  label: `${shift.name} (${shift.startTime}–${shift.endTime})`,
+                })),
+              ]}
+              placeholder="Selecione um turno"
+            />
 
             <Checkbox
               label="Ativo"

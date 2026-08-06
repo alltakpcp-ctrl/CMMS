@@ -8,6 +8,7 @@ export interface CreateUserInput {
   password: string;
   role: Role;
   sectorId?: string | null;
+  shiftId?: string | null;
 }
 
 export interface UpdateUserInput {
@@ -16,6 +17,7 @@ export interface UpdateUserInput {
   role?: Role;
   active?: boolean;
   sectorId?: string | null;
+  shiftId?: string | null;
   canReceivePartRequests?: boolean;
   canManageStock?: boolean;
   canPurchase?: boolean;
