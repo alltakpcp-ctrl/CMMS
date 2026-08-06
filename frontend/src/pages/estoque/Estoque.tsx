@@ -23,6 +23,12 @@ type ModalType = "entry" | "adjust" | "return" | "part" | null;
 
 const isLowStock = (p: Part) => p.minStock !== null && p.stockQty <= p.minStock;
 
+// Combining diacritical marks (U+0300-U+036F), built from char codes to dodge editor unicode normalization.
+const DIACRITICS_PATTERN = new RegExp(String.fromCharCode(0x5b, 0x5c, 0x75, 0x30, 0x33, 0x30, 0x30, 0x2d, 0x5c, 0x75, 0x30, 0x33, 0x36, 0x66, 0x5d), "g");
+
+const normalize = (s: string) =>
+  s.normalize("NFD").replace(DIACRITICS_PATTERN, "").toLowerCase().trim();
+
 const emptyEntryForm = { partId: "", quantity: 1, unitCost: "", reason: "" };
 const emptyAdjustForm = { partId: "", quantity: 1, direction: "increase" as "increase" | "decrease", reason: "" };
 const emptyReturnForm = { partId: "", quantity: 1, workOrderId: "", reason: "" };
@@ -42,6 +48,7 @@ export default function Estoque() {
 
   const [tab, setTab] = useState<"movimentacao" | "extrato">("movimentacao");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +220,12 @@ export default function Estoque() {
   }
 
   const partOptions = parts.map((p) => ({ value: p.id, label: `${p.code} — ${p.description}` }));
-  const visibleParts = onlyLowStock ? parts.filter(isLowStock) : parts;
+  const visibleParts = parts.filter((p) => {
+    if (onlyLowStock && !isLowStock(p)) return false;
+    const q = normalize(searchTerm);
+    if (!q) return true;
+    return normalize(p.description).includes(q) || normalize(p.code).includes(q);
+  });
 
   function handleSelectLedgerPart(partId: string) {
     setSelectedPartId(partId);
@@ -273,11 +285,20 @@ export default function Estoque() {
             </div>
           )}
 
-          <Checkbox
-            label="Só peças em reposição"
-            checked={onlyLowStock}
-            onChange={(e) => setOnlyLowStock(e.target.checked)}
-          />
+          <div className="flex flex-wrap items-center gap-4">
+            <Input
+              type="text"
+              placeholder="Buscar por descrição ou código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-xs"
+            />
+            <Checkbox
+              label="Só peças em reposição"
+              checked={onlyLowStock}
+              onChange={(e) => setOnlyLowStock(e.target.checked)}
+            />
+          </div>
 
           {loading && <p className="text-sm text-slate-500">Carregando…</p>}
 
