@@ -26,6 +26,8 @@ model User {
   canPurchase  Boolean @default(false)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
+  shiftId      String?
+  shift        Shift?   @relation(fields: [shiftId], references: [id])
 
   workOrdersRequested WorkOrder[]     @relation("WorkOrderRequester")
   workOrdersAssigned  WorkOrder[]     @relation("WorkOrderAssignee")
@@ -40,6 +42,17 @@ model User {
   subtasksCreated     Subtask[]       @relation("SubtaskCreatedBy")
   subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
   purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  startTime String   // "HH:mm"
+  endTime   String   // "HH:mm"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users     User[]
 }
 
 model Sector {
