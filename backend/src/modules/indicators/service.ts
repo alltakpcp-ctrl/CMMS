@@ -8,6 +8,7 @@ import {
   calculateMttr,
   calculatePhaseDurations,
   calculateTechnicianEfficiency,
+  calculateTechnicianParticipation,
   calculateThroughput,
   calculateTrend,
   TechnicianEfficiency,
@@ -43,6 +44,16 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
       assignedToId: true,
       assignedTo: { select: { name: true } },
       executions: { select: { startedAt: true, finishedAt: true } },
+      assignees: { select: { userId: true, user: { select: { name: true } } } },
+      subtasks: {
+        select: {
+          assignedToId: true,
+          assignedTo: { select: { name: true } },
+          status: true,
+          createdAt: true,
+          finishedAt: true,
+        },
+      },
     },
   });
 
@@ -57,6 +68,14 @@ async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<W
     assignedToId: wo.assignedToId,
     assignedToName: wo.assignedTo?.name ?? null,
     executions: wo.executions,
+    assignees: wo.assignees.map((a) => ({ userId: a.userId, userName: a.user?.name ?? null })),
+    subtasks: wo.subtasks.map((s) => ({
+      assignedToId: s.assignedToId,
+      assignedToName: s.assignedTo?.name ?? null,
+      status: s.status,
+      createdAt: s.createdAt,
+      finishedAt: s.finishedAt,
+    })),
   }));
 }
 
@@ -240,6 +259,43 @@ export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
         mttrHours: null,
         adherencePercentage: null,
         typeMix: [],
+        mttrAsPrincipalHours: null,
+        mttrAsApoioHours: null,
+        asPrincipalCount: 0,
+        asApoioCount: 0,
+        supportTimeHours: 0,
+      });
+    }
+  }
+
+  // Participação (principal vs apoio) — calculada sobre o MESMO
+  // periodWorkOrders (respeita from/to/targetSectorId), diferente do
+  // inProgressCount acima (que ignora data de propósito). Técnicos que só
+  // aparecem como apoio (nunca assignedToId) não existem em byId ainda —
+  // entram aqui com closedCount/inProgressCount zerados.
+  const participation = calculateTechnicianParticipation(periodWorkOrders);
+  for (const p of participation) {
+    const existing = byId.get(p.technicianId);
+    if (existing) {
+      existing.mttrAsPrincipalHours = p.mttrAsPrincipalHours;
+      existing.mttrAsApoioHours = p.mttrAsApoioHours;
+      existing.asPrincipalCount = p.asPrincipalCount;
+      existing.asApoioCount = p.asApoioCount;
+      existing.supportTimeHours = p.supportTimeHours;
+    } else {
+      byId.set(p.technicianId, {
+        technicianId: p.technicianId,
+        technicianName: p.technicianName,
+        closedCount: 0,
+        inProgressCount: 0,
+        mttrHours: null,
+        adherencePercentage: null,
+        typeMix: [],
+        mttrAsPrincipalHours: p.mttrAsPrincipalHours,
+        mttrAsApoioHours: p.mttrAsApoioHours,
+        asPrincipalCount: p.asPrincipalCount,
+        asApoioCount: p.asApoioCount,
+        supportTimeHours: p.supportTimeHours,
       });
     }
   }

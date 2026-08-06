@@ -13,6 +13,8 @@ export interface WorkOrderForIndicators {
   assignedToId: string | null;
   assignedToName: string | null;
   executions: { startedAt: Date | null; finishedAt: Date | null }[];
+  assignees: { userId: string; userName: string | null }[];
+  subtasks: { assignedToId: string; assignedToName: string | null; status: string; createdAt: Date; finishedAt: Date | null }[];
 }
 
 const MS_PER_HOUR = 1000 * 60 * 60;
@@ -441,6 +443,11 @@ export interface TechnicianEfficiency {
   mttrHours: number | null;
   adherencePercentage: number | null;
   typeMix: Array<{ type: string; count: number }>;
+  mttrAsPrincipalHours: number | null;
+  mttrAsApoioHours: number | null;
+  asPrincipalCount: number;
+  asApoioCount: number;
+  supportTimeHours: number;
 }
 
 export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators[]): TechnicianEfficiency[] {
@@ -476,8 +483,140 @@ export function calculateTechnicianEfficiency(workOrders: WorkOrderForIndicators
     }
     const typeMix = Array.from(typeCounts.entries()).map(([type, count]) => ({ type, count }));
 
-    return { technicianId, technicianName: name, closedCount, inProgressCount, mttrHours, adherencePercentage, typeMix };
+    return {
+      technicianId,
+      technicianName: name,
+      closedCount,
+      inProgressCount,
+      mttrHours,
+      adherencePercentage,
+      typeMix,
+      mttrAsPrincipalHours: null,
+      mttrAsApoioHours: null,
+      asPrincipalCount: 0,
+      asApoioCount: 0,
+      supportTimeHours: 0,
+    };
   });
 
   return result.sort((a, b) => b.closedCount - a.closedCount || a.technicianName.localeCompare(b.technicianName));
+}
+
+// ---------------------------------------------------------------------------
+// Participação por papel (principal vs apoio) — separa o MTTR e a contagem de
+// OS entre o responsável principal (assignedToId) e os manutentores de apoio
+// (WorkOrderAssignee + Subtask CONCLUIDA), e mede o tempo de apoio via
+// subtask independentemente do status da OS-mãe.
+//
+// Rateio por OS ENCERRADA com janela de execução completa (decisão de
+// negócio documentada aqui):
+//   - tempo próprio do principal = executionDurationHours(wo) (duração cheia)
+//   - tempo próprio de cada apoio = soma de (finishedAt − createdAt) das
+//     subtasks CONCLUIDA dele NESSA OS
+//   - se TODOS os participantes têm tempo próprio > 0: peso = tempoProprio ÷
+//     soma(tempoProprio de todos os participantes da OS)
+//   - senão (algum apoio só chegou via WorkOrderAssignee, sem subtask
+//     concluída registrada nessa OS): peso = 1 ÷ nº de participantes
+//     (rateio igual, fallback "por cabeça")
+//   - fatia = executionDurationHours(wo) × peso, acumulada como principal ou
+//     apoio conforme o papel do técnico NESSA OS; mttrAsPrincipal/ApoioHours
+//     é a média das fatias (mesmo padrão de summarizeHours).
+//
+// supportTimeHours é independente do rateio acima: soma de todo tempo de
+// subtask CONCLUIDA do técnico, em QUALQUER OS (mesmo ainda aberta).
+// ---------------------------------------------------------------------------
+export interface TechnicianParticipation {
+  technicianId: string;
+  technicianName: string;
+  mttrAsPrincipalHours: number | null;
+  mttrAsApoioHours: number | null;
+  asPrincipalCount: number;
+  asApoioCount: number;
+  supportTimeHours: number;
+}
+
+function subtaskHours(s: { createdAt: Date; finishedAt: Date | null }): number {
+  return s.finishedAt ? hoursBetween(s.createdAt, s.finishedAt) : 0;
+}
+
+export function calculateTechnicianParticipation(workOrders: WorkOrderForIndicators[]): TechnicianParticipation[] {
+  const names = new Map<string, string>();
+  const principalSlices = new Map<string, number[]>();
+  const apoioSlices = new Map<string, number[]>();
+  const principalCounts = new Map<string, number>();
+  const apoioCounts = new Map<string, number>();
+  const supportHours = new Map<string, number>();
+
+  const rememberName = (id: string, name: string | null) => {
+    if (name && !names.get(id)) names.set(id, name);
+  };
+
+  for (const wo of workOrders) {
+    if (wo.assignedToId) rememberName(wo.assignedToId, wo.assignedToName);
+    for (const a of wo.assignees) rememberName(a.userId, a.userName);
+    for (const s of wo.subtasks) rememberName(s.assignedToId, s.assignedToName);
+
+    for (const s of wo.subtasks) {
+      if (s.status !== "CONCLUIDA") continue;
+      supportHours.set(s.assignedToId, (supportHours.get(s.assignedToId) ?? 0) + subtaskHours(s));
+    }
+
+    if (wo.status !== WorkOrderStatus.ENCERRADA) continue;
+    const duration = executionDurationHours(wo);
+    if (duration === null) continue;
+    const principalId = wo.assignedToId;
+    if (!principalId) continue;
+
+    const concludedByAssignee = new Map<string, number>();
+    for (const s of wo.subtasks) {
+      if (s.status !== "CONCLUIDA") continue;
+      concludedByAssignee.set(s.assignedToId, (concludedByAssignee.get(s.assignedToId) ?? 0) + subtaskHours(s));
+    }
+
+    const apoioIds = new Set<string>();
+    for (const a of wo.assignees) {
+      if (a.userId !== principalId) apoioIds.add(a.userId);
+    }
+    for (const id of concludedByAssignee.keys()) {
+      if (id !== principalId) apoioIds.add(id);
+    }
+
+    const participantIds = [principalId, ...apoioIds];
+    const ownTimes = new Map<string, number>([[principalId, duration]]);
+    for (const id of apoioIds) {
+      ownTimes.set(id, concludedByAssignee.get(id) ?? 0);
+    }
+
+    const allHaveOwnTime = participantIds.every((id) => (ownTimes.get(id) ?? 0) > 0);
+    const totalOwnTime = participantIds.reduce((sum, id) => sum + (ownTimes.get(id) ?? 0), 0);
+
+    for (const id of participantIds) {
+      const weight = allHaveOwnTime ? (ownTimes.get(id) ?? 0) / totalOwnTime : 1 / participantIds.length;
+      const slice = duration * weight;
+
+      if (id === principalId) {
+        const list = principalSlices.get(id) ?? [];
+        list.push(slice);
+        principalSlices.set(id, list);
+        principalCounts.set(id, (principalCounts.get(id) ?? 0) + 1);
+      } else {
+        const list = apoioSlices.get(id) ?? [];
+        list.push(slice);
+        apoioSlices.set(id, list);
+        apoioCounts.set(id, (apoioCounts.get(id) ?? 0) + 1);
+      }
+    }
+  }
+
+  const allIds = new Set<string>([...principalSlices.keys(), ...apoioSlices.keys(), ...supportHours.keys()]);
+
+  return Array.from(allIds).map((technicianId) => ({
+    technicianId,
+    technicianName: names.get(technicianId) ?? "",
+    mttrAsPrincipalHours: summarizeHours(principalSlices.get(technicianId) ?? []).hours,
+    mttrAsApoioHours: summarizeHours(apoioSlices.get(technicianId) ?? []).hours,
+    asPrincipalCount: principalCounts.get(technicianId) ?? 0,
+    asApoioCount: apoioCounts.get(technicianId) ?? 0,
+    supportTimeHours: supportHours.get(technicianId) ?? 0,
+  }));
 }

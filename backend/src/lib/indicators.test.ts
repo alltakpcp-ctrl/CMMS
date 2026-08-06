@@ -29,6 +29,8 @@ function wo(overrides: Partial<WorkOrderForIndicators>): WorkOrderForIndicators 
     assignedToId: null,
     assignedToName: null,
     executions: [],
+    assignees: [],
+    subtasks: [],
     ...overrides,
   };
 }
@@ -504,6 +506,11 @@ describe("calculateTechnicianEfficiency", () => {
         mttrHours: null,
         adherencePercentage: null,
         typeMix: [{ type: WorkOrderType.CORRETIVA, count: 1 }],
+        mttrAsPrincipalHours: null,
+        mttrAsApoioHours: null,
+        asPrincipalCount: 0,
+        asApoioCount: 0,
+        supportTimeHours: 0,
       },
     ]);
   });
