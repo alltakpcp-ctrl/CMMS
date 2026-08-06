@@ -118,6 +118,7 @@ model Part {
   sectorId    String?
   sector      Sector?  @relation(fields: [sectorId], references: [id])
   active      Boolean  @default(true)
+  stockStatusOverride String?
   updatedAt   DateTime @updatedAt @default(now())
 
   workOrderParts   WorkOrderPart[]
@@ -272,6 +273,8 @@ model StockMovement {
   userId       String?
   user         User?    @relation(fields: [userId], references: [id])
   reason       String?
+  statusSnapshot String?
+  orderRef       String?
   createdAt    DateTime @default(now())
 
   @@index([partId, createdAt])

@@ -1,10 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
+import { effectiveStockStatus } from "../stock/schema";
 import { CreatePartInput, UpdatePartInput } from "./schema";
 
-export function listParts() {
-  return prisma.part.findMany({ orderBy: { code: "asc" } });
+export async function listParts() {
+  const parts = await prisma.part.findMany({ orderBy: { code: "asc" } });
+  return parts.map((p) => ({
+    ...p,
+    stockStatus: effectiveStockStatus(p.stockQty, p.minStock, p.maxStock, p.stockStatusOverride),
+  }));
 }
 
 export async function getPartById(id: string) {
