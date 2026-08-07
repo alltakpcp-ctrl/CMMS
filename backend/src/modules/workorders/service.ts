@@ -6,6 +6,7 @@ import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
 import { recordStockMovement } from "../stock/service";
+import { PERGUNTAS_PT_ALTURA } from "../permissaoTrabalho/perguntas";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
@@ -40,6 +41,7 @@ const workOrderInclude = {
   },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
+  permissaoTrabalho: { include: { respostas: { orderBy: { ordem: "asc" } } } },
 } satisfies Prisma.WorkOrderInclude;
 
 // Valida a lista de manutentores de apoio (assigneeIds) para planejamento()/
@@ -122,8 +124,9 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         assetId: input.assetId,
         requesterId: user.userId,
         status: WorkOrderStatus.ABERTA,
+        trabalhoEmAltura: input.trabalhoEmAltura ?? false,
       },
-      include: workOrderInclude,
+      select: { id: true },
     });
 
     await tx.statusHistory.create({
@@ -135,7 +138,26 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
       },
     });
 
-    return workOrder;
+    if (input.trabalhoEmAltura) {
+      await tx.permissaoTrabalho.create({
+        data: {
+          workOrderId: workOrder.id,
+          status: "RASCUNHO",
+          respostas: {
+            create: PERGUNTAS_PT_ALTURA.map((pergunta, i) => ({
+              ordem: i + 1,
+              pergunta,
+            })),
+          },
+        },
+      });
+    }
+
+    const created = await tx.workOrder.findUniqueOrThrow({
+      where: { id: workOrder.id },
+      include: workOrderInclude,
+    });
+    return created;
   });
 }
 
@@ -233,7 +255,10 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
   return prisma.$transaction(async (tx) => {
     const workOrder = await tx.workOrder.findUnique({
       where: { id },
-      include: { assignees: { select: { userId: true } } },
+      include: {
+        assignees: { select: { userId: true } },
+        permissaoTrabalho: { select: { status: true } },
+      },
     });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
@@ -250,6 +275,8 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         assigneeIds: workOrder.assignees.map((a) => a.userId),
         note,
         priority: workOrder.priority,
+        permissaoAprovadaSeNecessario:
+          !workOrder.trabalhoEmAltura || workOrder.permissaoTrabalho?.status === "APROVADA",
         ...context,
       },
     });
@@ -263,6 +290,13 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       const openSubtask = await tx.subtask.findFirst({ where: { workOrderId: id, status: "ABERTA" } });
       if (openSubtask) {
         throw new AppError(422, "HAS_OPEN_SUBTASKS", "Existem subtarefas abertas nesta OS.");
+      }
+
+      if (workOrder.permissaoTrabalho?.status === "APROVADA") {
+        await tx.permissaoTrabalho.update({
+          where: { workOrderId: id },
+          data: { status: "ENCERRADA", closedAt: new Date() },
+        });
       }
     }
 

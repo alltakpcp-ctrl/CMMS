@@ -6,7 +6,8 @@ export type TransitionErrorCode =
   | "INVALID_TRANSITION"
   | "MISSING_CONTEXT"
   | "NOTE_REQUIRED"
-  | "PRIORITY_NOT_URGENT";
+  | "PRIORITY_NOT_URGENT"
+  | "PT_NAO_APROVADA";
 
 export interface CanTransitionResult {
   ok: boolean;
@@ -24,6 +25,7 @@ export interface TransitionContext {
   hasScheduledEnd?: boolean;
   hasAssignedTechnician?: boolean;
   priority?: string | null;
+  permissaoAprovadaSeNecessario?: boolean;
 }
 
 interface TransitionRule {
@@ -53,6 +55,9 @@ const TRANSITIONS: TransitionRule[] = [
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
     requireAssignedTechnician: true,
+    guard: (ctx) => Boolean(ctx.permissaoAprovadaSeNecessario),
+    guardErrorCode: "PT_NAO_APROVADA",
+    guardErrorMessage: "Trabalho em altura exige Permissão de Trabalho aprovada antes de iniciar.",
   },
   // O próprio técnico pode iniciar direto da triagem, em qualquer prioridade,
   // sem passar pela programação do supervisor.
