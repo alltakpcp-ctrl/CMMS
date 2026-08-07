@@ -42,6 +42,7 @@ model User {
   subtasksCreated     Subtask[]       @relation("SubtaskCreatedBy")
   subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
   purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
+  permissoesTrabalhoAprovadas PermissaoTrabalho[] @relation("PermissaoTrabalhoApprovedBy")
 }
 
 model Shift {
@@ -132,6 +133,7 @@ model WorkOrder {
   number         String    @unique
   type           String
   disciplina     String    @default("ELETRICA")
+  trabalhoEmAltura Boolean @default(false)
   status         String    @default("ABERTA")
   priority       String
   title          String
@@ -172,6 +174,7 @@ model WorkOrder {
   assignees        WorkOrderAssignee[]
   stockMovements   StockMovement[]
   subtasks         Subtask[]
+  permissaoTrabalho PermissaoTrabalho?
 }
 
 // Manutentores de apoio (N:N), distintos do responsável principal
@@ -358,4 +361,37 @@ model PurchaseOrderComment {
   body            String
   supplierName    String?
   createdAt       DateTime      @default(now())
+}
+
+// status é String validada via zod, nunca enum nativo — mesma decisão de §2
+// do CLAUDE.md aplicada aos demais campos do schema.
+model PermissaoTrabalho {
+  id           String    @id @default(cuid())
+  workOrderId  String    @unique
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  status       String    @default("RASCUNHO")
+
+  emittedAt    DateTime?
+  closedAt     DateTime?
+
+  approvedById String?
+  approvedBy   User?     @relation("PermissaoTrabalhoApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  respostas    PermissaoTrabalhoResposta[]
+}
+
+model PermissaoTrabalhoResposta {
+  id                  String @id @default(cuid())
+  permissaoTrabalhoId String
+  permissaoTrabalho   PermissaoTrabalho @relation(fields: [permissaoTrabalhoId], references: [id], onDelete: Cascade)
+  ordem               Int
+  pergunta            String
+  resposta            String?
+  observacao          String?
+
+  @@unique([permissaoTrabalhoId, ordem])
 }

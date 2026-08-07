@@ -70,3 +70,19 @@ export const PurchaseOrderStatus = {
   ENVIADO_COMPRAS: "ENVIADO_COMPRAS",
 } as const;
 export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
+
+export const PermissaoTrabalhoStatus = {
+  RASCUNHO: "RASCUNHO",
+  PREENCHIDA: "PREENCHIDA",
+  AGUARDANDO_APROVACAO: "AGUARDANDO_APROVACAO",
+  APROVADA: "APROVADA",
+  REPROVADA: "REPROVADA",
+  ENCERRADA: "ENCERRADA",
+} as const;
+export type PermissaoTrabalhoStatus = (typeof PermissaoTrabalhoStatus)[keyof typeof PermissaoTrabalhoStatus];
+
+export const RespostaPT = {
+  SIM: "SIM",
+  NAO: "NAO",
+} as const;
+export type RespostaPT = (typeof RespostaPT)[keyof typeof RespostaPT];
