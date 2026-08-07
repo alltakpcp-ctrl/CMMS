@@ -37,6 +37,7 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const { warningVisible, secondsLeft, stayConnected } = useIdleLogout(logout);
+  const isEloisaTheme = user?.email.trim().toLowerCase() === "eloisa.caldeira@alltak.com.br";
 
   const items = NAV_ITEMS.filter((item) => {
     if (item.roles && (!user || !item.roles.includes(user.role))) return false;
@@ -55,8 +56,72 @@ export function AppLayout() {
   }, [open]);
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      {warningVisible && <IdleWarningModal secondsLeft={secondsLeft} onStay={stayConnected} />}
+    <>
+      {isEloisaTheme && (
+        <>
+          <style>{`
+            @keyframes capivaraEnter {
+              0% { opacity: 0; transform: translateY(20px); }
+              100% { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes capivaraFloat {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-10px); }
+            }
+            .capivara-enter-float-1 {
+              animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
+              animation-delay: 0s, 0.6s;
+            }
+            .capivara-enter-float-2 {
+              animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
+              animation-delay: 0.15s, 1.9s;
+            }
+            .capivara-enter-float-3 {
+              animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
+              animation-delay: 0.3s, 3.2s;
+            }
+            .eloisa-greeting-enter {
+              animation: capivaraEnter 0.6s ease-out both;
+            }
+          `}</style>
+          <img
+            src="/capivara-1.png"
+            alt=""
+            aria-hidden="true"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="capivara-enter-float-1 pointer-events-none fixed bottom-6 right-6 z-20 w-32 select-none md:w-40"
+          />
+          <img
+            src="/capivara-2.png"
+            alt=""
+            aria-hidden="true"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="capivara-enter-float-2 pointer-events-none fixed right-6 top-24 z-20 w-32 select-none md:w-40"
+          />
+          <img
+            src="/capivara-3.png"
+            alt=""
+            aria-hidden="true"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="capivara-enter-float-3 pointer-events-none fixed right-6 top-1/2 z-20 w-28 -translate-y-1/2 select-none md:w-36"
+          />
+          <div
+            aria-hidden="true"
+            className="eloisa-greeting-enter pointer-events-none fixed left-1/2 top-20 z-20 -translate-x-1/2 whitespace-nowrap rounded-xl bg-black/70 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur"
+          >
+            Bem-vinda, Eloisa! 🦫
+          </div>
+        </>
+      )}
+
+      <div className="flex min-h-screen bg-slate-100">
+        {warningVisible && <IdleWarningModal secondsLeft={secondsLeft} onStay={stayConnected} />}
 
       {open && (
         <div
@@ -126,6 +191,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

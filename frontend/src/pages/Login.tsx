@@ -151,7 +151,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const isEloisaTheme = email.trim().toLowerCase() === "eloisa.caldeira@alltak.com.br";
 
   if (token) {
     const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
@@ -173,77 +172,13 @@ export default function Login() {
   }
 
   return (
-    <>
-      <style>{`
-        @keyframes capivaraEnter {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes capivaraFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .capivara-enter-float-1 {
-          animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
-          animation-delay: 0s, 0.6s;
-        }
-        .capivara-enter-float-2 {
-          animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
-          animation-delay: 0.15s, 1.9s;
-        }
-        .capivara-enter-float-3 {
-          animation: capivaraEnter 0.6s ease-out both, capivaraFloat 4s ease-in-out infinite;
-          animation-delay: 0.3s, 3.2s;
-        }
-        .eloisa-greeting-enter {
-          animation: capivaraEnter 0.6s ease-out both;
-        }
-      `}</style>
-      <div
-        className="relative min-h-screen w-full overflow-hidden bg-slate-950 bg-cover bg-center"
-        style={{ backgroundImage: "url('/login-bg.png')" }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/30" />
+    <div
+      className="relative min-h-screen w-full overflow-hidden bg-slate-950 bg-cover bg-center"
+      style={{ backgroundImage: "url('/login-bg.png')" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/30" />
 
-        {isEloisaTheme && (
-          <>
-            <img
-              src="/capivara-1.png"
-              alt=""
-              aria-hidden="true"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-              className="capivara-enter-float-1 pointer-events-none absolute bottom-6 left-6 z-[5] w-32 select-none md:w-40"
-            />
-            <img
-              src="/capivara-2.png"
-              alt=""
-              aria-hidden="true"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-              className="capivara-enter-float-2 pointer-events-none absolute bottom-6 right-6 z-[5] w-32 select-none md:w-40"
-            />
-            <img
-              src="/capivara-3.png"
-              alt=""
-              aria-hidden="true"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-              className="capivara-enter-float-3 pointer-events-none absolute right-6 top-6 z-[5] w-28 select-none md:w-36"
-            />
-            <div
-              aria-hidden="true"
-              className="eloisa-greeting-enter pointer-events-none absolute left-1/2 top-6 z-[5] -translate-x-1/2 whitespace-nowrap rounded-xl bg-black/40 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur"
-            >
-              Bem-vinda, Eloisa! 🦫
-            </div>
-          </>
-        )}
-
-        <div className="relative z-10 flex h-screen flex-col gap-8 overflow-hidden px-6 py-8 md:flex-row md:items-stretch md:justify-between md:px-12 lg:px-20">
+      <div className="relative z-10 flex h-screen flex-col gap-8 overflow-hidden px-6 py-8 md:flex-row md:items-stretch md:justify-between md:px-12 lg:px-20">
         {/* Board à esquerda, sobre a imagem */}
         <div className="order-2 flex min-h-0 flex-1 flex-col overflow-hidden md:order-1 md:max-w-4xl md:py-4">
           <NovasSolicitacoesBoard />
@@ -299,7 +234,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-      </div>
-    </>
+    </div>
   );
 }
