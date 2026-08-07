@@ -2,6 +2,7 @@ import {
   Disciplina,
   PartRequestItemType,
   PartRequestStatus,
+  PermissaoTrabalhoStatus,
   Priority,
   PurchaseOrderStatus,
   Role,
@@ -135,6 +136,29 @@ export interface StatusHistoryEntry {
   changedAt: string;
 }
 
+export interface PermissaoTrabalhoResposta {
+  id: string;
+  permissaoTrabalhoId: string;
+  ordem: number;
+  pergunta: string;
+  resposta: "SIM" | "NAO" | null;
+  observacao: string | null;
+}
+
+export interface PermissaoTrabalho {
+  id: string;
+  workOrderId: string;
+  status: PermissaoTrabalhoStatus;
+  emittedAt: string | null;
+  closedAt: string | null;
+  approvedById: string | null;
+  approvedBy: { id: string; name: string } | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  respostas: PermissaoTrabalhoResposta[];
+}
+
 export interface WorkOrder {
   id: string;
   number: string;
@@ -167,6 +191,8 @@ export interface WorkOrder {
   parts: WorkOrderPart[];
   plannedPartItems: WorkOrderPlannedPart[];
   statusHistory?: StatusHistoryEntry[];
+  trabalhoEmAltura: boolean;
+  permissaoTrabalho: PermissaoTrabalho | null;
 }
 
 export interface Paginated<T> {

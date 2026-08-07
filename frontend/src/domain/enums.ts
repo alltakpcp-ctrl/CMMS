@@ -93,3 +93,13 @@ export const SubtaskStatus = {
   CANCELADA: "CANCELADA",
 } as const;
 export type SubtaskStatus = (typeof SubtaskStatus)[keyof typeof SubtaskStatus];
+
+export const PermissaoTrabalhoStatus = {
+  RASCUNHO: "RASCUNHO",
+  PREENCHIDA: "PREENCHIDA",
+  AGUARDANDO_APROVACAO: "AGUARDANDO_APROVACAO",
+  APROVADA: "APROVADA",
+  REPROVADA: "REPROVADA",
+  ENCERRADA: "ENCERRADA",
+} as const;
+export type PermissaoTrabalhoStatus = (typeof PermissaoTrabalhoStatus)[keyof typeof PermissaoTrabalhoStatus];

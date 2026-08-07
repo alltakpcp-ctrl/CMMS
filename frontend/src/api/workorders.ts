@@ -9,6 +9,7 @@ export interface CreateWorkOrderInput {
   title: string;
   description: string;
   assetId: string;
+  trabalhoEmAltura?: boolean;
 }
 
 export interface ListWorkOrdersFilters {
