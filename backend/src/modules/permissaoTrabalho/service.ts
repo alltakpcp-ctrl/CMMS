@@ -82,30 +82,33 @@ export async function patchResposta(respostaId: string, input: PatchRespostaInpu
       where: { permissaoTrabalhoId: ptId },
       select: { resposta: true },
     });
-    const completa = todas.every((r) => r.resposta !== null);
-    const novoStatus = completa
-      ? PermissaoTrabalhoStatus.PREENCHIDA
-      : PermissaoTrabalhoStatus.RASCUNHO;
-
-    // só recalcula entre RASCUNHO/PREENCHIDA; nunca rebaixa REPROVADA aqui
     const atual = resposta.permissaoTrabalho.status;
-    if (atual === PermissaoTrabalhoStatus.RASCUNHO || atual === PermissaoTrabalhoStatus.PREENCHIDA) {
+    const completa = todas.every((r) => r.resposta !== null);
+
+    // alvo quando completa: auto-submete direto para aprovação (sem passo manual)
+    const alvoCompleta = PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO;
+
+    let novoStatus: string | null = null;
+    if (atual === PermissaoTrabalhoStatus.RASCUNHO || atual === PermissaoTrabalhoStatus.REPROVADA) {
+      novoStatus = completa ? alvoCompleta : PermissaoTrabalhoStatus.RASCUNHO;
+    }
+    // se atual já era PREENCHIDA/AGUARDANDO_APROVACAO, não rebaixa aqui (edição bloqueada nesses status pelo guard de editabilidade)
+
+    if (novoStatus && novoStatus !== atual) {
       await tx.permissaoTrabalho.update({ where: { id: ptId }, data: { status: novoStatus } });
-    } else if (atual === PermissaoTrabalhoStatus.REPROVADA && completa) {
-      await tx.permissaoTrabalho.update({ where: { id: ptId }, data: { status: PermissaoTrabalhoStatus.PREENCHIDA } });
     }
 
-    const virouPreenchida =
+    const virouCompleta =
       (atual === PermissaoTrabalhoStatus.RASCUNHO || atual === PermissaoTrabalhoStatus.REPROVADA) &&
       completa;
 
-    if (virouPreenchida) {
+    if (virouCompleta) {
       const { sim, nao, na } = contarRespostas(todas);
       await registrarEventoPT(
         tx,
         resposta.permissaoTrabalho.workOrderId,
         user.userId,
-        `[PT] Preenchida — ${sim} Sim, ${nao} Não, ${na} N/A`
+        `[PT] Enviada para aprovação — ${sim} Sim, ${nao} Não, ${na} N/A`
       );
     }
 

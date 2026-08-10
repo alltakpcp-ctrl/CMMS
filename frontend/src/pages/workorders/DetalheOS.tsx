@@ -58,6 +58,7 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
   const isAssignedTech =
     role === Role.TECNICO &&
     (userId === wo.assignedToId || wo.assignees.some((a) => a.userId === userId));
+  const ptOk = !wo.trabalhoEmAltura || wo.permissaoTrabalho?.status === "APROVADA";
 
   if (wo.status === WorkOrderStatus.ABERTA && (role === Role.TECNICO || role === Role.SUPERVISOR)) {
     actions.push("triagem");
@@ -70,14 +71,15 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
   // (ver workOrderStateMachine.ts).
   if (
     (wo.status === WorkOrderStatus.TRIAGEM || wo.status === WorkOrderStatus.PLANEJADA) &&
-    role === Role.TECNICO
+    role === Role.TECNICO &&
+    ptOk
   ) {
     actions.push("iniciar");
   }
   if (wo.status === WorkOrderStatus.PLANEJADA && role === Role.SUPERVISOR) {
     actions.push("programacao");
   }
-  if (wo.status === WorkOrderStatus.PROGRAMADA && (isAssignedTech || role === Role.SUPERVISOR)) {
+  if (wo.status === WorkOrderStatus.PROGRAMADA && (isAssignedTech || role === Role.SUPERVISOR) && ptOk) {
     actions.push("iniciar");
   }
   if (wo.status === WorkOrderStatus.EM_EXECUCAO && (isAssignedTech || role === Role.SUPERVISOR)) {

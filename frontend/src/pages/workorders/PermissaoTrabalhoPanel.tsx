@@ -98,9 +98,7 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
     }
   }
 
-  const isTecnico = user?.role === Role.TECNICO;
   const isSupervisor = user?.role === Role.SUPERVISOR;
-  const podeSubmeter = isTecnico && pt.status === PermissaoTrabalhoStatus.PREENCHIDA;
   const podeAprovar = isSupervisor && pt.status === PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO;
 
   return (
@@ -183,16 +181,6 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
       </ul>
 
       <div className="mt-4 flex gap-2">
-        {podeSubmeter && (
-          <button
-            type="button"
-            disabled={acting}
-            onClick={() => doAcao("submeter")}
-            className="rounded bg-slate-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-          >
-            Submeter para aprovação
-          </button>
-        )}
         {podeAprovar && (
           <>
             <button
