@@ -215,7 +215,9 @@ export default function DetalheOS() {
             )}
           </Card>
 
-          {workOrder.trabalhoEmAltura && <PermissaoTrabalhoPanel workOrder={workOrder} />}
+          {workOrder.trabalhoEmAltura && (
+            <PermissaoTrabalhoPanel workOrder={workOrder} onReload={reload} />
+          )}
 
           {workOrder.status === WorkOrderStatus.EM_EXECUCAO && <SubtaskPanel workOrder={workOrder} />}
 

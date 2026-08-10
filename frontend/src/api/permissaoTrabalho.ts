@@ -2,7 +2,7 @@ import { apiRequest } from "./client";
 import { PermissaoTrabalho } from "../types";
 
 export interface PatchRespostaInput {
-  resposta?: "SIM" | "NAO" | null;
+  resposta?: "SIM" | "NAO" | "NA" | null;
   observacao?: string | null;
 }
 
@@ -25,5 +25,12 @@ export function patchStatus(token: string, ptId: string, acao: PatchStatusAcao) 
     method: "PATCH",
     token,
     body: { acao },
+  });
+}
+
+export function checkpoint(token: string, ptId: string) {
+  return apiRequest<PermissaoTrabalho>(`/permissao-trabalho/${ptId}/checkpoint`, {
+    method: "POST",
+    token,
   });
 }

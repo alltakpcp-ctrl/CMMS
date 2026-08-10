@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { AuthPayload } from "../../middlewares/authenticate";
@@ -9,6 +10,34 @@ const ptInclude = {
   respostas: { orderBy: { ordem: "asc" as const } },
   approvedBy: { select: { id: true, name: true } },
 };
+
+async function registrarEventoPT(
+  tx: Prisma.TransactionClient,
+  workOrderId: string,
+  changedById: string,
+  note: string
+) {
+  const wo = await tx.workOrder.findUniqueOrThrow({
+    where: { id: workOrderId },
+    select: { status: true },
+  });
+  await tx.statusHistory.create({
+    data: {
+      workOrderId,
+      fromStatus: wo.status,
+      toStatus: wo.status,
+      changedById,
+      note,
+    },
+  });
+}
+
+function contarRespostas(respostas: { resposta: string | null }[]) {
+  const sim = respostas.filter((r) => r.resposta === "SIM").length;
+  const nao = respostas.filter((r) => r.resposta === "NAO").length;
+  const na = respostas.filter((r) => r.resposta === "NA").length;
+  return { sim, nao, na };
+}
 
 export async function getByWorkOrderId(workOrderId: string) {
   const pt = await prisma.permissaoTrabalho.findUnique({
@@ -27,7 +56,7 @@ const STATUS_EDITAVEL = [
   PermissaoTrabalhoStatus.REPROVADA,
 ];
 
-export async function patchResposta(respostaId: string, input: PatchRespostaInput) {
+export async function patchResposta(respostaId: string, input: PatchRespostaInput, user: AuthPayload) {
   const resposta = await prisma.permissaoTrabalhoResposta.findUnique({
     where: { id: respostaId },
     include: { permissaoTrabalho: true },
@@ -66,6 +95,20 @@ export async function patchResposta(respostaId: string, input: PatchRespostaInpu
       await tx.permissaoTrabalho.update({ where: { id: ptId }, data: { status: PermissaoTrabalhoStatus.PREENCHIDA } });
     }
 
+    const virouPreenchida =
+      (atual === PermissaoTrabalhoStatus.RASCUNHO || atual === PermissaoTrabalhoStatus.REPROVADA) &&
+      completa;
+
+    if (virouPreenchida) {
+      const { sim, nao, na } = contarRespostas(todas);
+      await registrarEventoPT(
+        tx,
+        resposta.permissaoTrabalho.workOrderId,
+        user.userId,
+        `[PT] Preenchida — ${sim} Sim, ${nao} Não, ${na} N/A`
+      );
+    }
+
     return tx.permissaoTrabalho.findUniqueOrThrow({ where: { id: ptId }, include: ptInclude });
   });
 }
@@ -87,10 +130,14 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
     if (!completa) {
       throw new AppError(422, "PT_INCOMPLETE", "Todas as perguntas devem ser respondidas antes de submeter.");
     }
-    return prisma.permissaoTrabalho.update({
-      where: { id: ptId },
-      data: { status: PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO },
-      include: ptInclude,
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.permissaoTrabalho.update({
+        where: { id: ptId },
+        data: { status: PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO },
+        include: ptInclude,
+      });
+      await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Submetida para aprovação");
+      return updated;
     });
   }
 
@@ -103,22 +150,58 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
   }
 
   if (input.acao === "aprovar") {
-    return prisma.permissaoTrabalho.update({
-      where: { id: ptId },
-      data: {
-        status: PermissaoTrabalhoStatus.APROVADA,
-        emittedAt: new Date(),
-        approvedById: user.userId,
-        approvedAt: new Date(),
-      },
-      include: ptInclude,
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.permissaoTrabalho.update({
+        where: { id: ptId },
+        data: {
+          status: PermissaoTrabalhoStatus.APROVADA,
+          emittedAt: new Date(),
+          approvedById: user.userId,
+          approvedAt: new Date(),
+        },
+        include: ptInclude,
+      });
+      await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Aprovada");
+      return updated;
     });
   }
 
   // reprovar → volta para PREENCHIDA (editável)
-  return prisma.permissaoTrabalho.update({
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.permissaoTrabalho.update({
+      where: { id: ptId },
+      data: { status: PermissaoTrabalhoStatus.PREENCHIDA },
+      include: ptInclude,
+    });
+    await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Reprovada");
+    return updated;
+  });
+}
+
+export async function checkpoint(ptId: string, user: AuthPayload) {
+  const pt = await prisma.permissaoTrabalho.findUnique({
     where: { id: ptId },
-    data: { status: PermissaoTrabalhoStatus.PREENCHIDA },
-    include: ptInclude,
+    include: { respostas: { select: { resposta: true } } },
+  });
+  if (!pt) {
+    throw new AppError(404, "PT_NOT_FOUND", "Permissão de Trabalho não encontrada.");
+  }
+  // só registra checkpoint de edição quando a PT já passou de preenchida
+  const statusComEdicaoRegistravel = [
+    PermissaoTrabalhoStatus.PREENCHIDA,
+    PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO,
+  ];
+  if (!statusComEdicaoRegistravel.includes(pt.status as any)) {
+    return pt; // no-op silencioso — nada a registrar
+  }
+  const { sim, nao, na } = contarRespostas(pt.respostas);
+  return prisma.$transaction(async (tx) => {
+    await registrarEventoPT(
+      tx,
+      pt.workOrderId,
+      user.userId,
+      `[PT] Alterada — ${sim} Sim, ${nao} Não, ${na} N/A`
+    );
+    return tx.permissaoTrabalho.findUniqueOrThrow({ where: { id: ptId }, include: ptInclude });
   });
 }

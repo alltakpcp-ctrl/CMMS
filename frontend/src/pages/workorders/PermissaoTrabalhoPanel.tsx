@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { WorkOrder, PermissaoTrabalho, PermissaoTrabalhoResposta } from "../../types";
 import { PermissaoTrabalhoStatus, Role } from "../../domain/enums";
 import { useAuth } from "../../auth/AuthContext";
@@ -19,14 +19,32 @@ const EDITAVEL = ["RASCUNHO", "PREENCHIDA", "REPROVADA"];
 
 interface Props {
   workOrder: WorkOrder;
+  onReload?: () => void;
 }
 
-export function PermissaoTrabalhoPanel({ workOrder }: Props) {
+export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
   const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
   const [pt, setPt] = useState<PermissaoTrabalho | null>(workOrder.permissaoTrabalho);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevStatusRef = useRef(pt?.status);
+
+  // dispara reload quando a PT cruza um marco (status muda), para a timeline atualizar
+  useEffect(() => {
+    if (pt && prevStatusRef.current !== pt.status) {
+      prevStatusRef.current = pt.status;
+      onReload?.();
+    }
+  }, [pt?.status, onReload]);
+
+  // cleanup do timer no unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   if (!pt) {
     return null;
@@ -35,11 +53,26 @@ export function PermissaoTrabalhoPanel({ workOrder }: Props) {
   const editavel = EDITAVEL.includes(pt.status);
 
   async function saveResposta(resposta: PermissaoTrabalhoResposta, patch: ptApi.PatchRespostaInput) {
-    if (!token || !editavel) return;
+    if (!token || !editavel || !pt) return;
+    const statusAntes = pt.status; // captura antes do update
     setSavingId(resposta.id);
     try {
       const updated = await ptApi.patchResposta(token, resposta.id, patch);
       setPt(updated);
+      // só agenda checkpoint se JÁ estava preenchida/aguardando ANTES deste save
+      // (edição de PT já completa) — evita "Alterada" redundante logo após "Preenchida"
+      const jaEstavaCompleta =
+        statusAntes === PermissaoTrabalhoStatus.PREENCHIDA ||
+        statusAntes === PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO;
+      if (jaEstavaCompleta) {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          ptApi
+            .checkpoint(token, updated.id)
+            .then(() => onReload?.())
+            .catch(() => {}); // silencioso — checkpoint é best-effort
+        }, 3000);
+      }
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -105,6 +138,18 @@ export function PermissaoTrabalhoPanel({ workOrder }: Props) {
                   } disabled:opacity-50`}
                 >
                   Sim
+                </button>
+                <button
+                  type="button"
+                  disabled={!editavel || savingId === r.id}
+                  onClick={() => saveResposta(r, { resposta: "NA", observacao: r.observacao })}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    r.resposta === "NA"
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  } disabled:opacity-50`}
+                >
+                  N/A
                 </button>
                 <button
                   type="button"

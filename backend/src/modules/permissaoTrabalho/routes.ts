@@ -5,6 +5,7 @@ import {
   getPermissaoTrabalhoController,
   patchRespostaController,
   patchStatusController,
+  checkpointController,
 } from "./controller";
 
 export const permissaoTrabalhoRoutes = Router();
@@ -15,3 +16,4 @@ permissaoTrabalhoRoutes.use(authenticate);
 permissaoTrabalhoRoutes.get("/workorder/:workOrderId", asyncHandler(getPermissaoTrabalhoController));
 permissaoTrabalhoRoutes.patch("/respostas/:id", asyncHandler(patchRespostaController));
 permissaoTrabalhoRoutes.patch("/:id/status", asyncHandler(patchStatusController));
+permissaoTrabalhoRoutes.post("/:id/checkpoint", asyncHandler(checkpointController));

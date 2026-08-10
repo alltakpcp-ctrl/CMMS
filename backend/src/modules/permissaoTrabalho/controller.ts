@@ -16,10 +16,14 @@ export async function getPermissaoTrabalhoController(req: Request, res: Response
 
 export async function patchRespostaController(req: Request, res: Response) {
   const input = patchRespostaSchema.parse(req.body);
-  res.json(await ptService.patchResposta(req.params.id, input));
+  res.json(await ptService.patchResposta(req.params.id, input, requireUser(req)));
 }
 
 export async function patchStatusController(req: Request, res: Response) {
   const input = patchStatusSchema.parse(req.body);
   res.json(await ptService.patchStatus(req.params.id, input, requireUser(req)));
+}
+
+export async function checkpointController(req: Request, res: Response) {
+  res.json(await ptService.checkpoint(req.params.id, requireUser(req)));
 }

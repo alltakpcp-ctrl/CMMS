@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const patchRespostaSchema = z.object({
-  resposta: z.enum(["SIM", "NAO"]).nullable().optional(),
+  resposta: z.enum(["SIM", "NAO", "NA"]).nullable().optional(),
   observacao: z.string().nullable().optional(),
 });
 

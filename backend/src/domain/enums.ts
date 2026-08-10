@@ -84,5 +84,6 @@ export type PermissaoTrabalhoStatus = (typeof PermissaoTrabalhoStatus)[keyof typ
 export const RespostaPT = {
   SIM: "SIM",
   NAO: "NAO",
+  NA: "NA",
 } as const;
 export type RespostaPT = (typeof RespostaPT)[keyof typeof RespostaPT];

@@ -141,7 +141,7 @@ export interface PermissaoTrabalhoResposta {
   permissaoTrabalhoId: string;
   ordem: number;
   pergunta: string;
-  resposta: "SIM" | "NAO" | null;
+  resposta: "SIM" | "NAO" | "NA" | null;
   observacao: string | null;
 }
 
