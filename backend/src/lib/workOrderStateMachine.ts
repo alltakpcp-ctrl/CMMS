@@ -65,6 +65,9 @@ const TRANSITIONS: TransitionRule[] = [
     from: WorkOrderStatus.TRIAGEM,
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
+    guard: (ctx) => Boolean(ctx.permissaoAprovadaSeNecessario),
+    guardErrorCode: "PT_NAO_APROVADA",
+    guardErrorMessage: "Trabalho em altura exige Permissão de Trabalho aprovada antes de iniciar.",
   },
   // Mesma lógica, mas quando o planejamento já foi feito antes de o técnico
   // iniciar — pula a programação do supervisor.
@@ -72,6 +75,9 @@ const TRANSITIONS: TransitionRule[] = [
     from: WorkOrderStatus.PLANEJADA,
     to: WorkOrderStatus.EM_EXECUCAO,
     roles: [Role.TECNICO],
+    guard: (ctx) => Boolean(ctx.permissaoAprovadaSeNecessario),
+    guardErrorCode: "PT_NAO_APROVADA",
+    guardErrorMessage: "Trabalho em altura exige Permissão de Trabalho aprovada antes de iniciar.",
   },
   {
     from: WorkOrderStatus.EM_EXECUCAO,
