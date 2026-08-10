@@ -124,7 +124,6 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         assetId: input.assetId,
         requesterId: user.userId,
         status: WorkOrderStatus.ABERTA,
-        trabalhoEmAltura: input.trabalhoEmAltura ?? false,
       },
       select: { id: true },
     });
@@ -137,21 +136,6 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         changedById: user.userId,
       },
     });
-
-    if (input.trabalhoEmAltura) {
-      await tx.permissaoTrabalho.create({
-        data: {
-          workOrderId: workOrder.id,
-          status: "RASCUNHO",
-          respostas: {
-            create: PERGUNTAS_PT_ALTURA.map((pergunta, i) => ({
-              ordem: i + 1,
-              pergunta,
-            })),
-          },
-        },
-      });
-    }
 
     const created = await tx.workOrder.findUniqueOrThrow({
       where: { id: workOrder.id },
@@ -337,13 +321,33 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
     mutate: async (tx, workOrder) => {
       await assertActiveSector(tx, input.targetSectorId);
 
+      if (input.trabalhoEmAltura) {
+        await tx.permissaoTrabalho.create({
+          data: {
+            workOrderId: workOrder.id,
+            status: "RASCUNHO",
+            respostas: {
+              create: PERGUNTAS_PT_ALTURA.map((pergunta, i) => ({
+                ordem: i + 1,
+                pergunta,
+              })),
+            },
+          },
+        });
+      }
+
       if (input.priority === workOrder.priority) {
-        return { priority: input.priority, targetSectorId: input.targetSectorId };
+        return {
+          priority: input.priority,
+          targetSectorId: input.targetSectorId,
+          trabalhoEmAltura: input.trabalhoEmAltura,
+        };
       }
 
       return {
         priority: input.priority,
         targetSectorId: input.targetSectorId,
+        trabalhoEmAltura: input.trabalhoEmAltura,
         priorityAdjustedByTech: true,
         priorityOriginal: workOrder.priority,
         priorityAdjustedById: user.userId,

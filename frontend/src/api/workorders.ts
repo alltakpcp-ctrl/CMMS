@@ -9,7 +9,6 @@ export interface CreateWorkOrderInput {
   title: string;
   description: string;
   assetId: string;
-  trabalhoEmAltura?: boolean;
 }
 
 export interface ListWorkOrdersFilters {
@@ -27,6 +26,7 @@ export interface ListWorkOrdersFilters {
 export interface TriagemInput {
   priority: Priority;
   targetSectorId: string;
+  trabalhoEmAltura?: boolean;
 }
 
 export interface PlanejamentoInput {

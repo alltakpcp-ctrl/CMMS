@@ -11,7 +11,6 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { Textarea } from "../components/Textarea";
-import { Checkbox } from "../components/Checkbox";
 import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
@@ -30,7 +29,6 @@ export default function NovaSolicitacao() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assetId, setAssetId] = useState("");
-  const [trabalhoEmAltura, setTrabalhoEmAltura] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 
@@ -55,14 +53,12 @@ export default function NovaSolicitacao() {
         title,
         description,
         assetId,
-        trabalhoEmAltura,
       });
       setCreatedNumber(workOrder.number);
       showSuccess(`Solicitação ${workOrder.number} aberta com sucesso.`);
       setTitle("");
       setDescription("");
       setAssetId("");
-      setTrabalhoEmAltura(false);
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -138,12 +134,6 @@ export default function NovaSolicitacao() {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Descreva o problema ou serviço solicitado."
             required
-          />
-
-          <Checkbox
-            label="Trabalho em altura (exige Permissão de Trabalho)"
-            checked={trabalhoEmAltura}
-            onChange={(e) => setTrabalhoEmAltura(e.target.checked)}
           />
 
           <SearchableSelect
