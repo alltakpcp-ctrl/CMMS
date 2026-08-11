@@ -5,9 +5,20 @@ export const patchRespostaSchema = z.object({
   observacao: z.string().nullable().optional(),
 });
 
-export const patchStatusSchema = z.object({
-  acao: z.enum(["submeter", "aprovar", "reprovar"]),
-});
+export const patchStatusSchema = z
+  .object({
+    acao: z.enum(["submeter", "aprovar", "reprovar"]),
+    motivo: z.string().trim().min(1).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.acao === "reprovar" && !val.motivo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["motivo"],
+        message: "Motivo é obrigatório ao reprovar a PT.",
+      });
+    }
+  });
 
 export type PatchRespostaInput = z.infer<typeof patchRespostaSchema>;
 export type PatchStatusInput = z.infer<typeof patchStatusSchema>;

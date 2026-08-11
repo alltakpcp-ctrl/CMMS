@@ -144,9 +144,9 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
     });
   }
 
-  // aprovar / reprovar — só SUPERVISOR
-  if (user.role !== Role.SUPERVISOR) {
-    throw new AppError(403, "FORBIDDEN", "Apenas supervisor pode aprovar ou reprovar a PT.");
+  // aprovar / reprovar — só SEGURANCA
+  if (user.role !== Role.SEGURANCA) {
+    throw new AppError(403, "FORBIDDEN", "Apenas o técnico de segurança pode aprovar ou reprovar a PT.");
   }
   if (pt.status !== PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO) {
     throw new AppError(422, "PT_INVALID_STATE", "PT não está aguardando aprovação.");
@@ -161,6 +161,7 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
           emittedAt: new Date(),
           approvedById: user.userId,
           approvedAt: new Date(),
+          rejectionReason: null,
         },
         include: ptInclude,
       });
@@ -173,10 +174,10 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
   return prisma.$transaction(async (tx) => {
     const updated = await tx.permissaoTrabalho.update({
       where: { id: ptId },
-      data: { status: PermissaoTrabalhoStatus.PREENCHIDA },
+      data: { status: PermissaoTrabalhoStatus.PREENCHIDA, rejectionReason: input.motivo },
       include: ptInclude,
     });
-    await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Reprovada");
+    await registrarEventoPT(tx, pt.workOrderId, user.userId, `[PT] Reprovada: ${input.motivo}`);
     return updated;
   });
 }
