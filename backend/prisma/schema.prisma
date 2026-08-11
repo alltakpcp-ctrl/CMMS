@@ -43,6 +43,8 @@ model User {
   subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
   purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
   permissoesTrabalhoAprovadas PermissaoTrabalho[] @relation("PermissaoTrabalhoApprovedBy")
+  assinaturasPT          PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaUser")
+  assinaturasPTSolicitadas PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaRequestedBy")
 }
 
 model Shift {
@@ -377,11 +379,13 @@ model PermissaoTrabalho {
   approvedById String?
   approvedBy   User?     @relation("PermissaoTrabalhoApprovedBy", fields: [approvedById], references: [id])
   approvedAt   DateTime?
+  rejectionReason String?
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   respostas    PermissaoTrabalhoResposta[]
+  assinaturas  PermissaoTrabalhoAssinatura[]
 }
 
 model PermissaoTrabalhoResposta {
@@ -394,4 +398,20 @@ model PermissaoTrabalhoResposta {
   observacao          String?
 
   @@unique([permissaoTrabalhoId, ordem])
+}
+
+model PermissaoTrabalhoAssinatura {
+  id                  String            @id @default(cuid())
+  permissaoTrabalhoId String
+  permissaoTrabalho   PermissaoTrabalho @relation(fields: [permissaoTrabalhoId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User              @relation("PermissaoTrabalhoAssinaturaUser", fields: [userId], references: [id])
+  signedAt            DateTime?
+  requestedById       String
+  requestedBy         User              @relation("PermissaoTrabalhoAssinaturaRequestedBy", fields: [requestedById], references: [id])
+  requestedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([permissaoTrabalhoId, userId])
 }
