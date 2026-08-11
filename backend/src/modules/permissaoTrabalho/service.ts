@@ -9,6 +9,13 @@ import { PatchRespostaInput, PatchStatusInput } from "./schema";
 const ptInclude = {
   respostas: { orderBy: { ordem: "asc" as const } },
   approvedBy: { select: { id: true, name: true } },
+  assinaturas: {
+    orderBy: { requestedAt: "asc" as const },
+    include: {
+      user: { select: { id: true, name: true } },
+      requestedBy: { select: { id: true, name: true } },
+    },
+  },
 };
 
 async function registrarEventoPT(
