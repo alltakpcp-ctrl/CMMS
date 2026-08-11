@@ -260,7 +260,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         note,
         priority: workOrder.priority,
         permissaoAprovadaSeNecessario:
-          !workOrder.trabalhoEmAltura || workOrder.permissaoTrabalho?.status === "APROVADA",
+          !workOrder.trabalhoEmAltura || workOrder.permissaoTrabalho?.status === "LIBERADA",
         ...context,
       },
     });
@@ -276,7 +276,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         throw new AppError(422, "HAS_OPEN_SUBTASKS", "Existem subtarefas abertas nesta OS.");
       }
 
-      if (workOrder.permissaoTrabalho?.status === "APROVADA") {
+      if (workOrder.permissaoTrabalho?.status === "LIBERADA") {
         await tx.permissaoTrabalho.update({
           where: { workOrderId: id },
           data: { status: "ENCERRADA", closedAt: new Date() },
