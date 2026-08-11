@@ -8,6 +8,7 @@ import DetalheOS from "./pages/workorders/DetalheOS";
 import FilaTriagem from "./pages/FilaTriagem";
 import Agenda from "./pages/Agenda";
 import MinhasOS from "./pages/MinhasOS";
+import AssinaturasPendentes from "./pages/AssinaturasPendentes";
 import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
 import Usuarios from "./pages/cadastros/Usuarios";
@@ -20,6 +21,7 @@ import { RequireRole } from "./auth/RequireRole";
 import { RequireFlag } from "./auth/RequireFlag";
 import { AppLayout } from "./layout/AppLayout";
 import { Role } from "./domain/enums";
+import { PendenciasProvider } from "./pendencias/PendenciasContext";
 
 export default function App() {
   return (
@@ -29,11 +31,14 @@ export default function App() {
       <Route
         element={
           <RequireAuth>
-            <AppLayout />
+            <PendenciasProvider>
+              <AppLayout />
+            </PendenciasProvider>
           </RequireAuth>
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/assinaturas-pendentes" element={<AssinaturasPendentes />} />
         <Route path="/solicitacoes/nova" element={<NovaSolicitacao />} />
         <Route path="/ordens" element={<ListaOS />} />
         <Route path="/ordens/:id" element={<DetalheOS />} />

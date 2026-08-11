@@ -1,5 +1,17 @@
 import { apiRequest } from "./client";
 import { PermissaoTrabalho, PermissaoTrabalhoAssinatura } from "../types";
+import { PermissaoTrabalhoStatus } from "../domain/enums";
+
+export interface AssinaturaPendente {
+  id: string;
+  signedAt: string | null;
+  requestedAt: string;
+  permissaoTrabalho: {
+    id: string;
+    status: PermissaoTrabalhoStatus;
+    workOrder: { id: string; number: string; title: string };
+  };
+}
 
 export interface PatchRespostaInput {
   resposta?: "SIM" | "NAO" | "NA" | null;
@@ -55,4 +67,8 @@ export function assinar(token: string, assinaturaId: string) {
     method: "POST",
     token,
   });
+}
+
+export function listarMinhasPendencias(token: string) {
+  return apiRequest<AssinaturaPendente[]>(`/permissao-trabalho/assinaturas/minhas-pendencias`, { token });
 }

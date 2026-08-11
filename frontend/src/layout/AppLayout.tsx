@@ -5,6 +5,7 @@ import { Role } from "../domain/enums";
 import { ROLE_LABELS } from "../domain/labels";
 import { useIdleLogout } from "../hooks/useIdleLogout";
 import { IdleWarningModal } from "../components/IdleWarningModal";
+import { usePendencias } from "../pendencias/PendenciasContext";
 
 type BooleanFlagKey = { [K in keyof AuthUser]: AuthUser[K] extends boolean ? K : never }[keyof AuthUser];
 
@@ -31,10 +32,12 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/cadastros/setores", label: "Setores", roles: [Role.SUPERVISOR] },
   { to: "/estoque", label: "Estoque", roles: [Role.SUPERVISOR, Role.TECNICO] },
   { to: "/cadastros/usuarios", label: "Usuários", roles: [Role.SUPERVISOR] },
+  { to: "/assinaturas-pendentes", label: "Assinaturas Pendentes" },
 ];
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const { count } = usePendencias();
   const [open, setOpen] = useState(false);
   const { warningVisible, secondsLeft, stayConnected } = useIdleLogout(logout);
   const isEloisaTheme = user?.email.trim().toLowerCase() === "eloisa.caldeira@alltak.com.br";
@@ -43,6 +46,7 @@ export function AppLayout() {
     if (item.roles && (!user || !item.roles.includes(user.role))) return false;
     if (item.requiresFlag && !user?.[item.requiresFlag]) return false;
     if (item.to === "/solicitacoes/nova" && user?.role === Role.OPERADOR && !user.sectorId) return false;
+    if (item.to === "/assinaturas-pendentes" && count === 0) return false;
     return true;
   });
 
