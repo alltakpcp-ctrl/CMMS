@@ -209,3 +209,114 @@ export async function checkpoint(ptId: string, user: AuthPayload) {
     return tx.permissaoTrabalho.findUniqueOrThrow({ where: { id: ptId }, include: ptInclude });
   });
 }
+
+const assinaturaUserSelect = { select: { id: true, name: true } };
+
+export async function solicitarAssinatura(ptId: string, userId: string, user: AuthPayload) {
+  if (user.role !== Role.SUPERVISOR) {
+    throw new AppError(403, "FORBIDDEN", "Apenas supervisor pode gerenciar a lista de assinantes.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const pt = await tx.permissaoTrabalho.findUnique({ where: { id: ptId } });
+    if (!pt) {
+      throw new AppError(404, "PT_NOT_FOUND", "Permissão de Trabalho não encontrada.");
+    }
+    if (pt.status !== PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS) {
+      throw new AppError(
+        422,
+        "PT_INVALID_STATE",
+        "A lista de assinantes só pode ser alterada enquanto a PT aguarda assinaturas."
+      );
+    }
+
+    const targetUser = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!targetUser) {
+      throw new AppError(404, "USER_NOT_FOUND", "Usuário não encontrado.");
+    }
+
+    const existente = await tx.permissaoTrabalhoAssinatura.findUnique({
+      where: { permissaoTrabalhoId_userId: { permissaoTrabalhoId: ptId, userId } },
+    });
+    if (existente) {
+      throw new AppError(409, "ASSINATURA_DUPLICADA", "Este usuário já está na lista de assinantes.");
+    }
+
+    return tx.permissaoTrabalhoAssinatura.create({
+      data: { permissaoTrabalhoId: ptId, userId, requestedById: user.userId },
+      include: { user: assinaturaUserSelect, requestedBy: assinaturaUserSelect },
+    });
+  });
+}
+
+export async function removerAssinatura(assinaturaId: string, user: AuthPayload) {
+  if (user.role !== Role.SUPERVISOR) {
+    throw new AppError(403, "FORBIDDEN", "Apenas supervisor pode gerenciar a lista de assinantes.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const assinatura = await tx.permissaoTrabalhoAssinatura.findUnique({
+      where: { id: assinaturaId },
+      include: { permissaoTrabalho: { select: { status: true } } },
+    });
+    if (!assinatura) {
+      throw new AppError(404, "ASSINATURA_NOT_FOUND", "Assinatura não encontrada.");
+    }
+    if (assinatura.permissaoTrabalho.status !== PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS) {
+      throw new AppError(
+        422,
+        "PT_INVALID_STATE",
+        "A lista de assinantes só pode ser alterada enquanto a PT aguarda assinaturas."
+      );
+    }
+    if (assinatura.signedAt) {
+      throw new AppError(422, "ASSINATURA_JA_ASSINADA", "Não é possível remover uma assinatura já registrada.");
+    }
+
+    return tx.permissaoTrabalhoAssinatura.delete({ where: { id: assinaturaId } });
+  });
+}
+
+export async function assinar(assinaturaId: string, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const assinatura = await tx.permissaoTrabalhoAssinatura.findUnique({
+      where: { id: assinaturaId },
+      include: { permissaoTrabalho: { select: { status: true } } },
+    });
+    if (!assinatura) {
+      throw new AppError(404, "ASSINATURA_NOT_FOUND", "Assinatura não encontrada.");
+    }
+    if (assinatura.userId !== user.userId) {
+      throw new AppError(403, "FORBIDDEN", "Você só pode assinar a sua própria pendência.");
+    }
+    if (assinatura.signedAt) {
+      throw new AppError(422, "ASSINATURA_JA_ASSINADA", "Esta assinatura já foi registrada.");
+    }
+    if (assinatura.permissaoTrabalho.status !== PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS) {
+      throw new AppError(422, "PT_INVALID_STATE", "A PT não está aguardando assinaturas.");
+    }
+
+    // TODO(B3): checar se foi a última assinatura → LIBERADA
+    return tx.permissaoTrabalhoAssinatura.update({
+      where: { id: assinaturaId },
+      data: { signedAt: new Date() },
+      include: { user: assinaturaUserSelect },
+    });
+  });
+}
+
+export function listarMinhasPendencias(user: AuthPayload) {
+  return prisma.permissaoTrabalhoAssinatura.findMany({
+    where: { userId: user.userId, signedAt: null },
+    orderBy: { requestedAt: "asc" },
+    include: {
+      permissaoTrabalho: {
+        select: {
+          id: true,
+          status: true,
+          workOrder: { select: { id: true, number: true, title: true } },
+        },
+      },
+    },
+  });
+}

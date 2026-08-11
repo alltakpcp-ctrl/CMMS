@@ -20,5 +20,10 @@ export const patchStatusSchema = z
     }
   });
 
+export const solicitarAssinaturaSchema = z.object({
+  userId: z.string().min(1, "Usuário é obrigatório."),
+});
+
 export type PatchRespostaInput = z.infer<typeof patchRespostaSchema>;
 export type PatchStatusInput = z.infer<typeof patchStatusSchema>;
+export type SolicitarAssinaturaInput = z.infer<typeof solicitarAssinaturaSchema>;
