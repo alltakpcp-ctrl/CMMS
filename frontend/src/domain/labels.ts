@@ -16,6 +16,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   OPERADOR: "Operador",
   TECNICO: "Técnico",
   SUPERVISOR: "Supervisor",
+  SEGURANCA: "Segurança",
 };
 
 export const TYPE_LABELS: Record<WorkOrderType, string> = {

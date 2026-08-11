@@ -5,6 +5,7 @@ export const Role = {
   OPERADOR: "OPERADOR",
   TECNICO: "TECNICO",
   SUPERVISOR: "SUPERVISOR",
+  SEGURANCA: "SEGURANCA",
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
@@ -77,6 +78,7 @@ export const PermissaoTrabalhoStatus = {
   AGUARDANDO_APROVACAO: "AGUARDANDO_APROVACAO",
   APROVADA: "APROVADA",
   REPROVADA: "REPROVADA",
+  AGUARDANDO_ASSINATURAS: "AGUARDANDO_ASSINATURAS",
   ENCERRADA: "ENCERRADA",
 } as const;
 export type PermissaoTrabalhoStatus = (typeof PermissaoTrabalhoStatus)[keyof typeof PermissaoTrabalhoStatus];
