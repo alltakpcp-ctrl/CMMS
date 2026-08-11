@@ -102,6 +102,7 @@ export const PermissaoTrabalhoStatus = {
   APROVADA: "APROVADA",
   REPROVADA: "REPROVADA",
   AGUARDANDO_ASSINATURAS: "AGUARDANDO_ASSINATURAS",
+  LIBERADA: "LIBERADA",
   ENCERRADA: "ENCERRADA",
 } as const;
 export type PermissaoTrabalhoStatus = (typeof PermissaoTrabalhoStatus)[keyof typeof PermissaoTrabalhoStatus];

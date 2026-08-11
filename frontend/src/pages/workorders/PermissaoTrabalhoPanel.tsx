@@ -13,6 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
   APROVADA: "Aprovada",
   REPROVADA: "Reprovada",
   AGUARDANDO_ASSINATURAS: "Aguardando assinaturas",
+  LIBERADA: "Liberada",
   ENCERRADA: "Encerrada",
 };
 
