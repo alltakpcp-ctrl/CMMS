@@ -7,7 +7,7 @@ export const patchRespostaSchema = z.object({
 
 export const patchStatusSchema = z
   .object({
-    acao: z.enum(["submeter", "aprovar", "reprovar"]),
+    acao: z.enum(["submeter", "aprovar", "reprovar", "liberar"]),
     motivo: z.string().trim().min(1).optional(),
   })
   .superRefine((val, ctx) => {

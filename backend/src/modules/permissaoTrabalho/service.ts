@@ -144,6 +144,34 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
     });
   }
 
+  if (input.acao === "liberar") {
+    if (user.role !== Role.SUPERVISOR && user.role !== Role.SEGURANCA) {
+      throw new AppError(403, "FORBIDDEN", "Apenas supervisor ou técnico de segurança pode liberar a PT.");
+    }
+    if (pt.status !== PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS) {
+      throw new AppError(422, "PT_INVALID_STATE", "Só é possível liberar uma PT que aguarda assinaturas.");
+    }
+    return prisma.$transaction(async (tx) => {
+      const total = await tx.permissaoTrabalhoAssinatura.count({
+        where: { permissaoTrabalhoId: ptId },
+      });
+      if (total > 0) {
+        throw new AppError(
+          422,
+          "PT_TEM_ASSINANTES",
+          "A PT possui assinantes; a liberação manual só é permitida quando a lista está vazia."
+        );
+      }
+      const updated = await tx.permissaoTrabalho.update({
+        where: { id: ptId },
+        data: { status: PermissaoTrabalhoStatus.LIBERADA },
+        include: ptInclude,
+      });
+      await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Liberada manualmente (sem assinantes)");
+      return updated;
+    });
+  }
+
   // aprovar / reprovar — só SEGURANCA
   if (user.role !== Role.SEGURANCA) {
     throw new AppError(403, "FORBIDDEN", "Apenas o técnico de segurança pode aprovar ou reprovar a PT.");
@@ -154,10 +182,22 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
 
   if (input.acao === "aprovar") {
     return prisma.$transaction(async (tx) => {
+      const workOrder = await tx.workOrder.findUniqueOrThrow({
+        where: { id: pt.workOrderId },
+        select: { assignedToId: true, assignees: { select: { userId: true } } },
+      });
+      const signatariosIds = Array.from(
+        new Set(
+          [workOrder.assignedToId, ...workOrder.assignees.map((a) => a.userId)].filter(
+            (v): v is string => Boolean(v)
+          )
+        )
+      );
+
       const updated = await tx.permissaoTrabalho.update({
         where: { id: ptId },
         data: {
-          status: PermissaoTrabalhoStatus.APROVADA,
+          status: PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS,
           emittedAt: new Date(),
           approvedById: user.userId,
           approvedAt: new Date(),
@@ -165,7 +205,19 @@ export async function patchStatus(ptId: string, input: PatchStatusInput, user: A
         },
         include: ptInclude,
       });
-      await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Aprovada");
+
+      if (signatariosIds.length > 0) {
+        await tx.permissaoTrabalhoAssinatura.createMany({
+          data: signatariosIds.map((uid) => ({
+            permissaoTrabalhoId: ptId,
+            userId: uid,
+            requestedById: user.userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      await registrarEventoPT(tx, pt.workOrderId, user.userId, "[PT] Aprovada — aguardando assinaturas");
       return updated;
     });
   }
@@ -281,7 +333,7 @@ export async function assinar(assinaturaId: string, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
     const assinatura = await tx.permissaoTrabalhoAssinatura.findUnique({
       where: { id: assinaturaId },
-      include: { permissaoTrabalho: { select: { status: true } } },
+      include: { permissaoTrabalho: { select: { status: true, workOrderId: true } } },
     });
     if (!assinatura) {
       throw new AppError(404, "ASSINATURA_NOT_FOUND", "Assinatura não encontrada.");
@@ -296,12 +348,29 @@ export async function assinar(assinaturaId: string, user: AuthPayload) {
       throw new AppError(422, "PT_INVALID_STATE", "A PT não está aguardando assinaturas.");
     }
 
-    // TODO(B3): checar se foi a última assinatura → LIBERADA
-    return tx.permissaoTrabalhoAssinatura.update({
+    const assinada = await tx.permissaoTrabalhoAssinatura.update({
       where: { id: assinaturaId },
       data: { signedAt: new Date() },
       include: { user: assinaturaUserSelect },
     });
+
+    const pendentes = await tx.permissaoTrabalhoAssinatura.count({
+      where: { permissaoTrabalhoId: assinatura.permissaoTrabalhoId, signedAt: null },
+    });
+    if (pendentes === 0) {
+      await tx.permissaoTrabalho.update({
+        where: { id: assinatura.permissaoTrabalhoId },
+        data: { status: PermissaoTrabalhoStatus.LIBERADA },
+      });
+      await registrarEventoPT(
+        tx,
+        assinatura.permissaoTrabalho.workOrderId,
+        user.userId,
+        "[PT] Liberada — todas as assinaturas coletadas"
+      );
+    }
+
+    return assinada;
   });
 }
 
