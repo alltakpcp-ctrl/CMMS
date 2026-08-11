@@ -145,6 +145,16 @@ export interface PermissaoTrabalhoResposta {
   observacao: string | null;
 }
 
+export interface PermissaoTrabalhoAssinatura {
+  id: string;
+  userId: string;
+  user: { id: string; name: string };
+  signedAt: string | null;
+  requestedById: string;
+  requestedBy: { id: string; name: string };
+  requestedAt: string;
+}
+
 export interface PermissaoTrabalho {
   id: string;
   workOrderId: string;
@@ -154,9 +164,11 @@ export interface PermissaoTrabalho {
   approvedById: string | null;
   approvedBy: { id: string; name: string } | null;
   approvedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
   respostas: PermissaoTrabalhoResposta[];
+  assinaturas: PermissaoTrabalhoAssinatura[];
 }
 
 export interface WorkOrder {

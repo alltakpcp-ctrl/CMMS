@@ -1,12 +1,12 @@
 import { apiRequest } from "./client";
-import { PermissaoTrabalho } from "../types";
+import { PermissaoTrabalho, PermissaoTrabalhoAssinatura } from "../types";
 
 export interface PatchRespostaInput {
   resposta?: "SIM" | "NAO" | "NA" | null;
   observacao?: string | null;
 }
 
-export type PatchStatusAcao = "submeter" | "aprovar" | "reprovar";
+export type PatchStatusAcao = "submeter" | "aprovar" | "reprovar" | "liberar";
 
 export function getByWorkOrder(token: string, workOrderId: string) {
   return apiRequest<PermissaoTrabalho>(`/permissao-trabalho/workorder/${workOrderId}`, { token });
@@ -20,16 +20,38 @@ export function patchResposta(token: string, respostaId: string, input: PatchRes
   });
 }
 
-export function patchStatus(token: string, ptId: string, acao: PatchStatusAcao) {
+export function patchStatus(token: string, ptId: string, acao: PatchStatusAcao, motivo?: string) {
   return apiRequest<PermissaoTrabalho>(`/permissao-trabalho/${ptId}/status`, {
     method: "PATCH",
     token,
-    body: { acao },
+    body: { acao, ...(motivo ? { motivo } : {}) },
   });
 }
 
 export function checkpoint(token: string, ptId: string) {
   return apiRequest<PermissaoTrabalho>(`/permissao-trabalho/${ptId}/checkpoint`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function solicitarAssinatura(token: string, ptId: string, userId: string) {
+  return apiRequest<PermissaoTrabalhoAssinatura>(`/permissao-trabalho/${ptId}/assinaturas`, {
+    method: "POST",
+    token,
+    body: { userId },
+  });
+}
+
+export function removerAssinatura(token: string, assinaturaId: string) {
+  return apiRequest<void>(`/permissao-trabalho/assinaturas/${assinaturaId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function assinar(token: string, assinaturaId: string) {
+  return apiRequest<PermissaoTrabalhoAssinatura>(`/permissao-trabalho/assinaturas/${assinaturaId}/assinar`, {
     method: "POST",
     token,
   });
