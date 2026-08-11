@@ -94,6 +94,8 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
     return null;
   }
 
+  const assinaturas = pt.assinaturas ?? [];
+
   const editavel = EDITAVEL.includes(pt.status);
 
   async function saveResposta(resposta: PermissaoTrabalhoResposta, patch: ptApi.PatchRespostaInput) {
@@ -220,7 +222,7 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
     (pt.status === PermissaoTrabalhoStatus.PREENCHIDA || pt.status === PermissaoTrabalhoStatus.RASCUNHO);
   const mostrarAssinaturas = pt.status === PermissaoTrabalhoStatus.AGUARDANDO_ASSINATURAS;
 
-  const assinaturaUserIds = new Set(pt.assinaturas.map((a) => a.userId));
+  const assinaturaUserIds = new Set(assinaturas.map((a) => a.userId));
   const userOptions: SearchableSelectOption[] = assignableUsers
     .filter((u) => !assinaturaUserIds.has(u.id))
     .map((u) => ({ value: u.id, label: u.name }));
@@ -328,11 +330,11 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
         <div className="mt-4 border-t border-slate-100 pt-3">
           <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">Assinaturas</h4>
 
-          {pt.assinaturas.length === 0 ? (
+          {assinaturas.length === 0 ? (
             <p className="text-xs text-slate-500">Nenhum assinante na lista.</p>
           ) : (
             <ul className="space-y-1">
-              {pt.assinaturas.map((a) => (
+              {assinaturas.map((a) => (
                 <li
                   key={a.id}
                   className="flex items-center justify-between gap-2 rounded border border-slate-100 p-2"
@@ -374,7 +376,7 @@ export function PermissaoTrabalhoPanel({ workOrder, onReload }: Props) {
             </div>
           )}
 
-          {pt.assinaturas.length === 0 && (isSupervisor || isSeguranca) && (
+          {assinaturas.length === 0 && (isSupervisor || isSeguranca) && (
             <div className="mt-3">
               <Button variant="secondary" disabled={acting} onClick={handleLiberar}>
                 Liberar sem assinaturas

@@ -41,7 +41,18 @@ const workOrderInclude = {
   },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
-  permissaoTrabalho: { include: { respostas: { orderBy: { ordem: "asc" } } } },
+  permissaoTrabalho: {
+    include: {
+      respostas: { orderBy: { ordem: "asc" } },
+      assinaturas: {
+        orderBy: { requestedAt: "asc" },
+        include: {
+          user: { select: { id: true, name: true } },
+          requestedBy: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
 } satisfies Prisma.WorkOrderInclude;
 
 // Valida a lista de manutentores de apoio (assigneeIds) para planejamento()/
