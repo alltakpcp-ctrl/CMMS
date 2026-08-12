@@ -45,6 +45,8 @@ model User {
   permissoesTrabalhoAprovadas PermissaoTrabalho[] @relation("PermissaoTrabalhoApprovedBy")
   assinaturasPT          PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaUser")
   assinaturasPTSolicitadas PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaRequestedBy")
+  executionsStarted Execution[] @relation("ExecutionStartedBy")
+  executionsEnded   Execution[] @relation("ExecutionEndedBy")
 }
 
 model Shift {
@@ -233,6 +235,13 @@ model Execution {
   finishedAt        DateTime?
   testNotes         String?
   cleanupDone       Boolean   @default(false)
+  startedById       String?
+  startedBy         User?     @relation("ExecutionStartedBy", fields: [startedById], references: [id])
+  endedById         String?
+  endedBy           User?     @relation("ExecutionEndedBy", fields: [endedById], references: [id])
+  startNote         String?
+  endNote           String?
+  outcome           String?
 
   logs              ExecutionLog[]
 

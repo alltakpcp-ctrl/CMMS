@@ -90,3 +90,10 @@ export const RespostaPT = {
   NA: "NA",
 } as const;
 export type RespostaPT = (typeof RespostaPT)[keyof typeof RespostaPT];
+
+export const ExecutionOutcome = {
+  CONCLUIDA: "CONCLUIDA",
+  INTERROMPIDA: "INTERROMPIDA",
+  PAUSA_TURNO: "PAUSA_TURNO",
+} as const;
+export type ExecutionOutcome = (typeof ExecutionOutcome)[keyof typeof ExecutionOutcome];
