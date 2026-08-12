@@ -21,7 +21,7 @@ import { RequireRole } from "./auth/RequireRole";
 import { RequireFlag } from "./auth/RequireFlag";
 import { AppLayout } from "./layout/AppLayout";
 import { Role } from "./domain/enums";
-import { PendenciasProvider } from "./pendencias/PendenciasContext";
+import { NotificacoesProvider } from "./notificacoes/NotificacoesContext";
 
 export default function App() {
   return (
@@ -31,9 +31,9 @@ export default function App() {
       <Route
         element={
           <RequireAuth>
-            <PendenciasProvider>
+            <NotificacoesProvider>
               <AppLayout />
-            </PendenciasProvider>
+            </NotificacoesProvider>
           </RequireAuth>
         }
       >

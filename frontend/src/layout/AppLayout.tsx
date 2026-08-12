@@ -5,7 +5,8 @@ import { Role } from "../domain/enums";
 import { ROLE_LABELS } from "../domain/labels";
 import { useIdleLogout } from "../hooks/useIdleLogout";
 import { IdleWarningModal } from "../components/IdleWarningModal";
-import { usePendencias } from "../pendencias/PendenciasContext";
+import { NotificacoesBell } from "../components/NotificacoesBell";
+import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 
 type BooleanFlagKey = { [K in keyof AuthUser]: AuthUser[K] extends boolean ? K : never }[keyof AuthUser];
 
@@ -37,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppLayout() {
   const { user, logout } = useAuth();
-  const { count } = usePendencias();
+  const { countAssinaturas } = useNotificacoes();
   const [open, setOpen] = useState(false);
   const { warningVisible, secondsLeft, stayConnected } = useIdleLogout(logout);
   const isEloisaTheme = user?.email.trim().toLowerCase() === "eloisa.caldeira@alltak.com.br";
@@ -46,7 +47,7 @@ export function AppLayout() {
     if (item.roles && (!user || !item.roles.includes(user.role))) return false;
     if (item.requiresFlag && !user?.[item.requiresFlag]) return false;
     if (item.to === "/solicitacoes/nova" && user?.role === Role.OPERADOR && !user.sectorId) return false;
-    if (item.to === "/assinaturas-pendentes" && count === 0) return false;
+    if (item.to === "/assinaturas-pendentes" && countAssinaturas === 0) return false;
     return true;
   });
 
@@ -182,6 +183,7 @@ export function AppLayout() {
               <p className="font-medium text-slate-900">{user?.name}</p>
               <p className="text-slate-500">{user ? ROLE_LABELS[user.role] : ""}</p>
             </div>
+            <NotificacoesBell />
             <button
               onClick={logout}
               className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"

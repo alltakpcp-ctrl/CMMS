@@ -72,3 +72,13 @@ export function assinar(token: string, assinaturaId: string) {
 export function listarMinhasPendencias(token: string) {
   return apiRequest<AssinaturaPendente[]>(`/permissao-trabalho/assinaturas/minhas-pendencias`, { token });
 }
+
+export interface PtAguardandoAprovacao {
+  id: string;
+  status: PermissaoTrabalhoStatus;
+  workOrder: { id: string; number: string; title: string };
+}
+
+export function listarAguardandoAprovacao(token: string) {
+  return apiRequest<PtAguardandoAprovacao[]>(`/permissao-trabalho/aguardando-aprovacao`, { token });
+}

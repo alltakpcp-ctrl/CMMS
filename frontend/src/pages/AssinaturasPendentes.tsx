@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { usePendencias } from "../pendencias/PendenciasContext";
+import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 import * as ptApi from "../api/permissaoTrabalho";
 import { AssinaturaPendente } from "../api/permissaoTrabalho";
 import { Card } from "../components/Card";
@@ -13,7 +13,7 @@ import { useToast } from "../components/ToastProvider";
 
 export default function AssinaturasPendentes() {
   const { token } = useAuth();
-  const { refetch } = usePendencias();
+  const { refetch } = useNotificacoes();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
