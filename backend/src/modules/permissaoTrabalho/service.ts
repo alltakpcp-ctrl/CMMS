@@ -396,3 +396,15 @@ export function listarMinhasPendencias(user: AuthPayload) {
     },
   });
 }
+
+export function listarAguardandoAprovacao() {
+  return prisma.permissaoTrabalho.findMany({
+    where: { status: PermissaoTrabalhoStatus.AGUARDANDO_APROVACAO },
+    orderBy: { updatedAt: "asc" },
+    select: {
+      id: true,
+      status: true,
+      workOrder: { select: { id: true, number: true, title: true } },
+    },
+  });
+}

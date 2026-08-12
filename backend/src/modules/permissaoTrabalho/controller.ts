@@ -45,3 +45,7 @@ export async function assinarController(req: Request, res: Response) {
 export async function minhasPendenciasController(req: Request, res: Response) {
   res.json(await ptService.listarMinhasPendencias(requireUser(req)));
 }
+
+export async function listarAguardandoAprovacaoController(_req: Request, res: Response) {
+  res.json(await ptService.listarAguardandoAprovacao());
+}

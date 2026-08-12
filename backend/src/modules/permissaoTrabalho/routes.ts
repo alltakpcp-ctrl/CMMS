@@ -12,6 +12,7 @@ import {
   removerAssinaturaController,
   assinarController,
   minhasPendenciasController,
+  listarAguardandoAprovacaoController,
 } from "./controller";
 
 export const permissaoTrabalhoRoutes = Router();
@@ -22,6 +23,11 @@ permissaoTrabalhoRoutes.use(authenticate);
 permissaoTrabalhoRoutes.get("/workorder/:workOrderId", asyncHandler(getPermissaoTrabalhoController));
 permissaoTrabalhoRoutes.patch("/respostas/:id", asyncHandler(patchRespostaController));
 permissaoTrabalhoRoutes.get("/assinaturas/minhas-pendencias", asyncHandler(minhasPendenciasController));
+permissaoTrabalhoRoutes.get(
+  "/aguardando-aprovacao",
+  authorize(Role.SEGURANCA),
+  asyncHandler(listarAguardandoAprovacaoController)
+);
 permissaoTrabalhoRoutes.delete(
   "/assinaturas/:assinaturaId",
   authorize(Role.SUPERVISOR),
