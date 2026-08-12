@@ -6,7 +6,6 @@ import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
 import { recordStockMovement } from "../stock/service";
-import { PERGUNTAS_PT_ALTURA } from "../permissaoTrabalho/perguntas";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
@@ -41,18 +40,6 @@ const workOrderInclude = {
   },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
-  permissaoTrabalho: {
-    include: {
-      respostas: { orderBy: { ordem: "asc" } },
-      assinaturas: {
-        orderBy: { requestedAt: "asc" },
-        include: {
-          user: { select: { id: true, name: true } },
-          requestedBy: { select: { id: true, name: true } },
-        },
-      },
-    },
-  },
 } satisfies Prisma.WorkOrderInclude;
 
 // Valida a lista de manutentores de apoio (assigneeIds) para planejamento()/
@@ -252,7 +239,6 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       where: { id },
       include: {
         assignees: { select: { userId: true } },
-        permissaoTrabalho: { select: { status: true } },
       },
     });
     if (!workOrder) {
@@ -270,8 +256,6 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         assigneeIds: workOrder.assignees.map((a) => a.userId),
         note,
         priority: workOrder.priority,
-        permissaoAprovadaSeNecessario:
-          !workOrder.trabalhoEmAltura || workOrder.permissaoTrabalho?.status === "LIBERADA",
         ...context,
       },
     });
@@ -285,13 +269,6 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       const openSubtask = await tx.subtask.findFirst({ where: { workOrderId: id, status: "ABERTA" } });
       if (openSubtask) {
         throw new AppError(422, "HAS_OPEN_SUBTASKS", "Existem subtarefas abertas nesta OS.");
-      }
-
-      if (workOrder.permissaoTrabalho?.status === "LIBERADA") {
-        await tx.permissaoTrabalho.update({
-          where: { workOrderId: id },
-          data: { status: "ENCERRADA", closedAt: new Date() },
-        });
       }
     }
 
@@ -331,21 +308,6 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
     userId: user.userId,
     mutate: async (tx, workOrder) => {
       await assertActiveSector(tx, input.targetSectorId);
-
-      if (input.trabalhoEmAltura) {
-        await tx.permissaoTrabalho.create({
-          data: {
-            workOrderId: workOrder.id,
-            status: "RASCUNHO",
-            respostas: {
-              create: PERGUNTAS_PT_ALTURA.map((pergunta, i) => ({
-                ordem: i + 1,
-                pergunta,
-              })),
-            },
-          },
-        });
-      }
 
       if (input.priority === workOrder.priority) {
         return {

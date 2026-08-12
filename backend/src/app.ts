@@ -14,7 +14,6 @@ import { partRequestsRoutes } from "./modules/part-requests/routes";
 import { purchaseOrdersRoutes } from "./modules/purchase-orders/routes";
 import { stockRoutes } from "./modules/stock/routes";
 import { subtaskNestedRoutes, subtaskRoutes } from "./modules/subtasks/routes";
-import { permissaoTrabalhoRoutes } from "./modules/permissaoTrabalho/routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 export const app = express();
@@ -44,6 +43,5 @@ app.use("/part-requests", partRequestsRoutes);
 app.use("/purchase-orders", purchaseOrdersRoutes);
 app.use("/stock", stockRoutes);
 app.use("/subtasks", subtaskRoutes);
-app.use("/permissao-trabalho", permissaoTrabalhoRoutes);
 
 app.use(errorHandler);
