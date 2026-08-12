@@ -28,7 +28,6 @@ import { ValidarForm } from "./actions/ValidarForm";
 import { CancelarForm } from "./actions/CancelarForm";
 import { MoverFaseForm } from "./actions/MoverFaseForm";
 import { SubtaskPanel } from "./subtasks/SubtaskPanel";
-import { PermissaoTrabalhoPanel } from "./PermissaoTrabalhoPanel";
 
 type ActionKey =
   | "triagem"
@@ -216,10 +215,6 @@ export default function DetalheOS() {
               </div>
             )}
           </Card>
-
-          {workOrder.trabalhoEmAltura && (
-            <PermissaoTrabalhoPanel workOrder={workOrder} onReload={reload} />
-          )}
 
           {workOrder.status === WorkOrderStatus.EM_EXECUCAO && <SubtaskPanel workOrder={workOrder} />}
 

@@ -6,7 +6,6 @@ import { PRIORITY_LABELS } from "../../../domain/labels";
 import * as workOrdersApi from "../../../api/workorders";
 import { Select } from "../../../components/Select";
 import { SearchableSelect } from "../../../components/SearchableSelect";
-import { Checkbox } from "../../../components/Checkbox";
 import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
 import { ActionFormProps } from "./types";
@@ -16,7 +15,6 @@ export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
   const { sectors, loading: loadingSectors } = useSectors(token);
   const [priority, setPriority] = useState<Priority>(Priority.MEDIA);
   const [targetSectorId, setTargetSectorId] = useState(workOrder.asset.sectorId);
-  const [trabalhoEmAltura, setTrabalhoEmAltura] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +27,6 @@ export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
       const updated = await workOrdersApi.triagem(token, workOrder.id, {
         priority,
         targetSectorId,
-        trabalhoEmAltura,
       });
       onSuccess(updated);
     } catch (err) {
@@ -57,12 +54,6 @@ export function TriagemForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
         placeholder={loadingSectors ? "Carregando setores..." : "Selecione um setor"}
         disabled={loadingSectors}
         required
-      />
-
-      <Checkbox
-        label="Trabalho em altura (exige Permissão de Trabalho)"
-        checked={trabalhoEmAltura}
-        onChange={(e) => setTrabalhoEmAltura(e.target.checked)}
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}

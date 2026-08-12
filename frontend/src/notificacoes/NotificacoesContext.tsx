@@ -1,12 +1,11 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import * as ptApi from "../api/permissaoTrabalho";
 import * as workOrdersApi from "../api/workorders";
 import { Role, WorkOrderStatus } from "../domain/enums";
 
 const POLL_INTERVAL_MS = 60000;
 
-export type NotificacaoTipo = "ASSINATURA" | "PT_APROVACAO" | "OS_VALIDACAO";
+export type NotificacaoTipo = "OS_VALIDACAO";
 
 export interface Notificacao {
   id: string;
@@ -20,7 +19,6 @@ export interface Notificacao {
 interface NotificacoesContextValue {
   items: Notificacao[];
   count: number;
-  countAssinaturas: number;
   refetch: () => void;
 }
 
@@ -36,34 +34,7 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const tarefas: Promise<Notificacao[]>[] = [
-      ptApi.listarMinhasPendencias(token).then((pendencias) =>
-        pendencias.map((item) => ({
-          id: `ASSINATURA-${item.id}`,
-          tipo: "ASSINATURA" as const,
-          titulo: "Assinatura pendente",
-          descricao: `${item.permissaoTrabalho.workOrder.number} — ${item.permissaoTrabalho.workOrder.title}`,
-          link: "/assinaturas-pendentes",
-          timestamp: item.requestedAt,
-        }))
-      ),
-    ];
-
-    if (user.role === Role.SEGURANCA) {
-      tarefas.push(
-        ptApi.listarAguardandoAprovacao(token).then((pendencias) =>
-          pendencias.map((item) => ({
-            id: `PT_APROVACAO-${item.id}`,
-            tipo: "PT_APROVACAO" as const,
-            titulo: "PT aguardando aprovação",
-            descricao: `${item.workOrder.number} — ${item.workOrder.title}`,
-            link: `/ordens/${item.workOrder.id}`,
-            // O endpoint não retorna timestamp (só ordena por updatedAt internamente) — usa data atual como fallback.
-            timestamp: new Date().toISOString(),
-          }))
-        )
-      );
-    }
+    const tarefas: Promise<Notificacao[]>[] = [];
 
     if (user.role === Role.SUPERVISOR) {
       tarefas.push(
@@ -111,10 +82,8 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const count = items.length;
-  const countAssinaturas = items.filter((item) => item.tipo === "ASSINATURA").length;
-
   return (
-    <NotificacoesContext.Provider value={{ items, count, countAssinaturas, refetch }}>
+    <NotificacoesContext.Provider value={{ items, count, refetch }}>
       {children}
     </NotificacoesContext.Provider>
   );

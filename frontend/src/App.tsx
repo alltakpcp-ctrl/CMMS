@@ -8,7 +8,6 @@ import DetalheOS from "./pages/workorders/DetalheOS";
 import FilaTriagem from "./pages/FilaTriagem";
 import Agenda from "./pages/Agenda";
 import MinhasOS from "./pages/MinhasOS";
-import AssinaturasPendentes from "./pages/AssinaturasPendentes";
 import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
 import Usuarios from "./pages/cadastros/Usuarios";
@@ -38,7 +37,6 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
-        <Route path="/assinaturas-pendentes" element={<AssinaturasPendentes />} />
         <Route path="/solicitacoes/nova" element={<NovaSolicitacao />} />
         <Route path="/ordens" element={<ListaOS />} />
         <Route path="/ordens/:id" element={<DetalheOS />} />
