@@ -26,3 +26,11 @@ export function formatPercentage(value: number | null): string {
   if (value === null) return "—";
   return `${value.toFixed(1)}%`;
 }
+
+export function formatDuration(minutes: number): string {
+  if (minutes < 1) return "< 1min";
+  if (minutes < 60) return `${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}min`;
+}

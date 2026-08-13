@@ -11,10 +11,28 @@ import { Button } from "../../../components/Button";
 import { Modal } from "../../../components/Modal";
 import { useToast } from "../../../components/ToastProvider";
 import { getErrorMessage } from "../../../lib/errors";
+import { formatDuration } from "../../../lib/format";
 import { AbrirSubtarefaForm } from "./AbrirSubtarefaForm";
 import { ReatribuirSubtarefaForm } from "./ReatribuirSubtarefaForm";
 
 type ModalState = { type: "abrir" } | { type: "reatribuir"; subtask: Subtask } | null;
+
+function diffMinutes(from: string, to: Date): number {
+  return Math.floor((to.getTime() - new Date(from).getTime()) / 60000);
+}
+
+function getDurationLabel(subtask: Subtask): string | null {
+  if (subtask.status === "CONCLUIDA") {
+    if (!subtask.finishedAt) return null;
+    const minutes = diffMinutes(subtask.createdAt, new Date(subtask.finishedAt));
+    return `Duração: ${formatDuration(minutes)}`;
+  }
+  if (subtask.status === "ABERTA") {
+    const minutes = diffMinutes(subtask.createdAt, new Date());
+    return `Em andamento: ${formatDuration(minutes)}`;
+  }
+  return null;
+}
 
 export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
   const { token, user } = useAuth();
@@ -24,6 +42,7 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
+  const [, setNow] = useState(() => new Date());
 
   const userNameById = useMemo(
     () => new Map(assignableUsers.map((u) => [u.id, u.name])),
@@ -41,6 +60,13 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
   }, [token, workOrder.id, showError]);
 
   useEffect(reloadSubtasks, [reloadSubtasks]);
+
+  useEffect(() => {
+    const hasOpenSubtask = subtasks.some((subtask) => subtask.status === "ABERTA");
+    if (!hasOpenSubtask) return;
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, [subtasks]);
 
   function closeModal() {
     setModal(null);
@@ -98,42 +124,46 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
 
       {!loading && subtasks.length > 0 && (
         <ul className="space-y-2">
-          {subtasks.map((subtask) => (
-            <li
-              key={subtask.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 p-3"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">{subtask.title}</p>
-                  <Badge color={SUBTASK_STATUS_COLORS[subtask.status]}>
-                    {SUBTASK_STATUS_LABELS[subtask.status]}
-                  </Badge>
+          {subtasks.map((subtask) => {
+            const durationLabel = getDurationLabel(subtask);
+            return (
+              <li
+                key={subtask.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 p-3"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-slate-900">{subtask.title}</p>
+                    <Badge color={SUBTASK_STATUS_COLORS[subtask.status]}>
+                      {SUBTASK_STATUS_LABELS[subtask.status]}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Estimativa: {subtask.estimatedMinutes} min · Responsável:{" "}
+                    {userNameById.get(subtask.assignedToId) ?? "—"}
+                    {durationLabel && <> · {durationLabel}</>}
+                  </p>
+                  {subtask.description && (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{subtask.description}</p>
+                  )}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Estimativa: {subtask.estimatedMinutes} min · Responsável:{" "}
-                  {userNameById.get(subtask.assignedToId) ?? "—"}
-                </p>
-                {subtask.description && (
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{subtask.description}</p>
-                )}
-              </div>
 
-              {subtask.status === "ABERTA" && canAct(subtask) && (
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setModal({ type: "reatribuir", subtask })}>
-                    Reatribuir
-                  </Button>
-                  <Button variant="primary" onClick={() => handleFinish(subtask)}>
-                    Finalizar
-                  </Button>
-                  <Button variant="danger" onClick={() => handleCancel(subtask)}>
-                    Cancelar
-                  </Button>
-                </div>
-              )}
-            </li>
-          ))}
+                {subtask.status === "ABERTA" && canAct(subtask) && (
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => setModal({ type: "reatribuir", subtask })}>
+                      Reatribuir
+                    </Button>
+                    <Button variant="primary" onClick={() => handleFinish(subtask)}>
+                      Finalizar
+                    </Button>
+                    <Button variant="danger" onClick={() => handleCancel(subtask)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
