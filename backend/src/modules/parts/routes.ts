@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { Role } from "../../domain/enums";
 import { authenticate } from "../../middlewares/authenticate";
-import { authorize } from "../../middlewares/authorize";
+import { supervisorOrCanManageStock } from "../../middlewares/canManageStock";
 import { asyncHandler } from "../../lib/asyncHandler";
 import {
   createPartController,
@@ -17,6 +16,6 @@ partsRoutes.use(authenticate);
 
 partsRoutes.get("/", asyncHandler(listPartsController));
 partsRoutes.get("/:id", asyncHandler(getPartController));
-partsRoutes.post("/", authorize(Role.SUPERVISOR), asyncHandler(createPartController));
-partsRoutes.put("/:id", authorize(Role.SUPERVISOR), asyncHandler(updatePartController));
-partsRoutes.delete("/:id", authorize(Role.SUPERVISOR), asyncHandler(deletePartController));
+partsRoutes.post("/", supervisorOrCanManageStock(), asyncHandler(createPartController));
+partsRoutes.put("/:id", supervisorOrCanManageStock(), asyncHandler(updatePartController));
+partsRoutes.delete("/:id", supervisorOrCanManageStock(), asyncHandler(deletePartController));

@@ -20,8 +20,19 @@ export async function getPartById(id: string) {
   return part;
 }
 
-export function createPart(input: CreatePartInput) {
-  return prisma.part.create({ data: input });
+export async function createPart(input: CreatePartInput) {
+  try {
+    return await prisma.part.create({ data: input });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new AppError(
+        409,
+        "PART_CODE_DUPLICATE",
+        "Já existe uma peça cadastrada com este código."
+      );
+    }
+    throw err;
+  }
 }
 
 export async function updatePart(id: string, input: UpdatePartInput) {
