@@ -125,9 +125,12 @@ Três perfis. Enum: `OPERADOR`, `TECNICO`, `SUPERVISOR`.
 | (5) Encerramento técnico | ❌ | ✅ | ❌ |
 | (5) Validar e dar baixa na OS | ❌ | ❌ | ✅ |
 | (6) Ver indicadores | 👁️ leitura | 👁️ leitura | ✅ completo |
-| Cadastros (ativos, peças, usuários) | ❌ | ❌ | ✅ |
+| Cadastros (ativos, usuários) | ❌ | ❌ | ✅ |
+| Cadastro de peças (criar/editar/excluir) | ❌ | 🔓 | ✅ |
 
 - 👁️ = pode visualizar dashboard, mas sem exportar/gerir.
+- 🔓 = também permitido a TECNICO com a flag `canManageStock` (mesmo gate de
+  `POST /stock/entry|adjust|return`, via `supervisorOrCanManageStock()`).
 - O middleware de RBAC deve bloquear no backend **independentemente** do que o
   frontend exibe. Frontend apenas oculta o que o usuário não pode fazer.
 - TECNICO **não abre** solicitação — apenas responde a partir da triagem (etapa 2).
