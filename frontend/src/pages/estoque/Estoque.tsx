@@ -208,9 +208,9 @@ export default function Estoque() {
       if (editingPart) {
         await partsApi.updatePart(token, editingPart.id, {
           unit: partForm.unit,
-          minStock,
-          maxStock,
-          location,
+          minStock: partForm.minStock === "" ? null : Number(partForm.minStock),
+          maxStock: partForm.maxStock === "" ? null : Number(partForm.maxStock),
+          location: partForm.location.trim() === "" ? null : partForm.location.trim(),
         });
         showSuccess("Peça atualizada.");
       } else {
