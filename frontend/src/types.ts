@@ -97,7 +97,11 @@ export interface Subtask {
   assignedToId: string;
   createdBy?: PublicUser;
   assignedTo?: PublicUser;
+  // @deprecated ver openedAt/closedAt — só preenchido no caminho CONCLUIDA.
   finishedAt: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  closedById: string | null;
   createdAt: string;
   updatedAt: string;
 }

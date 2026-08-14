@@ -23,12 +23,18 @@ function diffMinutes(from: string, to: Date): number {
 
 function getDurationLabel(subtask: Subtask): string | null {
   if (subtask.status === "CONCLUIDA") {
-    if (!subtask.finishedAt) return null;
-    const minutes = diffMinutes(subtask.createdAt, new Date(subtask.finishedAt));
+    const end = subtask.closedAt ?? subtask.finishedAt;
+    if (!end) return null;
+    const minutes = diffMinutes(subtask.openedAt, new Date(end));
+    return `Duração: ${formatDuration(minutes)}`;
+  }
+  if (subtask.status === "CANCELADA") {
+    if (!subtask.closedAt) return null;
+    const minutes = diffMinutes(subtask.openedAt, new Date(subtask.closedAt));
     return `Duração: ${formatDuration(minutes)}`;
   }
   if (subtask.status === "ABERTA") {
-    const minutes = diffMinutes(subtask.createdAt, new Date());
+    const minutes = diffMinutes(subtask.openedAt, new Date());
     return `Em andamento: ${formatDuration(minutes)}`;
   }
   return null;

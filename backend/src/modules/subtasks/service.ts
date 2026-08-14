@@ -110,7 +110,7 @@ export async function finishSubtask(id: string, user: AuthPayload) {
 
   return prisma.subtask.update({
     where: { id },
-    data: { status: "CONCLUIDA", finishedAt: new Date() },
+    data: { status: "CONCLUIDA", finishedAt: new Date(), closedAt: new Date(), closedById: user.userId },
   });
 }
 
@@ -120,6 +120,6 @@ export async function cancelSubtask(id: string, user: AuthPayload) {
 
   return prisma.subtask.update({
     where: { id },
-    data: { status: "CANCELADA" },
+    data: { status: "CANCELADA", closedAt: new Date(), closedById: user.userId },
   });
 }
