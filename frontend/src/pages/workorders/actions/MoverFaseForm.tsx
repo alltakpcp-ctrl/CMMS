@@ -1,6 +1,7 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../../auth/AuthContext";
 import * as workOrdersApi from "../../../api/workorders";
+import * as subtasksApi from "../../../api/subtasks";
 import { WorkOrderStatus } from "../../../domain/enums";
 import { STATUS_LABELS } from "../../../domain/labels";
 import { Select } from "../../../components/Select";
@@ -23,10 +24,20 @@ export function MoverFaseForm({ workOrder, onSuccess, onClose }: ActionFormProps
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasOpenSubtask, setHasOpenSubtask] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    subtasksApi
+      .listSubtasks(token, workOrder.id)
+      .then((subtasks) => setHasOpenSubtask(subtasks.some((s) => s.status === "ABERTA")))
+      .catch(() => setHasOpenSubtask(false));
+  }, [token, workOrder.id]);
 
   const noChange = toStatus === workOrder.status;
   const noteTooShort = note.trim().length < MIN_NOTE_LENGTH;
   const affectsIndicators = isTerminal(toStatus) || isTerminal(workOrder.status);
+  const blockedByOpenSubtask = toStatus === WorkOrderStatus.ENCERRADA && hasOpenSubtask;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -61,11 +72,21 @@ export function MoverFaseForm({ workOrder, onSuccess, onClose }: ActionFormProps
         onChange={(e) => setToStatus(e.target.value as WorkOrderStatus)}
       >
         {ALL_STATUSES.map((status) => (
-          <option key={status} value={status}>
+          <option
+            key={status}
+            value={status}
+            disabled={status === WorkOrderStatus.ENCERRADA && hasOpenSubtask}
+          >
             {STATUS_LABELS[status]}
           </option>
         ))}
       </Select>
+
+      {blockedByOpenSubtask && (
+        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Conclua ou cancele as subtarefas abertas antes de encerrar a OS.
+        </p>
+      )}
 
       <Textarea
         label="Motivo do override (obrigatório)"
@@ -80,7 +101,7 @@ export function MoverFaseForm({ workOrder, onSuccess, onClose }: ActionFormProps
         <Button type="button" variant="secondary" onClick={onClose}>
           Voltar
         </Button>
-        <Button type="submit" disabled={submitting || noChange || noteTooShort}>
+        <Button type="submit" disabled={submitting || noChange || noteTooShort || blockedByOpenSubtask}>
           {submitting ? "Movendo…" : "Mover fase"}
         </Button>
       </div>

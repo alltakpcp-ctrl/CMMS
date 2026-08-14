@@ -223,6 +223,21 @@ export async function getWorkOrderById(id: string, user: AuthPayload) {
   return workOrder;
 }
 
+async function assertNoOpenSubtasks(tx: Prisma.TransactionClient, workOrderId: string) {
+  const openSubtasks = await tx.subtask.findMany({
+    where: { workOrderId, status: "ABERTA" },
+    select: { id: true, title: true },
+  });
+  if (openSubtasks.length > 0) {
+    const titles = openSubtasks.map((s) => s.title).join(", ");
+    throw new AppError(
+      422,
+      "HAS_OPEN_SUBTASKS",
+      `Não é possível encerrar a OS. Existem ${openSubtasks.length} subtarefa(s) em aberto: ${titles}. Conclua ou cancele todas antes de encerrar.`
+    );
+  }
+}
+
 interface ApplyTransitionParams {
   id: string;
   to: WorkOrderStatus;
@@ -265,11 +280,11 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
       throw new AppError(status, result.code ?? "INVALID_TRANSITION", result.reason ?? "Transição inválida.");
     }
 
-    if (to === WorkOrderStatus.ENCERRADA) {
-      const openSubtask = await tx.subtask.findFirst({ where: { workOrderId: id, status: "ABERTA" } });
-      if (openSubtask) {
-        throw new AppError(422, "HAS_OPEN_SUBTASKS", "Existem subtarefas abertas nesta OS.");
-      }
+    // Bloqueia tanto o encerramento técnico (→AGUARDANDO_VALIDACAO) quanto a
+    // validação do supervisor (→ENCERRADA) — defesa em profundidade caso uma
+    // subtask seja reaberta enquanto a OS já está aguardando validação.
+    if (to === WorkOrderStatus.AGUARDANDO_VALIDACAO || to === WorkOrderStatus.ENCERRADA) {
+      await assertNoOpenSubtasks(tx, id);
     }
 
     const extraData = (await mutate?.(tx, workOrder)) ?? {};
@@ -707,6 +722,10 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
 
     if (dto.toStatus === workOrder.status) {
       throw new AppError(409, "NO_CHANGE", "A OS já está neste status.");
+    }
+
+    if (dto.toStatus === WorkOrderStatus.ENCERRADA) {
+      await assertNoOpenSubtasks(tx, id);
     }
 
     // Devolver para uma fase pré-atribuição "renova" o ciclo: assignedToId
