@@ -11,7 +11,7 @@ import { Button } from "../../../components/Button";
 import { Modal } from "../../../components/Modal";
 import { useToast } from "../../../components/ToastProvider";
 import { getErrorMessage } from "../../../lib/errors";
-import { formatDuration } from "../../../lib/format";
+import { formatDuration, formatDateTime } from "../../../lib/format";
 import { AbrirSubtarefaForm } from "./AbrirSubtarefaForm";
 import { ReatribuirSubtarefaForm } from "./ReatribuirSubtarefaForm";
 
@@ -26,16 +26,16 @@ function getDurationLabel(subtask: Subtask): string | null {
     const end = subtask.closedAt ?? subtask.finishedAt;
     if (!end) return null;
     const minutes = diffMinutes(subtask.openedAt, new Date(end));
-    return `Duração: ${formatDuration(minutes)}`;
+    return formatDuration(minutes);
   }
   if (subtask.status === "CANCELADA") {
     if (!subtask.closedAt) return null;
     const minutes = diffMinutes(subtask.openedAt, new Date(subtask.closedAt));
-    return `Duração: ${formatDuration(minutes)}`;
+    return formatDuration(minutes);
   }
   if (subtask.status === "ABERTA") {
     const minutes = diffMinutes(subtask.openedAt, new Date());
-    return `Em andamento: ${formatDuration(minutes)}`;
+    return formatDuration(minutes);
   }
   return null;
 }
@@ -147,8 +147,21 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
                   <p className="mt-0.5 text-xs text-slate-500">
                     Estimativa: {subtask.estimatedMinutes} min · Responsável:{" "}
                     {userNameById.get(subtask.assignedToId) ?? "—"}
-                    {durationLabel && <> · {durationLabel}</>}
                   </p>
+                  <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+                    <dt className="text-slate-500">Início</dt>
+                    <dd className="text-slate-900">{formatDateTime(subtask.openedAt)}</dd>
+                    <dt className="text-slate-500">Fim</dt>
+                    <dd className="text-slate-900">{formatDateTime(subtask.closedAt)}</dd>
+                    {durationLabel && (
+                      <>
+                        <dt className="text-slate-500">
+                          {subtask.status === "ABERTA" ? "Em andamento" : "Duração"}
+                        </dt>
+                        <dd className="text-slate-900">{durationLabel}</dd>
+                      </>
+                    )}
+                  </dl>
                   {subtask.description && (
                     <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{subtask.description}</p>
                   )}
