@@ -18,6 +18,39 @@ async function login(email: string): Promise<string> {
   return res.body.token as string;
 }
 
+// Percorre ABERTA -> ... -> EM_EXECUCAO (mesmos passos do caminho feliz), para
+// os testes de bloqueio por subtask que precisam de uma OS já em execução.
+async function criarOSEmExecucao(title: string): Promise<string> {
+  const created = await request(app)
+    .post("/workorders")
+    .set("Authorization", `Bearer ${operadorToken}`)
+    .send({ type: WorkOrderType.CORRETIVA, title, description: "desc", assetId });
+  const id = created.body.id;
+
+  await request(app)
+    .post(`/workorders/${id}/triagem`)
+    .set("Authorization", `Bearer ${tecnicoToken}`)
+    .send({ priority: "ALTA", targetSectorId: sectorId });
+  await request(app)
+    .post(`/workorders/${id}/planejamento`)
+    .set("Authorization", `Bearer ${tecnicoToken}`)
+    .send({ plan: "Plano." });
+  await request(app)
+    .post(`/workorders/${id}/programacao`)
+    .set("Authorization", `Bearer ${supervisorToken}`)
+    .send({
+      scheduledStart: new Date().toISOString(),
+      scheduledEnd: new Date(Date.now() + 3600_000).toISOString(),
+      assigneeIds: [tecnicoId],
+    });
+  await request(app)
+    .post(`/workorders/${id}/iniciar`)
+    .set("Authorization", `Bearer ${tecnicoToken}`)
+    .send({ riskAnalysis: "risco" });
+
+  return id;
+}
+
 beforeAll(async () => {
   const passwordHash = await bcrypt.hash("senha123", 10);
 
@@ -229,5 +262,163 @@ describe("caminhos de erro", () => {
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe("INSUFFICIENT_STOCK");
+  });
+});
+
+describe("bloqueio de encerramento por subtarefa em aberto", () => {
+  it("rejeita encerramentoTecnico (422 HAS_OPEN_SUBTASKS) quando existe subtask ABERTA", async () => {
+    const id = await criarOSEmExecucao("Subtask aberta bloqueia encerramento");
+    await prisma.subtask.create({
+      data: {
+        workOrderId: id,
+        title: "Troca de rolamento",
+        estimatedMinutes: 30,
+        createdById: tecnicoId,
+        assignedToId: tecnicoId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
+      .set("Authorization", `Bearer ${tecnicoToken}`)
+      .send({ testNotes: "Testado.", cleanupDone: true });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe("HAS_OPEN_SUBTASKS");
+  });
+
+  it("mensagem de erro inclui a contagem e os títulos das subtarefas pendentes", async () => {
+    const id = await criarOSEmExecucao("Mensagem lista subtasks pendentes");
+    await prisma.subtask.createMany({
+      data: [
+        {
+          workOrderId: id,
+          title: "Troca de rolamento",
+          estimatedMinutes: 30,
+          createdById: tecnicoId,
+          assignedToId: tecnicoId,
+        },
+        {
+          workOrderId: id,
+          title: "Verificação elétrica",
+          estimatedMinutes: 20,
+          createdById: tecnicoId,
+          assignedToId: tecnicoId,
+        },
+      ],
+    });
+
+    const res = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
+      .set("Authorization", `Bearer ${tecnicoToken}`)
+      .send({ testNotes: "Testado.", cleanupDone: true });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.message).toContain("2 subtarefa(s)");
+    expect(res.body.error.message).toContain("Troca de rolamento");
+    expect(res.body.error.message).toContain("Verificação elétrica");
+  });
+
+  it("permite encerramentoTecnico quando todas as subtasks estão CONCLUIDA/CANCELADA", async () => {
+    const id = await criarOSEmExecucao("Subtasks fechadas não bloqueiam");
+    await prisma.subtask.create({
+      data: {
+        workOrderId: id,
+        title: "Subtask concluída",
+        estimatedMinutes: 15,
+        createdById: tecnicoId,
+        assignedToId: tecnicoId,
+        status: "CONCLUIDA",
+        finishedAt: new Date(),
+        closedAt: new Date(),
+        closedById: tecnicoId,
+      },
+    });
+    await prisma.subtask.create({
+      data: {
+        workOrderId: id,
+        title: "Subtask cancelada",
+        estimatedMinutes: 15,
+        createdById: tecnicoId,
+        assignedToId: tecnicoId,
+        status: "CANCELADA",
+        closedAt: new Date(),
+        closedById: tecnicoId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
+      .set("Authorization", `Bearer ${tecnicoToken}`)
+      .send({ testNotes: "Testado.", cleanupDone: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("AGUARDANDO_VALIDACAO");
+  });
+
+  it("permite encerramentoTecnico quando a OS não tem nenhuma subtask", async () => {
+    const id = await criarOSEmExecucao("OS sem subtasks");
+
+    const res = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
+      .set("Authorization", `Bearer ${tecnicoToken}`)
+      .send({ testNotes: "Testado.", cleanupDone: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("AGUARDANDO_VALIDACAO");
+  });
+
+  it("rejeita validar (→ENCERRADA) quando uma subtask é reaberta após o envio para validação", async () => {
+    const id = await criarOSEmExecucao("Subtask reaberta bloqueia validação");
+
+    const encerramento = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
+      .set("Authorization", `Bearer ${tecnicoToken}`)
+      .send({ testNotes: "Testado.", cleanupDone: true });
+    expect(encerramento.status).toBe(200);
+    expect(encerramento.body.status).toBe("AGUARDANDO_VALIDACAO");
+
+    // Simula uma subtask reaberta (ex.: supervisor devolveu a subtask) enquanto
+    // a OS já está aguardando validação — não passa pelo endpoint de subtasks
+    // porque não há reabertura exposta na API hoje, só a criação de uma nova.
+    await prisma.subtask.create({
+      data: {
+        workOrderId: id,
+        title: "Ajuste pendente encontrado na validação",
+        estimatedMinutes: 10,
+        createdById: tecnicoId,
+        assignedToId: tecnicoId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/workorders/${id}/validar`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ approve: true });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe("HAS_OPEN_SUBTASKS");
+  });
+
+  it("timelineOverride bloqueia encerramento com subtask aberta", async () => {
+    const id = await criarOSEmExecucao("Override para ENCERRADA com subtask aberta");
+    await prisma.subtask.create({
+      data: {
+        workOrderId: id,
+        title: "Troca de rolamento",
+        estimatedMinutes: 30,
+        createdById: tecnicoId,
+        assignedToId: tecnicoId,
+      },
+    });
+
+    const res = await request(app)
+      .patch(`/workorders/${id}/timeline`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ toStatus: "ENCERRADA", note: "Override para teste do bloqueio de subtask aberta." });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe("HAS_OPEN_SUBTASKS");
+    expect(res.body.error.message).toContain("Troca de rolamento");
   });
 });
