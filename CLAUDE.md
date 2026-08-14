@@ -31,13 +31,13 @@ Setores de destino: **Mecânica**, **Elétrica**, **Predial**.
 |---|---|
 | Backend | Node.js (LTS) + Express |
 | ORM | Prisma |
-| Banco (MVP) | **SQLite** (arquivo local `dev.db`) |
-| Banco (futuro) | PostgreSQL — manter schema compatível para troca via `provider` |
+| Banco (dev local) | **SQLite** (arquivo local `dev.db`) |
+| Banco (produção) | **PostgreSQL (Neon)** — já em produção; ver "Decisão de produção" abaixo <!-- TODO confirmar: dev local ainda usa SQLite ou já migrou para Postgres? --> |
 | Frontend | React + Vite + Tailwind CSS |
 | Auth | JWT (access token) + hash de senha com bcrypt |
 | Validação | zod (backend) |
 | HTTP client (front) | fetch nativo ou axios |
-| Datas | dayjs |
+| Datas | `Date` nativo <!-- TODO confirmar: dayjs removido do SubtaskPanel; verificar se ainda há uso em outras telas antes de remover a dependência de vez --> |
 
 ### Decisões de MVP já tomadas (NÃO reabrir)
 - **Banco = SQLite.** Migração para Postgres deve ser trivial: usar apenas tipos
@@ -88,7 +88,7 @@ Setores de destino: **Mecânica**, **Elétrica**, **Predial**.
 │   ├── src/
 │   │   ├── config/        # env, prisma client
 │   │   ├── middlewares/   # auth, rbac, error handler
-│   │   ├── modules/       # um diretório por domínio (auth, users, assets, parts, workorders, indicators)
+│   │   ├── modules/       # um diretório por domínio (auth, users, assets, parts, stock, workorders, subtasks, indicators)
 │   │   │   └── <mod>/     # routes.ts, controller.ts, service.ts, schema.ts
 │   │   ├── lib/           # helpers (workorder state machine, indicators calc)
 │   │   ├── app.ts
@@ -219,6 +219,12 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
   `GET/POST /workorders/:workOrderId/subtasks` (nested, listar/abrir),
   `PATCH /subtasks/:id` (editar/reatribuir), `POST /subtasks/:id/finish`,
   `POST /subtasks/:id/cancel`. Todas exigem `authorize(TECNICO, SUPERVISOR)`.
+- **Exibição de duração (front, `SubtaskPanel.tsx`):** o card mostra a duração
+  calculada a partir de `createdAt` — `Duração: <t>` para `CONCLUIDA` (usa
+  `finishedAt`; se null, omite) e `Em andamento: <t>` para `ABERTA` (usa `now()`).
+  Formatação via `lib/format.ts#formatDuration` (min/h). Auto-refresh a cada 60s
+  por `setInterval`, ativado apenas quando há subtask `ABERTA`, com cleanup no
+  unmount. Datas com `Date` nativo — **sem dayjs**.
 
 ### WorkOrderPart (peças usadas na OS)
 - `id`, `workOrderId` (→ WorkOrder), `partId` (→ Part), `quantity` (int).
@@ -331,7 +337,7 @@ Endpoints de indicadores retornam JSON agregado; o dashboard consome e plota.
 
 ## 10. Regras de execução das specs (IMPORTANTE)
 
-1. Executar as specs **na ordem numérica** (01 → 05).
+1. Executar as specs **na ordem numérica** (01 → 06).
 2. Ao **terminar cada fase**, PARAR e apresentar um resumo do que foi feito +
    como testar. **Não** iniciar a próxima fase sem confirmação do usuário.
 3. Respeitar rigorosamente as decisões de MVP do §2 (não implementar cron de

@@ -502,7 +502,13 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
       }
 
       await tx.execution.create({
-        data: { workOrderId: id, riskAnalysis: input.riskAnalysis, startedAt: new Date() },
+        data: {
+          workOrderId: id,
+          riskAnalysis: input.riskAnalysis,
+          startedAt: new Date(),
+          startedById: user.userId,
+          startNote: input.startNote ?? null,
+        },
       });
 
       // Início direto da TRIAGEM ou PLANEJADA (prioridade URGENTE, ver
@@ -632,7 +638,14 @@ export function encerramentoTecnico(id: string, input: EncerramentoTecnicoInput,
 
       await tx.execution.update({
         where: { id: openExecution.id },
-        data: { testNotes: input.testNotes, cleanupDone: input.cleanupDone, finishedAt: new Date() },
+        data: {
+          testNotes: input.testNotes,
+          cleanupDone: input.cleanupDone,
+          finishedAt: new Date(),
+          endedById: user.userId,
+          endNote: input.endNote ?? null,
+          outcome: input.outcome ?? null,
+        },
       });
     },
   });

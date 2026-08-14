@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Disciplina, Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import { Disciplina, ExecutionOutcome, Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 
 export const createWorkOrderSchema = z.object({
   type: z.nativeEnum(WorkOrderType),
@@ -67,6 +67,7 @@ export const reprogramacaoSchema = z
 export const iniciarSchema = z.object({
   riskAnalysis: z.string().min(1, "Análise de risco é obrigatória."),
   assigneeIds: z.array(z.string().min(1)).optional().default([]),
+  startNote: z.string().trim().min(1).optional(),
 });
 
 export const registrarSchema = z
@@ -89,6 +90,8 @@ export const registrarSchema = z
 export const encerramentoTecnicoSchema = z.object({
   testNotes: z.string().min(1, "Notas de teste são obrigatórias."),
   cleanupDone: z.boolean(),
+  endNote: z.string().trim().min(1).optional(),
+  outcome: z.nativeEnum(ExecutionOutcome).optional(),
 });
 
 export const validarSchema = z
