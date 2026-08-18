@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api/client";
@@ -8,8 +8,39 @@ import { Priority } from "../domain/enums";
 import { DISCIPLINA_LABELS, PRIORITY_COLORS, PRIORITY_LABELS } from "../domain/labels";
 import { formatDateTime } from "../lib/format";
 
-const POLL_INTERVAL_MS = 30000;
 const EMPTY_BOARD: PublicWorkOrdersBoard = { abertas: [], programadas: [] };
+
+// Board público exibido no kiosk do chão de fábrica (tela de login, sem
+// autenticação). Só faz sentido atualizar sozinho durante o expediente —
+// fora dessa janela o setInterval de polling é desligado (clearInterval),
+// não apenas ignorado, para não manter o backend/Neon acordado à toa.
+export const BOARD_SCHEDULE = {
+  diasUteis: [1, 2, 3, 4, 5], // Date#getDay(): 0=domingo ... 6=sábado
+  horaInicio: 5,
+  horaFim: 19,
+  intervaloMs: 60_000,
+};
+
+// Dedupe do disparo imediato quando `active` vira true (retorno de foco ou
+// entrada na janela): se já houve uma busca bem-sucedida há menos disso, o
+// setInterval seguinte cuida — evita rajada em alt-tab repetido. Não se aplica
+// ao botão "Atualizar agora" (ação explícita do usuário).
+const FOCUS_DEDUPE_MS = 60_000;
+
+function isWithinBoardWindow(date: Date): boolean {
+  const dia = date.getDay();
+  const hora = date.getHours();
+  return (
+    (BOARD_SCHEDULE.diasUteis as number[]).includes(dia) &&
+    hora >= BOARD_SCHEDULE.horaInicio &&
+    hora < BOARD_SCHEDULE.horaFim
+  );
+}
+
+const pad = (h: number) => String(h).padStart(2, "0");
+// "seg–sex" é texto fixo, não derivado de `diasUteis` — se a lista de dias
+// úteis mudar, ajuste este rótulo junto.
+const BOARD_WINDOW_LABEL = `seg–sex, ${pad(BOARD_SCHEDULE.horaInicio)}:00–${pad(BOARD_SCHEDULE.horaFim)}:00`;
 
 const PRIORITY_BG: Record<Priority, string> = {
   BAIXA: "#e0f2fe", // sky-100 (azul bebê)
@@ -97,15 +128,42 @@ function BoardColumn({
 
 function NovasSolicitacoesBoard() {
   const [board, setBoard] = useState<PublicWorkOrdersBoard>(EMPTY_BOARD);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [withinWindow, setWithinWindow] = useState(() => isWithinBoardWindow(new Date()));
+  const [visible, setVisible] = useState(() => !document.hidden);
+  const lastFetchAtRef = useRef(0);
+
+  // Reavalia a janela de horário a cada minuto — é o que faz o board religar
+  // sozinho ao cruzar os limites de BOARD_SCHEDULE (ou virar o fim de semana)
+  // sem precisar de reload manual. Só recalcula o horário local, não consulta a API.
+  useEffect(() => {
+    const clock = setInterval(() => setWithinWindow(isWithinBoardWindow(new Date())), 60_000);
+    return () => clearInterval(clock);
+  }, []);
 
   useEffect(() => {
+    function handleVisibilityChange() {
+      setVisible(!document.hidden);
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  const active = withinWindow && visible;
+
+  useEffect(() => {
+    if (!active) return;
+
     let cancelled = false;
 
     async function load() {
+      setLoading(true);
       try {
         const data = await getPublicWorkOrdersBoard();
-        if (!cancelled) setBoard(data);
+        if (!cancelled) {
+          setBoard(data);
+          lastFetchAtRef.current = Date.now();
+        }
       } catch {
         // Quadro público: falha silenciosa, mantém a última lista carregada.
       } finally {
@@ -113,31 +171,60 @@ function NovasSolicitacoesBoard() {
       }
     }
 
-    load();
-    const interval = setInterval(load, POLL_INTERVAL_MS);
+    if (Date.now() - lastFetchAtRef.current >= FOCUS_DEDUPE_MS) {
+      load();
+    }
+    const interval = setInterval(load, BOARD_SCHEDULE.intervaloMs);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [active]);
+
+  const handleForceRefresh = useCallback(() => {
+    setLoading(true);
+    getPublicWorkOrdersBoard()
+      .then((data) => {
+        setBoard(data);
+        lastFetchAtRef.current = Date.now();
+      })
+      .catch(() => {
+        // Quadro público: falha silenciosa, mantém a última lista carregada.
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="flex h-full w-full flex-col gap-6 sm:flex-row">
-      <BoardColumn
-        title="Novas OS"
-        subtitle="Ordens de serviço em aberto"
-        items={board.abertas}
-        loading={loading}
-        emptyLabel="Nenhuma solicitação em aberto."
-      />
-      <BoardColumn
-        title="OS Programadas"
-        subtitle="Ordenadas por prioridade"
-        items={board.programadas}
-        loading={loading}
-        emptyLabel="Nenhuma OS programada."
-        showSchedule
-      />
+    <div className="flex h-full w-full flex-col">
+      {!withinWindow && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-white/20 bg-black/30 px-4 py-2 text-sm text-white/80">
+          <span>Atualização pausada fora do expediente ({BOARD_WINDOW_LABEL}).</span>
+          <button
+            type="button"
+            onClick={handleForceRefresh}
+            className="shrink-0 rounded-md border border-white/30 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
+          >
+            Atualizar agora
+          </button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 sm:flex-row">
+        <BoardColumn
+          title="Novas OS"
+          subtitle="Ordens de serviço em aberto"
+          items={board.abertas}
+          loading={loading}
+          emptyLabel="Nenhuma solicitação em aberto."
+        />
+        <BoardColumn
+          title="OS Programadas"
+          subtitle="Ordenadas por prioridade"
+          items={board.programadas}
+          loading={loading}
+          emptyLabel="Nenhuma OS programada."
+          showSchedule
+        />
+      </div>
     </div>
   );
 }

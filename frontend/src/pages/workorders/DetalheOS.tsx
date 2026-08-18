@@ -18,6 +18,7 @@ import { Modal } from "../../components/Modal";
 import { formatDateTime } from "../../lib/format";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
+import { useNotificacoes } from "../../notificacoes/NotificacoesContext";
 import { TriagemForm } from "./actions/TriagemForm";
 import { PlanejamentoForm } from "./actions/PlanejamentoForm";
 import { ProgramacaoForm } from "./actions/ProgramacaoForm";
@@ -106,6 +107,7 @@ export default function DetalheOS() {
   const { id } = useParams<{ id: string }>();
   const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { refetch: refetchNotificacoes } = useNotificacoes();
 
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +130,7 @@ export default function DetalheOS() {
     setActiveAction(null);
     showSuccess("Ação registrada com sucesso.");
     reload();
+    refetchNotificacoes();
   }
 
   if (loading) return <p className="text-sm text-slate-500">Carregando…</p>;
