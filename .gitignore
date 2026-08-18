@@ -2,3 +2,6 @@
 TESTE - CONTROLE MANUTENÇÃO - CONTROLE.csv
 # Asset solto
 Gemini_Generated_Image_DarkMode.png
+# Backup pré-migração de banco (dumps, logs, dados sensíveis)
+_migracao_*/
+.migracao_ts
