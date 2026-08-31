@@ -682,6 +682,21 @@ export function validar(id: string, input: ValidarInput, user: AuthPayload) {
     role: user.role,
     userId: user.userId,
     note: input.note,
+    // Reprovação: a Execution do ciclo anterior já foi fechada em
+    // encerramentoTecnico() (finishedAt preenchido) e fica como histórico.
+    // Sem abrir uma nova aqui, a OS volta a EM_EXECUCAO sem nenhuma Execution
+    // em aberto e registrar()/encerramentoTecnico() falham com
+    // NO_OPEN_EXECUTION assim que o técnico tenta usá-los.
+    mutate: async (tx) => {
+      await tx.execution.create({
+        data: {
+          workOrderId: id,
+          startedAt: new Date(),
+          finishedAt: null,
+          startedById: user.userId,
+        },
+      });
+    },
   });
 }
 
