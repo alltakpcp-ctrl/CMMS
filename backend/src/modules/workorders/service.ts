@@ -769,6 +769,21 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
       data: { finishedAt: new Date() },
     });
 
+    // Destino EM_EXECUCAO: as ações naturais dessa fase (registrar,
+    // encerramento técnico) exigem uma Execution em aberto — sem isso, a OS
+    // fica visivelmente em EM_EXECUCAO mas registrar()/encerramentoTecnico()
+    // falham com NO_OPEN_EXECUTION (mesma causa raiz corrigida em validar()).
+    if (dto.toStatus === WorkOrderStatus.EM_EXECUCAO) {
+      await tx.execution.create({
+        data: {
+          workOrderId: id,
+          startedAt: new Date(),
+          finishedAt: null,
+          startedById: user.userId,
+        },
+      });
+    }
+
     await tx.statusHistory.create({
       data: {
         workOrderId: id,
