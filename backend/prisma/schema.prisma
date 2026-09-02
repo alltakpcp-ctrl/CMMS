@@ -97,6 +97,7 @@ model Asset {
   workOrders WorkOrder[]
   sectors    AssetSector[]
   partRequests PartRequest[]
+  maintenancePlans MaintenancePlan[]
 }
 
 model AssetSector {
@@ -163,6 +164,8 @@ model WorkOrder {
   scheduledEnd   DateTime?
   assignedToId   String?
   assignedTo     User?     @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  maintenancePlanId String?
+  maintenancePlan   MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id])
   priorityAdjustedByTech Boolean   @default(false)
   priorityOriginal       String?
   priorityAdjustedAt     DateTime?
@@ -196,6 +199,37 @@ model WorkOrderAssignee {
   @@unique([workOrderId, userId])
   @@index([workOrderId])
   @@index([userId])
+}
+
+// Plano de manutenção preventiva — 1 registro por item de checklist. Vencimento
+// é calculado sob demanda (sem cron) em lib/maintenancePlans.ts, a partir da
+// última Execution encerrada vinculada a uma WorkOrder deste plano (ou de
+// createdAt, se nunca executado). Abertura de OS a partir de um plano vencido
+// é manual (ver CLAUDE.md §5).
+model MaintenancePlan {
+  id               String    @id @default(cuid())
+  assetId          String
+  asset            Asset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  discipline       String    // MaintenanceDiscipline
+  title            String
+  description      String?
+  priority         String    // Priority
+  periodicity      String    // MaintenancePeriodicity
+  estimatedMinutes Int?
+  responsible      String?
+  action01         String?
+  action02         String?
+  action03         String?
+  action04         String?
+  action05         String?
+  action06         String?
+  active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  workOrders       WorkOrder[]
+
+  @@index([assetId])
 }
 
 // status é String validada via zod (ABERTA | CONCLUIDA | CANCELADA), mesma
