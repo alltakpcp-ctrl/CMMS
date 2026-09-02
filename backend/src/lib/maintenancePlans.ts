@@ -48,7 +48,7 @@ export function calculateNextDueDate(
   const dueDate = nextBusinessDay(dueDateRaw);
 
   const isOverdue = startOfUtcDay(referenceDate).getTime() > dueDate.getTime();
-  const deadline = isOverdue ? nextBusinessDay(dueDate) : null;
+  const deadline = isOverdue ? nextBusinessDay(addUtcDays(dueDate, 1)) : null;
 
   return { dueDate, isOverdue, deadline };
 }

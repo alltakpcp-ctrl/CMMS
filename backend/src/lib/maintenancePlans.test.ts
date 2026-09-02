@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateNextDueDate, MaintenancePlanForDueDate } from "./maintenancePlans";
+import { isBusinessDay } from "./businessDays";
 
 function utc(year: number, month: number, day: number): Date {
   return new Date(Date.UTC(year, month - 1, day));
@@ -59,6 +60,17 @@ describe("calculateNextDueDate", () => {
     expect(result.dueDate.getTime()).toBe(utc(2024, 2, 14).getTime());
   });
 
+  it("empurra vencimento que cai em Sexta-Feira Santa (2024) para o próximo dia útil", () => {
+    // 28/03/2024 (quinta) + 1 dia (DIARIO) = 29/03/2024, Sexta-Feira Santa —
+    // 30 e 31/03 são fim de semana, então o próximo dia útil é 01/04/2024.
+    const result = calculateNextDueDate(
+      plan({ periodicity: "DIARIO" }),
+      { finishedAt: utc(2024, 3, 28) },
+      utc(2024, 3, 28)
+    );
+    expect(result.dueDate.getTime()).toBe(utc(2024, 4, 1).getTime());
+  });
+
   it("usa createdAt do plano quando nunca houve execução", () => {
     const result = calculateNextDueDate(
       plan({ periodicity: "SEMANAL", createdAt: utc(2026, 1, 1) }),
@@ -77,15 +89,33 @@ describe("calculateNextDueDate", () => {
     expect(result.dueDate.getTime()).toBe(utc(2026, 1, 8).getTime());
   });
 
-  it("marca como vencido (isOverdue) e calcula deadline quando referenceDate é posterior ao vencimento", () => {
+  it("marca como vencido (isOverdue) e calcula deadline como o próximo dia útil ESTRITAMENTE após o vencimento", () => {
     const result = calculateNextDueDate(
       plan({ periodicity: "SEMANAL", createdAt: utc(2026, 1, 1) }),
       null,
-      utc(2026, 1, 20) // bem depois do vencimento (08/01/2026)
+      utc(2026, 1, 20) // bem depois do vencimento (08/01/2026, quinta-feira)
     );
     expect(result.isOverdue).toBe(true);
     expect(result.deadline).not.toBeNull();
-    expect(result.deadline!.getTime()).toBe(result.dueDate.getTime());
+    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate.getTime());
+    expect(isBusinessDay(result.dueDate)).toBe(true);
+    expect(isBusinessDay(result.deadline!)).toBe(true);
+  });
+
+  it("quando dueDate cai numa sexta-feira útil normal, deadline pula o fim de semana para a segunda-feira seguinte", () => {
+    // createdAt 02/01/2026 (sexta) + 7 dias (SEMANAL) = 09/01/2026, também
+    // sexta-feira útil normal (sem feriado) — deadline não pode ser a própria
+    // sexta, tem que pular sábado/domingo até 12/01/2026 (segunda).
+    const result = calculateNextDueDate(
+      plan({ periodicity: "SEMANAL", createdAt: utc(2026, 1, 2) }),
+      null,
+      utc(2026, 1, 20)
+    );
+    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 9).getTime());
+    expect(result.isOverdue).toBe(true);
+    expect(result.deadline).not.toBeNull();
+    expect(result.deadline!.getTime()).toBe(utc(2026, 1, 12).getTime());
+    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate.getTime());
   });
 
   it("não marca como vencido quando referenceDate é igual à data de vencimento", () => {
