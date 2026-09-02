@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import * as maintenancePlansApi from "../../api/maintenancePlans";
 import { MaintenancePlanWithDueDate } from "../../types";
-import { Priority } from "../../domain/enums";
+import { Priority, WorkOrderType } from "../../domain/enums";
 import { Button } from "../../components/Button";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
@@ -12,6 +13,7 @@ import { CalendarListView } from "./CalendarListView";
 import { CalendarSidebarFilters } from "./CalendarSidebarFilters";
 import { MaintenancePlanEventPopover } from "./MaintenancePlanEventPopover";
 import { MaintenancePlanModal } from "../MaintenancePlanModal";
+import { NovaSolicitacaoPrefill } from "../NovaSolicitacao";
 
 type ModalState = { mode: "create" } | { mode: "edit"; planId: string };
 
@@ -46,6 +48,7 @@ function formatPeriodLabel(view: CalendarView, reference: Date): string {
 export function MaintenanceCalendar() {
   const { token } = useAuth();
   const { showError } = useToast();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<CalendarView>("month");
   const [reference, setReference] = useState<Date>(startOfToday());
@@ -58,6 +61,24 @@ export function MaintenanceCalendar() {
 
   function handleEventClick(plan: MaintenancePlanWithDueDate, anchorRect: DOMRect) {
     setPopover({ plan, anchorRect });
+  }
+
+  // Pré-preenche a criação de OS a partir de um plano vencido — só os campos
+  // com equivalência direta (assetId/disciplina/priority/title/description).
+  // Sem encadeamento automático de planejamento: a OS nasce ABERTA e segue o
+  // fluxo manual normal. maintenancePlanId não é setado aqui — createWorkOrder
+  // (schema atual) não aceita esse campo, ver gap conhecido no resumo da tarefa.
+  function handleOpenWorkOrder(plan: MaintenancePlanWithDueDate) {
+    const prefill: NovaSolicitacaoPrefill = {
+      type: WorkOrderType.PREVENTIVA,
+      disciplina: plan.discipline,
+      priority: plan.priority,
+      title: plan.title,
+      description: plan.description ?? undefined,
+      assetId: plan.assetId,
+    };
+    setPopover(null);
+    navigate("/solicitacoes/nova", { state: prefill });
   }
 
   function reload() {
@@ -217,6 +238,7 @@ export function MaintenanceCalendar() {
             setModal({ mode: "edit", planId: popover.plan.id });
             setPopover(null);
           }}
+          onOpenWorkOrder={() => handleOpenWorkOrder(popover.plan)}
         />
       )}
 
