@@ -7,6 +7,7 @@ import Indicadores from "./pages/Indicadores";
 import DetalheOS from "./pages/workorders/DetalheOS";
 import FilaTriagem from "./pages/FilaTriagem";
 import Agenda from "./pages/Agenda";
+import AgendaProgramacao from "./pages/agenda/AgendaProgramacao";
 import MinhasOS from "./pages/MinhasOS";
 import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
@@ -62,6 +63,14 @@ export default function App() {
           element={
             <RequireRole roles={[Role.SUPERVISOR]}>
               <Agenda />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/agenda/programacao"
+          element={
+            <RequireRole roles={[Role.SUPERVISOR]}>
+              <AgendaProgramacao />
             </RequireRole>
           }
         />

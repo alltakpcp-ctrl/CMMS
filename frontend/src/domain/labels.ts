@@ -164,3 +164,12 @@ export const MAINTENANCE_PERIODICITY_LABELS: Record<MaintenancePeriodicity, stri
   SEMESTRAL: "Semestral",
   ANUAL: "Anual",
 };
+
+// Cor por disciplina no calendário de preventivas (MaintenanceCalendar) —
+// vocabulário próprio (não o de Badge), pensado para barras de evento numa
+// grade de dias.
+export const DISCIPLINE_COLORS: Record<MaintenanceDiscipline, { bg: string; text: string; dot: string }> = {
+  MECANICA: { bg: "bg-blue-100 hover:bg-blue-200", text: "text-blue-800", dot: "bg-blue-500" },
+  ELETRICA: { bg: "bg-amber-100 hover:bg-amber-200", text: "text-amber-800", dot: "bg-amber-500" },
+  PREDIAL: { bg: "bg-emerald-100 hover:bg-emerald-200", text: "text-emerald-800", dot: "bg-emerald-500" },
+};
