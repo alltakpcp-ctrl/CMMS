@@ -10,6 +10,10 @@ import { addDays, addMonths, getMonthMatrix, getWeekDays, isoDateKey, startOfTod
 import { CalendarMonthView } from "./CalendarMonthView";
 import { CalendarListView } from "./CalendarListView";
 import { CalendarSidebarFilters } from "./CalendarSidebarFilters";
+import { MaintenancePlanEventPopover } from "./MaintenancePlanEventPopover";
+import { MaintenancePlanModal } from "../MaintenancePlanModal";
+
+type ModalState = { mode: "create" } | { mode: "edit"; planId: string };
 
 type CalendarView = "month" | "week" | "day";
 
@@ -49,6 +53,12 @@ export function MaintenanceCalendar() {
   const [loading, setLoading] = useState(true);
   const [excludedAssetIds, setExcludedAssetIds] = useState<Set<string>>(new Set());
   const [excludedPriorities, setExcludedPriorities] = useState<Set<Priority>>(new Set());
+  const [popover, setPopover] = useState<{ plan: MaintenancePlanWithDueDate; anchorRect: DOMRect } | null>(null);
+  const [modal, setModal] = useState<ModalState | null>(null);
+
+  function handleEventClick(plan: MaintenancePlanWithDueDate, anchorRect: DOMRect) {
+    setPopover({ plan, anchorRect });
+  }
 
   function reload() {
     if (!token) return;
@@ -133,6 +143,8 @@ export function MaintenanceCalendar() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>
+
           <div className="flex overflow-hidden rounded border border-slate-300">
             {(Object.keys(VIEW_LABELS) as CalendarView[]).map((v) => (
               <button
@@ -183,16 +195,38 @@ export function MaintenanceCalendar() {
               reference={reference}
               today={today}
               eventsByDay={eventsByDay}
+              onEventClick={handleEventClick}
             />
           ) : (
             <CalendarListView
               days={view === "week" ? getWeekDays(reference) : [reference]}
               today={today}
               eventsByDay={eventsByDay}
+              onEventClick={handleEventClick}
             />
           )}
         </div>
       </div>
+
+      {popover && (
+        <MaintenancePlanEventPopover
+          plan={popover.plan}
+          anchorRect={popover.anchorRect}
+          onClose={() => setPopover(null)}
+          onEdit={() => {
+            setModal({ mode: "edit", planId: popover.plan.id });
+            setPopover(null);
+          }}
+        />
+      )}
+
+      {modal && (
+        <MaintenancePlanModal
+          planId={modal.mode === "edit" ? modal.planId : undefined}
+          onClose={() => setModal(null)}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }

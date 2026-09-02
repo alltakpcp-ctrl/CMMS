@@ -7,12 +7,13 @@ interface CalendarListViewProps {
   days: Date[];
   today: Date;
   eventsByDay: Map<string, MaintenancePlanWithDueDate[]>;
+  onEventClick: (plan: MaintenancePlanWithDueDate, anchorRect: DOMRect) => void;
 }
 
 // Vista compartilhada por Semana e Dia — para os planos, só a data importa
 // (não têm horário), então uma lista por dia é mais legível que reproduzir a
 // grade de horas do iCloud.
-export function CalendarListView({ days, today, eventsByDay }: CalendarListViewProps) {
+export function CalendarListView({ days, today, eventsByDay, onEventClick }: CalendarListViewProps) {
   return (
     <div className="space-y-3">
       {days.map((day) => {
@@ -34,16 +35,21 @@ export function CalendarListView({ days, today, eventsByDay }: CalendarListViewP
                 {events.map((plan) => {
                   const colors = DISCIPLINE_COLORS[plan.discipline];
                   return (
-                    <li
-                      key={plan.id}
-                      className={`flex items-center gap-2 px-3 py-2 text-sm ${
-                        plan.isOverdue ? "bg-red-50" : ""
-                      }`}
-                    >
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${colors.dot}`} aria-hidden="true" />
-                      <span className="flex-1 truncate text-slate-800">{plan.title}</span>
-                      <span className="shrink-0 truncate text-xs text-slate-500">{plan.asset.name}</span>
-                      {plan.isOverdue && <span className="shrink-0 text-xs font-medium text-red-600">⚠ Vencido</span>}
+                    <li key={plan.id}>
+                      <button
+                        type="button"
+                        onClick={(e) => onEventClick(plan, e.currentTarget.getBoundingClientRect())}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                          plan.isOverdue ? "bg-red-50" : ""
+                        }`}
+                      >
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${colors.dot}`} aria-hidden="true" />
+                        <span className="flex-1 truncate text-slate-800">{plan.title}</span>
+                        <span className="shrink-0 truncate text-xs text-slate-500">{plan.asset.name}</span>
+                        {plan.isOverdue && (
+                          <span className="shrink-0 text-xs font-medium text-red-600">⚠ Vencido</span>
+                        )}
+                      </button>
                     </li>
                   );
                 })}

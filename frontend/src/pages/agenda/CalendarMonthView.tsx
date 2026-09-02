@@ -9,9 +9,10 @@ interface CalendarMonthViewProps {
   reference: Date;
   today: Date;
   eventsByDay: Map<string, MaintenancePlanWithDueDate[]>;
+  onEventClick: (plan: MaintenancePlanWithDueDate, anchorRect: DOMRect) => void;
 }
 
-export function CalendarMonthView({ weeks, reference, today, eventsByDay }: CalendarMonthViewProps) {
+export function CalendarMonthView({ weeks, reference, today, eventsByDay, onEventClick }: CalendarMonthViewProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200">
       <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
@@ -52,16 +53,18 @@ export function CalendarMonthView({ weeks, reference, today, eventsByDay }: Cale
                   {visible.map((plan) => {
                     const colors = DISCIPLINE_COLORS[plan.discipline];
                     return (
-                      <div
+                      <button
                         key={plan.id}
+                        type="button"
                         title={plan.title}
-                        className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${
+                        onClick={(e) => onEventClick(plan, e.currentTarget.getBoundingClientRect())}
+                        className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium ${colors.bg} ${colors.text} ${
                           plan.isOverdue ? "ring-1 ring-inset ring-red-500" : ""
                         }`}
                       >
                         {plan.isOverdue && "⚠ "}
                         {plan.title}
-                      </div>
+                      </button>
                     );
                   })}
                   {hidden > 0 && <p className="px-1.5 text-xs text-slate-500">+{hidden} mais</p>}
