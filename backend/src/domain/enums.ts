@@ -97,3 +97,29 @@ export const ExecutionOutcome = {
   PAUSA_TURNO: "PAUSA_TURNO",
 } as const;
 export type ExecutionOutcome = (typeof ExecutionOutcome)[keyof typeof ExecutionOutcome];
+
+export const MaintenanceDiscipline = {
+  MECANICA: "MECANICA",
+  ELETRICA: "ELETRICA",
+  PREDIAL: "PREDIAL",
+} as const;
+export type MaintenanceDiscipline = (typeof MaintenanceDiscipline)[keyof typeof MaintenanceDiscipline];
+
+export const MaintenancePeriodicity = {
+  DIARIO: "DIARIO",
+  SEMANAL: "SEMANAL",
+  MENSAL: "MENSAL",
+  TRIMESTRAL: "TRIMESTRAL",
+  SEMESTRAL: "SEMESTRAL",
+  ANUAL: "ANUAL",
+} as const;
+export type MaintenancePeriodicity = (typeof MaintenancePeriodicity)[keyof typeof MaintenancePeriodicity];
+
+export const PERIODICITY_DAYS: Record<MaintenancePeriodicity, number> = {
+  DIARIO: 1,
+  SEMANAL: 7,
+  MENSAL: 30,
+  TRIMESTRAL: 90,
+  SEMESTRAL: 180,
+  ANUAL: 365,
+};
