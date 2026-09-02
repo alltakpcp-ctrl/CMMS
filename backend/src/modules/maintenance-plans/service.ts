@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { calculateNextDueDate, DueDateResult } from "../../lib/maintenancePlans";
@@ -35,18 +35,20 @@ export async function updateMaintenancePlan(id: string, input: UpdateMaintenance
 
 export async function deleteMaintenancePlan(id: string) {
   await getMaintenancePlanById(id);
-  try {
-    await prisma.maintenancePlan.delete({ where: { id } });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
-      throw new AppError(
-        422,
-        "MAINTENANCE_PLAN_HAS_WORK_ORDERS",
-        "Plano possui OS vinculadas e não pode ser excluído. Considere desativá-lo (active=false)."
-      );
-    }
-    throw err;
+
+  const linkedWorkOrdersCount = await prisma.workOrder.count({
+    where: { maintenancePlanId: id },
+  });
+
+  if (linkedWorkOrdersCount > 0) {
+    throw new AppError(
+      422,
+      "MAINTENANCE_PLAN_HAS_WORK_ORDERS",
+      `Plano possui ${linkedWorkOrdersCount} OS vinculada(s) e não pode ser excluído. Considere desativá-lo (active=false).`
+    );
   }
+
+  await prisma.maintenancePlan.delete({ where: { id } });
 }
 
 // Última Execution encerrada por plano, numa única query (evita N+1 no
