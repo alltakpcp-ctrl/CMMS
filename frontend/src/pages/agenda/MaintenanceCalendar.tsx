@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as maintenancePlansApi from "../../api/maintenancePlans";
 import { MaintenancePlanWithDueDate } from "../../types";
+import { Priority } from "../../domain/enums";
 import { Button } from "../../components/Button";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { addDays, addMonths, getMonthMatrix, getWeekDays, isoDateKey, startOfToday } from "../../lib/calendar";
 import { CalendarMonthView } from "./CalendarMonthView";
 import { CalendarListView } from "./CalendarListView";
+import { CalendarSidebarFilters } from "./CalendarSidebarFilters";
 
 type CalendarView = "month" | "week" | "day";
 
@@ -45,6 +47,8 @@ export function MaintenanceCalendar() {
   const [reference, setReference] = useState<Date>(startOfToday());
   const [plans, setPlans] = useState<MaintenancePlanWithDueDate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [excludedAssetIds, setExcludedAssetIds] = useState<Set<string>>(new Set());
+  const [excludedPriorities, setExcludedPriorities] = useState<Set<Priority>>(new Set());
 
   function reload() {
     if (!token) return;
@@ -58,9 +62,43 @@ export function MaintenanceCalendar() {
 
   useEffect(reload, [token]);
 
+  // Ativos com pelo menos 1 plano — a lista de planos já traz o asset
+  // completo (include: { asset: true } no backend), então não precisa de uma
+  // segunda chamada a listAssets() só pra cruzar ids.
+  const assetsWithPlans = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const plan of plans) {
+      byId.set(plan.assetId, plan.asset.name);
+    }
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [plans]);
+
+  function toggleAsset(assetId: string) {
+    setExcludedAssetIds((current) => {
+      const next = new Set(current);
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
+      return next;
+    });
+  }
+
+  function togglePriority(priority: Priority) {
+    setExcludedPriorities((current) => {
+      const next = new Set(current);
+      if (next.has(priority)) next.delete(priority);
+      else next.add(priority);
+      return next;
+    });
+  }
+
+  const filteredPlans = useMemo(
+    () => plans.filter((plan) => !excludedAssetIds.has(plan.assetId) && !excludedPriorities.has(plan.priority)),
+    [plans, excludedAssetIds, excludedPriorities]
+  );
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, MaintenancePlanWithDueDate[]>();
-    for (const plan of plans) {
+    for (const plan of filteredPlans) {
       const key = isoDateKey(plan.dueDate);
       const list = map.get(key);
       if (list) {
@@ -70,7 +108,7 @@ export function MaintenanceCalendar() {
       }
     }
     return map;
-  }, [plans]);
+  }, [filteredPlans]);
 
   const today = startOfToday();
 
@@ -127,13 +165,34 @@ export function MaintenanceCalendar() {
         </div>
       </div>
 
-      {loading && plans.length === 0 ? (
-        <p className="text-sm text-slate-500">Carregando…</p>
-      ) : view === "month" ? (
-        <CalendarMonthView weeks={getMonthMatrix(reference)} reference={reference} today={today} eventsByDay={eventsByDay} />
-      ) : (
-        <CalendarListView days={view === "week" ? getWeekDays(reference) : [reference]} today={today} eventsByDay={eventsByDay} />
-      )}
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <CalendarSidebarFilters
+          assets={assetsWithPlans}
+          excludedAssetIds={excludedAssetIds}
+          onToggleAsset={toggleAsset}
+          excludedPriorities={excludedPriorities}
+          onTogglePriority={togglePriority}
+        />
+
+        <div className="flex-1">
+          {loading && plans.length === 0 ? (
+            <p className="text-sm text-slate-500">Carregando…</p>
+          ) : view === "month" ? (
+            <CalendarMonthView
+              weeks={getMonthMatrix(reference)}
+              reference={reference}
+              today={today}
+              eventsByDay={eventsByDay}
+            />
+          ) : (
+            <CalendarListView
+              days={view === "week" ? getWeekDays(reference) : [reference]}
+              today={today}
+              eventsByDay={eventsByDay}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
