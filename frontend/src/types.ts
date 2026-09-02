@@ -1,5 +1,7 @@
 import {
   Disciplina,
+  MaintenanceDiscipline,
+  MaintenancePeriodicity,
   PartRequestItemType,
   PartRequestStatus,
   PermissaoTrabalhoStatus,
@@ -40,6 +42,38 @@ export interface Asset {
   preventivePeriodicityDays: number | null;
   active: boolean;
   createdAt: string;
+}
+
+// Retorno de GET /maintenance-plans/:id — sem dueDate/isOverdue/deadline (só a
+// lista os calcula, ver MaintenancePlanWithDueDate).
+export interface MaintenancePlan {
+  id: string;
+  assetId: string;
+  asset: Asset;
+  discipline: MaintenanceDiscipline;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  periodicity: MaintenancePeriodicity;
+  estimatedMinutes: number | null;
+  responsible: string | null;
+  action01: string | null;
+  action02: string | null;
+  action03: string | null;
+  action04: string | null;
+  action05: string | null;
+  action06: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Retorno de GET /maintenance-plans (lista) — mesmo shape + campos calculados
+// por calculateNextDueDate no backend.
+export interface MaintenancePlanWithDueDate extends MaintenancePlan {
+  dueDate: string;
+  isOverdue: boolean;
+  deadline: string | null;
 }
 
 export interface Part {

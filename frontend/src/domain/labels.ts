@@ -1,5 +1,7 @@
 import {
   Disciplina,
+  MaintenanceDiscipline,
+  MaintenancePeriodicity,
   PartRequestItemType,
   PartRequestStatus,
   Priority,
@@ -146,4 +148,19 @@ export const SUBTASK_STATUS_COLORS: Record<SubtaskStatus, "amber" | "green" | "r
   ABERTA: "amber",
   CONCLUIDA: "green",
   CANCELADA: "red",
+};
+
+export const MAINTENANCE_DISCIPLINE_LABELS: Record<MaintenanceDiscipline, string> = {
+  MECANICA: "Mecânica",
+  ELETRICA: "Elétrica",
+  PREDIAL: "Predial",
+};
+
+export const MAINTENANCE_PERIODICITY_LABELS: Record<MaintenancePeriodicity, string> = {
+  DIARIO: "Diário",
+  SEMANAL: "Semanal",
+  MENSAL: "Mensal",
+  TRIMESTRAL: "Trimestral",
+  SEMESTRAL: "Semestral",
+  ANUAL: "Anual",
 };
