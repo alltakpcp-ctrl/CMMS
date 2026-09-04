@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/fila", label: "Fila de triagem", roles: [Role.TECNICO, Role.SUPERVISOR] },
   { to: "/agenda", label: "Agenda", roles: [Role.SUPERVISOR] },
   { to: "/minhas-os", label: "Minhas OS", roles: [Role.TECNICO] },
+  { to: "/preventivas", label: "Preventivas", roles: [Role.TECNICO] },
   { to: "/pedidos/montar", label: "Montar Pedido", requiresFlag: "canReceivePartRequests" },
   { to: "/pedidos/revisao", label: "Revisão de Pedidos", roles: [Role.SUPERVISOR] },
   { to: "/pedidos/compras", label: "Compras", requiresFlag: "canPurchase" },

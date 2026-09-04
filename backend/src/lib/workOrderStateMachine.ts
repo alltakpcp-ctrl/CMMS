@@ -1,4 +1,4 @@
-import { Role, WorkOrderStatus } from "../domain/enums";
+import { Role, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export type TransitionErrorCode =
   | "ROLE_FORBIDDEN"
@@ -23,7 +23,9 @@ export interface TransitionContext {
   hasScheduledStart?: boolean;
   hasScheduledEnd?: boolean;
   hasAssignedTechnician?: boolean;
+  hasEstimatedMinutes?: boolean;
   priority?: string | null;
+  type?: WorkOrderType;
 }
 
 interface TransitionRule {
@@ -47,6 +49,11 @@ const TRANSITIONS: TransitionRule[] = [
     to: WorkOrderStatus.PROGRAMADA,
     roles: [Role.SUPERVISOR],
     requiredContextFlags: ["hasScheduledStart", "hasScheduledEnd", "hasAssignedTechnician"],
+    // Tempo estimado só é exigido para PREVENTIVA — corretiva/preditiva
+    // seguem sem essa obrigatoriedade na programação.
+    guard: (context) => context.type !== WorkOrderType.PREVENTIVA || Boolean(context.hasEstimatedMinutes),
+    guardErrorCode: "MISSING_CONTEXT",
+    guardErrorMessage: "Tempo estimado do serviço é obrigatório para programar manutenção preventiva.",
   },
   {
     from: WorkOrderStatus.PROGRAMADA,

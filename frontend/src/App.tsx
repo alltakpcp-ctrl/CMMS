@@ -8,6 +8,7 @@ import DetalheOS from "./pages/workorders/DetalheOS";
 import FilaTriagem from "./pages/FilaTriagem";
 import Agenda from "./pages/Agenda";
 import AgendaProgramacao from "./pages/agenda/AgendaProgramacao";
+import PreventivasTecnico from "./pages/agenda/PreventivasTecnico";
 import MinhasOS from "./pages/MinhasOS";
 import Ativos from "./pages/cadastros/Ativos";
 import Setores from "./pages/cadastros/Setores";
@@ -79,6 +80,14 @@ export default function App() {
           element={
             <RequireRole roles={[Role.TECNICO]}>
               <MinhasOS />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/preventivas"
+          element={
+            <RequireRole roles={[Role.TECNICO]}>
+              <PreventivasTecnico />
             </RequireRole>
           }
         />

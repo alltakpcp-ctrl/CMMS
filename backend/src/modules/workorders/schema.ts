@@ -48,6 +48,9 @@ export const programacaoSchema = z.object({
   scheduledStart: z.coerce.date(),
   scheduledEnd: z.coerce.date(),
   assigneeIds: z.array(z.string().min(1)).min(1, "Selecione ao menos um técnico."),
+  // Obrigatório apenas para PREVENTIVA — reforçado em canTransition
+  // (workOrderStateMachine.ts), que conhece o type da OS.
+  estimatedMinutes: z.number().int().positive().optional(),
 });
 
 export const reprogramacaoSchema = z

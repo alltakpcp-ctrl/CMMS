@@ -12,8 +12,8 @@ interface MaintenancePlanEventPopoverProps {
   plan: MaintenancePlanWithDueDate;
   anchorRect: DOMRect;
   onClose: () => void;
-  onEdit: () => void;
-  onOpenWorkOrder: () => void;
+  onEdit?: () => void;
+  onOpenWorkOrder?: () => void;
 }
 
 function computeStyle(anchorRect: DOMRect): CSSProperties {
@@ -115,12 +115,16 @@ export function MaintenancePlanEventPopover({
         </div>
       )}
 
-      <div className="mt-4 flex justify-end gap-2">
-        {plan.isOverdue && <Button onClick={onOpenWorkOrder}>Abrir OS</Button>}
-        <Button variant="secondary" onClick={onEdit}>
-          Editar
-        </Button>
-      </div>
+      {(onOpenWorkOrder || onEdit) && (
+        <div className="mt-4 flex justify-end gap-2">
+          {plan.isOverdue && onOpenWorkOrder && <Button onClick={onOpenWorkOrder}>Abrir OS</Button>}
+          {onEdit && (
+            <Button variant="secondary" onClick={onEdit}>
+              Editar
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

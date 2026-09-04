@@ -42,6 +42,7 @@ export interface ProgramacaoInput {
   scheduledStart: string;
   scheduledEnd: string;
   assigneeIds: string[];
+  estimatedMinutes?: number;
 }
 
 export interface IniciarInput {

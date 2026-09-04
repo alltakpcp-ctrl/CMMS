@@ -45,7 +45,13 @@ function formatPeriodLabel(view: CalendarView, reference: Date): string {
   return `${startLabel} – ${endLabel}`;
 }
 
-export function MaintenanceCalendar() {
+interface MaintenanceCalendarProps {
+  // TECNICO só visualiza — sem criar/editar plano nem abrir OS a partir do
+  // calendário (POST /workorders é restrito a OPERADOR/SUPERVISOR no backend).
+  readOnly?: boolean;
+}
+
+export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarProps) {
   const { token } = useAuth();
   const { showError } = useToast();
   const navigate = useNavigate();
@@ -164,7 +170,7 @@ export function MaintenanceCalendar() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>
+          {!readOnly && <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>}
 
           <div className="flex overflow-hidden rounded border border-slate-300">
             {(Object.keys(VIEW_LABELS) as CalendarView[]).map((v) => (
@@ -234,15 +240,19 @@ export function MaintenanceCalendar() {
           plan={popover.plan}
           anchorRect={popover.anchorRect}
           onClose={() => setPopover(null)}
-          onEdit={() => {
-            setModal({ mode: "edit", planId: popover.plan.id });
-            setPopover(null);
-          }}
-          onOpenWorkOrder={() => handleOpenWorkOrder(popover.plan)}
+          onEdit={
+            readOnly
+              ? undefined
+              : () => {
+                  setModal({ mode: "edit", planId: popover.plan.id });
+                  setPopover(null);
+                }
+          }
+          onOpenWorkOrder={readOnly ? undefined : () => handleOpenWorkOrder(popover.plan)}
         />
       )}
 
-      {modal && (
+      {!readOnly && modal && (
         <MaintenancePlanModal
           planId={modal.mode === "edit" ? modal.planId : undefined}
           onClose={() => setModal(null)}

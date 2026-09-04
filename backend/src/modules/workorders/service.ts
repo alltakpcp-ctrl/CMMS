@@ -7,7 +7,7 @@ import { canTransition, TransitionContext } from "../../lib/workOrderStateMachin
 import { assertActiveSector } from "../../lib/sectors";
 import { recordStockMovement } from "../stock/service";
 import { AuthPayload } from "../../middlewares/authenticate";
-import { Role, WorkOrderStatus } from "../../domain/enums";
+import { Role, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 import {
   CancelarInput,
   CreateWorkOrderInput,
@@ -271,6 +271,7 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
         assigneeIds: workOrder.assignees.map((a) => a.userId),
         note,
         priority: workOrder.priority,
+        type: workOrder.type as WorkOrderType,
         ...context,
       },
     });
@@ -404,6 +405,7 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
       hasScheduledStart: Boolean(input.scheduledStart),
       hasScheduledEnd: Boolean(input.scheduledEnd),
       hasAssignedTechnician: Boolean(input.assigneeIds?.length),
+      hasEstimatedMinutes: Boolean(input.estimatedMinutes),
     },
     mutate: async (tx) => {
       // Primeiro id vira o responsável principal (assignedToId); os demais
@@ -415,6 +417,7 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
         scheduledStart: input.scheduledStart,
         scheduledEnd: input.scheduledEnd,
         assignedToId: principalId,
+        ...(input.estimatedMinutes !== undefined && { estimatedMinutes: input.estimatedMinutes }),
         assignees: {
           createMany: { data: supportIds.map((assigneeId) => ({ userId: assigneeId })), skipDuplicates: true },
         },
