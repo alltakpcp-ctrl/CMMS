@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import * as maintenancePlansApi from "../api/maintenancePlans";
 import * as assetsApi from "../api/assets";
+import { useTecnicos } from "../hooks/useTecnicos";
 import { Asset, MaintenancePlan } from "../types";
 import { MaintenanceDiscipline, MaintenancePeriodicity, Priority } from "../domain/enums";
 import { MAINTENANCE_DISCIPLINE_LABELS, MAINTENANCE_PERIODICITY_LABELS, PRIORITY_LABELS } from "../domain/labels";
@@ -10,6 +11,7 @@ import { Input } from "../components/Input";
 import { Textarea } from "../components/Textarea";
 import { Select } from "../components/Select";
 import { SearchableSelect } from "../components/SearchableSelect";
+import { MultiSearchableSelect } from "../components/MultiSearchableSelect";
 import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
@@ -27,7 +29,7 @@ interface FormState {
   description: string;
   priority: Priority;
   periodicity: MaintenancePeriodicity;
-  estimatedMinutes: string;
+  estimatedHours: string;
   responsible: string;
   action01: string;
   action02: string;
@@ -45,7 +47,7 @@ const emptyForm: FormState = {
   description: "",
   priority: Priority.MEDIA,
   periodicity: MaintenancePeriodicity.MENSAL,
-  estimatedMinutes: "",
+  estimatedHours: "",
   responsible: "",
   action01: "",
   action02: "",
@@ -63,8 +65,11 @@ function planToForm(plan: MaintenancePlan): FormState {
     title: plan.title,
     description: plan.description ?? "",
     priority: plan.priority,
-    periodicity: plan.periodicity,
-    estimatedMinutes: plan.estimatedMinutes?.toString() ?? "",
+    // Plano rascunho (periodicity null) ainda não tem periodicidade — usa
+    // MENSAL como valor inicial no form, mas isEditingDraft (ver abaixo) força
+    // o usuário a escolher explicitamente antes de salvar.
+    periodicity: plan.periodicity ?? MaintenancePeriodicity.MENSAL,
+    estimatedHours: plan.estimatedHours?.toString() ?? "",
     responsible: plan.responsible ?? "",
     action01: plan.action01 ?? "",
     action02: plan.action02 ?? "",
@@ -79,6 +84,8 @@ function planToForm(plan: MaintenancePlan): FormState {
 export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePlanModalProps) {
   const { token } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { tecnicos } = useTecnicos();
+  const tecnicoOptions = tecnicos.map((t) => ({ value: t.id, label: t.name }));
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
@@ -86,6 +93,12 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
   const [form, setForm] = useState<FormState>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Só usados na criação — gera a 1ª OS (já PROGRAMADA) junto com o plano.
+  // Editar um plano existente não agenda uma nova OS.
+  const [scheduledStart, setScheduledStart] = useState("");
+  const [scheduledEnd, setScheduledEnd] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -109,6 +122,10 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (!planId && assigneeIds.length === 0) {
+      showError("Selecione ao menos um técnico responsável.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -118,7 +135,7 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
         description: form.description || undefined,
         priority: form.priority,
         periodicity: form.periodicity,
-        estimatedMinutes: form.estimatedMinutes ? Number(form.estimatedMinutes) : undefined,
+        estimatedHours: Number(form.estimatedHours),
         responsible: form.responsible || undefined,
         action01: form.action01 || undefined,
         action02: form.action02 || undefined,
@@ -131,8 +148,13 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
         await maintenancePlansApi.updateMaintenancePlan(token, planId, { ...payload, active: form.active });
         showSuccess("Plano de manutenção atualizado.");
       } else {
-        await maintenancePlansApi.createMaintenancePlan(token, payload);
-        showSuccess("Plano de manutenção criado.");
+        const { workOrder } = await maintenancePlansApi.createMaintenancePlan(token, {
+          ...payload,
+          scheduledStart: new Date(scheduledStart).toISOString(),
+          scheduledEnd: new Date(scheduledEnd).toISOString(),
+          assigneeIds,
+        });
+        showSuccess(`Plano criado e OS ${workOrder.number} gerada e programada com sucesso.`);
       }
       onSaved();
       onClose();
@@ -230,11 +252,13 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
           </Select>
 
           <Input
-            label="Tempo estimado (minutos, opcional)"
+            label="Tempo estimado (horas)"
             type="number"
-            min={1}
-            value={form.estimatedMinutes}
-            onChange={(e) => setForm({ ...form, estimatedMinutes: e.target.value })}
+            min={0.25}
+            step={0.25}
+            value={form.estimatedHours}
+            onChange={(e) => setForm({ ...form, estimatedHours: e.target.value })}
+            required
           />
 
           <Input
@@ -242,6 +266,35 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
             value={form.responsible}
             onChange={(e) => setForm({ ...form, responsible: e.target.value })}
           />
+
+          {!planId && (
+            <div className="space-y-4 rounded border border-slate-200 p-3">
+              <p className="text-sm font-medium text-slate-700">
+                Agendamento da 1ª OS (gerada junto com o plano, já programada)
+              </p>
+              <Input
+                label="Início"
+                type="datetime-local"
+                value={scheduledStart}
+                onChange={(e) => setScheduledStart(e.target.value)}
+                required
+              />
+              <Input
+                label="Fim estimado"
+                type="datetime-local"
+                value={scheduledEnd}
+                onChange={(e) => setScheduledEnd(e.target.value)}
+                required
+              />
+              <MultiSearchableSelect
+                label="Técnico(s) responsável(is)"
+                value={assigneeIds}
+                onChange={setAssigneeIds}
+                options={tecnicoOptions}
+                placeholder="Buscar técnico…"
+              />
+            </div>
+          )}
 
           <div>
             <p className="mb-2 text-sm font-medium text-slate-700">Ações do checklist (opcionais)</p>

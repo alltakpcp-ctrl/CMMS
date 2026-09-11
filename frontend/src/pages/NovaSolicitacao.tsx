@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Disciplina, Priority, Role, WorkOrderType } from "../domain/enums";
 import { DISCIPLINA_LABELS, PRIORITY_LABELS, TYPE_LABELS } from "../domain/labels";
@@ -15,35 +14,19 @@ import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
 
-// Pré-preenchimento vindo do calendário de preventivas (Agenda), a partir de
-// um MaintenancePlan vencido — ver MaintenanceCalendar.tsx#handleOpenWorkOrder.
-// Só os campos com equivalência direta no plano; sem maintenancePlanId (o
-// schema de createWorkOrder não aceita esse campo hoje).
-export interface NovaSolicitacaoPrefill {
-  type: WorkOrderType;
-  disciplina: Disciplina;
-  priority: Priority;
-  title: string;
-  description?: string;
-  assetId: string;
-}
-
 export default function NovaSolicitacao() {
   const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const prefill = location.state as NovaSolicitacaoPrefill | null;
 
   const isOperadorSemSetor = user?.role === Role.OPERADOR && !user.sectorId;
 
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [type, setType] = useState<WorkOrderType>(prefill?.type ?? WorkOrderType.CORRETIVA);
-  const [disciplina, setDisciplina] = useState<Disciplina>(prefill?.disciplina ?? Disciplina.ELETRICA);
-  const [priority, setPriority] = useState<Priority>(prefill?.priority ?? Priority.MEDIA);
-  const [title, setTitle] = useState(prefill?.title ?? "");
-  const [description, setDescription] = useState(prefill?.description ?? "");
-  const [assetId, setAssetId] = useState(prefill?.assetId ?? "");
+  const [type, setType] = useState<WorkOrderType>(WorkOrderType.CORRETIVA);
+  const [disciplina, setDisciplina] = useState<Disciplina>(Disciplina.ELETRICA);
+  const [priority, setPriority] = useState<Priority>(Priority.MEDIA);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [assetId, setAssetId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 

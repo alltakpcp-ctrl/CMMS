@@ -11,7 +11,7 @@ import { Button } from "../../../components/Button";
 import { Modal } from "../../../components/Modal";
 import { useToast } from "../../../components/ToastProvider";
 import { getErrorMessage } from "../../../lib/errors";
-import { formatDuration, formatDateTime } from "../../../lib/format";
+import { formatDuration, formatDateTime, formatHours } from "../../../lib/format";
 import { AbrirSubtarefaForm } from "./AbrirSubtarefaForm";
 import { ReatribuirSubtarefaForm } from "./ReatribuirSubtarefaForm";
 
@@ -145,7 +145,7 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
                     </Badge>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Estimativa: {subtask.estimatedMinutes} min · Responsável:{" "}
+                    Estimativa: {formatHours(subtask.estimatedHours)} · Responsável:{" "}
                     {userNameById.get(subtask.assignedToId) ?? "—"}
                   </p>
                   <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">

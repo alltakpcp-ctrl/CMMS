@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import * as maintenancePlansApi from "../../api/maintenancePlans";
 import { MaintenancePlanWithDueDate } from "../../types";
-import { Priority, WorkOrderType } from "../../domain/enums";
+import { Priority } from "../../domain/enums";
 import { Button } from "../../components/Button";
+import { Modal } from "../../components/Modal";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { addDays, addMonths, getMonthMatrix, getWeekDays, isoDateKey, startOfToday } from "../../lib/calendar";
@@ -13,7 +13,7 @@ import { CalendarListView } from "./CalendarListView";
 import { CalendarSidebarFilters } from "./CalendarSidebarFilters";
 import { MaintenancePlanEventPopover } from "./MaintenancePlanEventPopover";
 import { MaintenancePlanModal } from "../MaintenancePlanModal";
-import { NovaSolicitacaoPrefill } from "../NovaSolicitacao";
+import { GerarOsForm } from "./GerarOsForm";
 
 type ModalState = { mode: "create" } | { mode: "edit"; planId: string };
 
@@ -45,16 +45,9 @@ function formatPeriodLabel(view: CalendarView, reference: Date): string {
   return `${startLabel} – ${endLabel}`;
 }
 
-interface MaintenanceCalendarProps {
-  // TECNICO só visualiza — sem criar/editar plano nem abrir OS a partir do
-  // calendário (POST /workorders é restrito a OPERADOR/SUPERVISOR no backend).
-  readOnly?: boolean;
-}
-
-export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarProps) {
+export function MaintenanceCalendar() {
   const { token } = useAuth();
-  const { showError } = useToast();
-  const navigate = useNavigate();
+  const { showError, showSuccess } = useToast();
 
   const [view, setView] = useState<CalendarView>("month");
   const [reference, setReference] = useState<Date>(startOfToday());
@@ -64,27 +57,16 @@ export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarPro
   const [excludedPriorities, setExcludedPriorities] = useState<Set<Priority>>(new Set());
   const [popover, setPopover] = useState<{ plan: MaintenancePlanWithDueDate; anchorRect: DOMRect } | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [generateModal, setGenerateModal] = useState<{ planId: string } | null>(null);
 
   function handleEventClick(plan: MaintenancePlanWithDueDate, anchorRect: DOMRect) {
     setPopover({ plan, anchorRect });
   }
 
-  // Pré-preenche a criação de OS a partir de um plano vencido — só os campos
-  // com equivalência direta (assetId/disciplina/priority/title/description).
-  // Sem encadeamento automático de planejamento: a OS nasce ABERTA e segue o
-  // fluxo manual normal. maintenancePlanId não é setado aqui — createWorkOrder
-  // (schema atual) não aceita esse campo, ver gap conhecido no resumo da tarefa.
-  function handleOpenWorkOrder(plan: MaintenancePlanWithDueDate) {
-    const prefill: NovaSolicitacaoPrefill = {
-      type: WorkOrderType.PREVENTIVA,
-      disciplina: plan.discipline,
-      priority: plan.priority,
-      title: plan.title,
-      description: plan.description ?? undefined,
-      assetId: plan.assetId,
-    };
-    setPopover(null);
-    navigate("/solicitacoes/nova", { state: prefill });
+  function handleGenerateOsSuccess(workOrder: { number: string }) {
+    setGenerateModal(null);
+    showSuccess(`OS ${workOrder.number} gerada e programada com sucesso.`);
+    reload();
   }
 
   function reload() {
@@ -133,10 +115,17 @@ export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarPro
     [plans, excludedAssetIds, excludedPriorities]
   );
 
+  // Planos rascunho (periodicity null — criados quando um OPERADOR abre uma
+  // OS PREVENTIVA sem plano prévio) não têm vencimento e não entram na grade
+  // do calendário; ficam numa lista à parte até o supervisor completar a
+  // periodicidade (editando o plano).
+  const draftPlans = useMemo(() => filteredPlans.filter((plan) => plan.dueDate === null), [filteredPlans]);
+  const scheduledPlans = useMemo(() => filteredPlans.filter((plan) => plan.dueDate !== null), [filteredPlans]);
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, MaintenancePlanWithDueDate[]>();
-    for (const plan of filteredPlans) {
-      const key = isoDateKey(plan.dueDate);
+    for (const plan of scheduledPlans) {
+      const key = isoDateKey(plan.dueDate as string);
       const list = map.get(key);
       if (list) {
         list.push(plan);
@@ -145,7 +134,7 @@ export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarPro
       }
     }
     return map;
-  }, [filteredPlans]);
+  }, [scheduledPlans]);
 
   const today = startOfToday();
 
@@ -170,7 +159,7 @@ export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarPro
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!readOnly && <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>}
+          <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>
 
           <div className="flex overflow-hidden rounded border border-slate-300">
             {(Object.keys(VIEW_LABELS) as CalendarView[]).map((v) => (
@@ -235,29 +224,61 @@ export function MaintenanceCalendar({ readOnly = false }: MaintenanceCalendarPro
         </div>
       </div>
 
+      {draftPlans.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-3">
+          <p className="mb-2 text-sm font-medium text-amber-900">
+            Rascunhos pendentes de periodicidade ({draftPlans.length})
+          </p>
+          <ul className="space-y-1">
+            {draftPlans.map((plan) => (
+              <li key={plan.id} className="flex items-center justify-between gap-2 text-sm text-amber-900">
+                <span>
+                  {plan.title} — {plan.asset.name}
+                </span>
+                <button
+                  className="text-amber-700 underline hover:text-amber-900"
+                  onClick={() => setModal({ mode: "edit", planId: plan.id })}
+                >
+                  Completar plano
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {popover && (
         <MaintenancePlanEventPopover
           plan={popover.plan}
           anchorRect={popover.anchorRect}
           onClose={() => setPopover(null)}
-          onEdit={
-            readOnly
-              ? undefined
-              : () => {
-                  setModal({ mode: "edit", planId: popover.plan.id });
-                  setPopover(null);
-                }
-          }
-          onOpenWorkOrder={readOnly ? undefined : () => handleOpenWorkOrder(popover.plan)}
+          onEdit={() => {
+            setModal({ mode: "edit", planId: popover.plan.id });
+            setPopover(null);
+          }}
+          onGenerateWorkOrder={() => {
+            setGenerateModal({ planId: popover.plan.id });
+            setPopover(null);
+          }}
         />
       )}
 
-      {!readOnly && modal && (
+      {modal && (
         <MaintenancePlanModal
           planId={modal.mode === "edit" ? modal.planId : undefined}
           onClose={() => setModal(null)}
           onSaved={reload}
         />
+      )}
+
+      {generateModal && (
+        <Modal title="Gerar OS a partir do plano" onClose={() => setGenerateModal(null)}>
+          <GerarOsForm
+            planId={generateModal.planId}
+            onSuccess={handleGenerateOsSuccess}
+            onClose={() => setGenerateModal(null)}
+          />
+        </Modal>
       )}
     </div>
   );

@@ -272,7 +272,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
       data: {
         workOrderId: id,
         title: "Troca de rolamento",
-        estimatedMinutes: 30,
+        estimatedHours: 0.5,
         createdById: tecnicoId,
         assignedToId: tecnicoId,
       },
@@ -294,14 +294,14 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
         {
           workOrderId: id,
           title: "Troca de rolamento",
-          estimatedMinutes: 30,
+          estimatedHours: 0.5,
           createdById: tecnicoId,
           assignedToId: tecnicoId,
         },
         {
           workOrderId: id,
           title: "Verificação elétrica",
-          estimatedMinutes: 20,
+          estimatedHours: 0.33,
           createdById: tecnicoId,
           assignedToId: tecnicoId,
         },
@@ -325,7 +325,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
       data: {
         workOrderId: id,
         title: "Subtask concluída",
-        estimatedMinutes: 15,
+        estimatedHours: 0.25,
         createdById: tecnicoId,
         assignedToId: tecnicoId,
         status: "CONCLUIDA",
@@ -338,7 +338,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
       data: {
         workOrderId: id,
         title: "Subtask cancelada",
-        estimatedMinutes: 15,
+        estimatedHours: 0.25,
         createdById: tecnicoId,
         assignedToId: tecnicoId,
         status: "CANCELADA",
@@ -385,7 +385,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
       data: {
         workOrderId: id,
         title: "Ajuste pendente encontrado na validação",
-        estimatedMinutes: 10,
+        estimatedHours: 0.17,
         createdById: tecnicoId,
         assignedToId: tecnicoId,
       },
@@ -406,7 +406,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
       data: {
         workOrderId: id,
         title: "Troca de rolamento",
-        estimatedMinutes: 30,
+        estimatedHours: 0.5,
         createdById: tecnicoId,
         assignedToId: tecnicoId,
       },

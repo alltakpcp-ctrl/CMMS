@@ -13,7 +13,7 @@ interface MaintenancePlanEventPopoverProps {
   anchorRect: DOMRect;
   onClose: () => void;
   onEdit?: () => void;
-  onOpenWorkOrder?: () => void;
+  onGenerateWorkOrder?: () => void;
 }
 
 function computeStyle(anchorRect: DOMRect): CSSProperties {
@@ -38,7 +38,7 @@ export function MaintenancePlanEventPopover({
   anchorRect,
   onClose,
   onEdit,
-  onOpenWorkOrder,
+  onGenerateWorkOrder,
 }: MaintenancePlanEventPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -115,9 +115,9 @@ export function MaintenancePlanEventPopover({
         </div>
       )}
 
-      {(onOpenWorkOrder || onEdit) && (
+      {(onGenerateWorkOrder || onEdit) && (
         <div className="mt-4 flex justify-end gap-2">
-          {plan.isOverdue && onOpenWorkOrder && <Button onClick={onOpenWorkOrder}>Abrir OS</Button>}
+          {plan.active && onGenerateWorkOrder && <Button onClick={onGenerateWorkOrder}>Gerar OS</Button>}
           {onEdit && (
             <Button variant="secondary" onClick={onEdit}>
               Editar

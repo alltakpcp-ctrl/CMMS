@@ -4,14 +4,14 @@ import { Subtask } from "../types";
 export interface CreateSubtaskInput {
   title: string;
   description?: string;
-  estimatedMinutes: number;
+  estimatedHours: number;
   assignedToId?: string;
 }
 
 export interface UpdateSubtaskInput {
   title?: string;
   description?: string;
-  estimatedMinutes?: number;
+  estimatedHours?: number;
   assignedToId?: string;
 }
 

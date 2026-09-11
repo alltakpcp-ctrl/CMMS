@@ -1,10 +1,19 @@
 import { Request, Response } from "express";
+import { AppError } from "../../lib/AppError";
 import {
   createMaintenancePlanSchema,
+  generateWorkOrderFromPlanSchema,
   listMaintenancePlansQuerySchema,
   updateMaintenancePlanSchema,
 } from "./schema";
 import * as maintenancePlansService from "./service";
+
+function requireUser(req: Request) {
+  if (!req.user) {
+    throw new AppError(401, "UNAUTHENTICATED", "Token de autenticação ausente.");
+  }
+  return req.user;
+}
 
 export async function listMaintenancePlansController(req: Request, res: Response) {
   const query = listMaintenancePlansQuerySchema.parse(req.query);
@@ -17,7 +26,8 @@ export async function getMaintenancePlanController(req: Request, res: Response) 
 
 export async function createMaintenancePlanController(req: Request, res: Response) {
   const input = createMaintenancePlanSchema.parse(req.body);
-  res.status(201).json(await maintenancePlansService.createMaintenancePlan(input));
+  const result = await maintenancePlansService.createMaintenancePlan(input, requireUser(req));
+  res.status(201).json(result);
 }
 
 export async function updateMaintenancePlanController(req: Request, res: Response) {
@@ -28,4 +38,14 @@ export async function updateMaintenancePlanController(req: Request, res: Respons
 export async function deleteMaintenancePlanController(req: Request, res: Response) {
   await maintenancePlansService.deleteMaintenancePlan(req.params.id);
   res.status(204).send();
+}
+
+export async function generateWorkOrderFromPlanController(req: Request, res: Response) {
+  const input = generateWorkOrderFromPlanSchema.parse(req.body);
+  const workOrder = await maintenancePlansService.generateWorkOrderFromExistingPlan(
+    req.params.id,
+    input,
+    requireUser(req)
+  );
+  res.status(201).json(workOrder);
 }

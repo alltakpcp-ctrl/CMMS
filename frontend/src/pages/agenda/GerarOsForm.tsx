@@ -1,23 +1,32 @@
 import { FormEvent, useState } from "react";
-import { useAuth } from "../../../auth/AuthContext";
-import { useTecnicos } from "../../../hooks/useTecnicos";
-import * as workOrdersApi from "../../../api/workorders";
-import { WorkOrderType } from "../../../domain/enums";
-import { Input } from "../../../components/Input";
-import { MultiSearchableSelect } from "../../../components/MultiSearchableSelect";
-import { Button } from "../../../components/Button";
-import { getErrorMessage } from "../../../lib/errors";
-import { ActionFormProps } from "./types";
+import { useAuth } from "../../auth/AuthContext";
+import { useTecnicos } from "../../hooks/useTecnicos";
+import * as maintenancePlansApi from "../../api/maintenancePlans";
+import { WorkOrder } from "../../types";
+import { Input } from "../../components/Input";
+import { MultiSearchableSelect } from "../../components/MultiSearchableSelect";
+import { Button } from "../../components/Button";
+import { getErrorMessage } from "../../lib/errors";
 
-export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
+interface GerarOsFormProps {
+  planId: string;
+  onSuccess: (workOrder: WorkOrder) => void;
+  onClose: () => void;
+}
+
+// Gera um novo ciclo de OS a partir de um plano de preventiva já existente
+// (POST /maintenance-plans/:id/gerar-os) — a OS nasce já PROGRAMADA, sem
+// passar por triagem/planejamento. Mesmos campos usados na criação do plano
+// (ver MaintenancePlanModal), só que aqui o plano (checklist/periodicidade)
+// já existe — só falta agendar o próximo ciclo.
+export function GerarOsForm({ planId, onSuccess, onClose }: GerarOsFormProps) {
   const { token } = useAuth();
   const { tecnicos } = useTecnicos();
   const tecnicoOptions = tecnicos.map((t) => ({ value: t.id, label: t.name }));
-  const isPreventiva = workOrder.type === WorkOrderType.PREVENTIVA;
+
   const [scheduledStart, setScheduledStart] = useState("");
   const [scheduledEnd, setScheduledEnd] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [estimatedHours, setEstimatedHours] = useState(workOrder.estimatedHours?.toString() ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,20 +37,15 @@ export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormPro
       setError("Selecione ao menos um técnico.");
       return;
     }
-    if (isPreventiva && !estimatedHours) {
-      setError("Tempo estimado do serviço é obrigatório para programar manutenção preventiva.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await workOrdersApi.programacao(token, workOrder.id, {
+      const workOrder = await maintenancePlansApi.generateWorkOrderFromPlan(token, planId, {
         scheduledStart: new Date(scheduledStart).toISOString(),
         scheduledEnd: new Date(scheduledEnd).toISOString(),
         assigneeIds,
-        estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
       });
-      onSuccess(updated);
+      onSuccess(workOrder);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -52,34 +56,25 @@ export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormPro
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input
-        label="Início programado"
+        label="Início"
         type="datetime-local"
         value={scheduledStart}
         onChange={(e) => setScheduledStart(e.target.value)}
         required
       />
       <Input
-        label="Fim programado"
+        label="Fim estimado"
         type="datetime-local"
         value={scheduledEnd}
         onChange={(e) => setScheduledEnd(e.target.value)}
         required
       />
       <MultiSearchableSelect
-        label="Técnicos"
+        label="Técnico(s) responsável(is)"
         value={assigneeIds}
         onChange={setAssigneeIds}
         options={tecnicoOptions}
         placeholder="Buscar técnico…"
-      />
-      <Input
-        label={`Tempo estimado do serviço (horas)${isPreventiva ? "" : " — opcional"}`}
-        type="number"
-        min={0.25}
-        step={0.25}
-        value={estimatedHours}
-        onChange={(e) => setEstimatedHours(e.target.value)}
-        required={isPreventiva}
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -89,7 +84,7 @@ export function ProgramacaoForm({ workOrder, onSuccess, onClose }: ActionFormPro
           Cancelar
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Salvando…" : "Confirmar programação"}
+          {submitting ? "Gerando…" : "Gerar OS"}
         </Button>
       </div>
     </form>

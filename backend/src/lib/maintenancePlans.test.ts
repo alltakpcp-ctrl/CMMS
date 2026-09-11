@@ -23,7 +23,7 @@ describe("calculateNextDueDate", () => {
       null,
       utc(2026, 1, 1)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 8).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2026, 1, 8).getTime());
     expect(result.isOverdue).toBe(false);
     expect(result.deadline).toBeNull();
   });
@@ -35,7 +35,7 @@ describe("calculateNextDueDate", () => {
       { finishedAt: utc(2026, 1, 2) },
       utc(2026, 1, 2)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 5).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2026, 1, 5).getTime());
   });
 
   it("empurra vencimento que cai em feriado fixo (25/12) para o próximo dia útil", () => {
@@ -45,8 +45,8 @@ describe("calculateNextDueDate", () => {
       utc(2025, 12, 25)
     );
     // raw = 25/12/2026 (Natal) — dueDate não pode cair nessa data.
-    expect(result.dueDate.getTime()).not.toBe(utc(2026, 12, 25).getTime());
-    expect(result.dueDate.getTime()).toBeGreaterThan(utc(2026, 12, 25).getTime());
+    expect(result.dueDate!.getTime()).not.toBe(utc(2026, 12, 25).getTime());
+    expect(result.dueDate!.getTime()).toBeGreaterThan(utc(2026, 12, 25).getTime());
   });
 
   it("empurra vencimento que cai em feriado móvel (Carnaval 2024) para o próximo dia útil", () => {
@@ -57,7 +57,7 @@ describe("calculateNextDueDate", () => {
       { finishedAt: utc(2024, 1, 13) },
       utc(2024, 1, 13)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2024, 2, 14).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2024, 2, 14).getTime());
   });
 
   it("empurra vencimento que cai em Sexta-Feira Santa (2024) para o próximo dia útil", () => {
@@ -68,7 +68,7 @@ describe("calculateNextDueDate", () => {
       { finishedAt: utc(2024, 3, 28) },
       utc(2024, 3, 28)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2024, 4, 1).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2024, 4, 1).getTime());
   });
 
   it("usa createdAt do plano quando nunca houve execução", () => {
@@ -77,7 +77,7 @@ describe("calculateNextDueDate", () => {
       null,
       utc(2026, 1, 1)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 8).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2026, 1, 8).getTime());
   });
 
   it("ignora createdAt quando há última execução válida", () => {
@@ -86,7 +86,7 @@ describe("calculateNextDueDate", () => {
       { finishedAt: utc(2026, 1, 1) },
       utc(2026, 1, 1)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 8).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2026, 1, 8).getTime());
   });
 
   it("marca como vencido (isOverdue) e calcula deadline como o próximo dia útil ESTRITAMENTE após o vencimento", () => {
@@ -97,8 +97,8 @@ describe("calculateNextDueDate", () => {
     );
     expect(result.isOverdue).toBe(true);
     expect(result.deadline).not.toBeNull();
-    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate.getTime());
-    expect(isBusinessDay(result.dueDate)).toBe(true);
+    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate!.getTime());
+    expect(isBusinessDay(result.dueDate!)).toBe(true);
     expect(isBusinessDay(result.deadline!)).toBe(true);
   });
 
@@ -111,11 +111,11 @@ describe("calculateNextDueDate", () => {
       null,
       utc(2026, 1, 20)
     );
-    expect(result.dueDate.getTime()).toBe(utc(2026, 1, 9).getTime());
+    expect(result.dueDate!.getTime()).toBe(utc(2026, 1, 9).getTime());
     expect(result.isOverdue).toBe(true);
     expect(result.deadline).not.toBeNull();
     expect(result.deadline!.getTime()).toBe(utc(2026, 1, 12).getTime());
-    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate.getTime());
+    expect(result.deadline!.getTime()).toBeGreaterThan(result.dueDate!.getTime());
   });
 
   it("não marca como vencido quando referenceDate é igual à data de vencimento", () => {

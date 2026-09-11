@@ -5,6 +5,7 @@ import { publicUserSelect } from "../../lib/publicUser";
 import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
+import { resolveAssigneeIds } from "../../lib/assignees";
 import { recordStockMovement } from "../stock/service";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
@@ -23,7 +24,10 @@ import {
   ValidarInput,
 } from "./schema";
 
-const workOrderInclude = {
+// Exportado para reaproveitar em maintenance-plans/service.ts, que também
+// cria/gera WorkOrder (geração automática a partir de um plano de preventiva)
+// e precisa devolver o mesmo formato usado pelo resto da API de OS.
+export const workOrderInclude = {
   asset: true,
   targetSector: true,
   requester: { select: publicUserSelect },
@@ -41,51 +45,6 @@ const workOrderInclude = {
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
 } satisfies Prisma.WorkOrderInclude;
-
-// Valida a lista de manutentores de apoio (assigneeIds) para planejamento()/
-// iniciar(): dedup, todos devem ser TECNICO ativo, e nenhum pode coincidir
-// com o responsável principal (rejectIds) — ou é removido da lista
-// silenciosamente quando for o próprio auto-atribuído (excludeIds), caso do
-// início imediato em iniciar().
-async function resolveAssigneeIds(
-  tx: Prisma.TransactionClient,
-  assigneeIds: string[],
-  options: { rejectIds?: Array<string | null | undefined>; excludeIds?: Array<string | null | undefined> } = {}
-): Promise<string[]> {
-  const excludeSet = new Set(options.excludeIds?.filter((id): id is string => Boolean(id)));
-  const rejectSet = new Set(options.rejectIds?.filter((id): id is string => Boolean(id)));
-
-  const deduped = Array.from(new Set(assigneeIds)).filter((id) => !excludeSet.has(id));
-
-  if (deduped.some((id) => rejectSet.has(id))) {
-    throw new AppError(
-      422,
-      "INVALID_ASSIGNEE",
-      "O responsável pela OS não pode constar também como manutentor de apoio."
-    );
-  }
-
-  if (deduped.length === 0) {
-    return [];
-  }
-
-  const found = await tx.user.findMany({
-    where: { id: { in: deduped } },
-    select: { id: true, role: true, active: true },
-  });
-  const validIds = new Set(found.filter((u) => u.role === Role.TECNICO && u.active).map((u) => u.id));
-  const allValid = deduped.every((id) => validIds.has(id));
-
-  if (!allValid) {
-    throw new AppError(
-      422,
-      "INVALID_ASSIGNEE",
-      "Todos os manutentores de apoio devem ser usuários TECNICO ativos."
-    );
-  }
-
-  return deduped;
-}
 
 export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
   const asset = await prisma.asset.findUnique({ where: { id: input.assetId } });
@@ -111,6 +70,34 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
   return prisma.$transaction(async (tx) => {
     const number = await generateWorkOrderNumber(tx);
 
+    // Vínculo reverso Agenda ⇄ OS: toda OS PREVENTIVA fica associada a um
+    // MaintenancePlan, mesmo quando aberta direto (não pela Agenda). Se já
+    // existe um plano ativo para o ativo+disciplina, vincula a ele; senão,
+    // cria um plano "rascunho" (sem periodicidade — o supervisor completa
+    // depois na Agenda) só para a OS aparecer no calendário de preventivas.
+    let maintenancePlanId: string | undefined;
+    if (input.type === WorkOrderType.PREVENTIVA) {
+      const existingPlan = await tx.maintenancePlan.findFirst({
+        where: { assetId: input.assetId, discipline: input.disciplina, active: true },
+        select: { id: true },
+      });
+      maintenancePlanId = existingPlan
+        ? existingPlan.id
+        : (
+            await tx.maintenancePlan.create({
+              data: {
+                assetId: input.assetId,
+                discipline: input.disciplina,
+                title: input.title,
+                description: input.description,
+                priority: input.priority,
+                periodicity: null,
+              },
+              select: { id: true },
+            })
+          ).id;
+    }
+
     const workOrder = await tx.workOrder.create({
       data: {
         number,
@@ -122,6 +109,7 @@ export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPay
         assetId: input.assetId,
         requesterId: user.userId,
         status: WorkOrderStatus.ABERTA,
+        maintenancePlanId,
       },
       select: { id: true },
     });
@@ -379,7 +367,7 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
 
       return {
         plan: input.plan,
-        estimatedMinutes: input.estimatedMinutes,
+        estimatedHours: input.estimatedHours,
         tools: input.tools,
         ppe: input.ppe,
         plannedPartItems: {
@@ -405,7 +393,7 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
       hasScheduledStart: Boolean(input.scheduledStart),
       hasScheduledEnd: Boolean(input.scheduledEnd),
       hasAssignedTechnician: Boolean(input.assigneeIds?.length),
-      hasEstimatedMinutes: Boolean(input.estimatedMinutes),
+      hasEstimatedHours: Boolean(input.estimatedHours),
     },
     mutate: async (tx) => {
       // Primeiro id vira o responsável principal (assignedToId); os demais
@@ -417,7 +405,7 @@ export function programacao(id: string, input: ProgramacaoInput, user: AuthPaylo
         scheduledStart: input.scheduledStart,
         scheduledEnd: input.scheduledEnd,
         assignedToId: principalId,
-        ...(input.estimatedMinutes !== undefined && { estimatedMinutes: input.estimatedMinutes }),
+        ...(input.estimatedHours !== undefined && { estimatedHours: input.estimatedHours }),
         assignees: {
           createMany: { data: supportIds.map((assigneeId) => ({ userId: assigneeId })), skipDuplicates: true },
         },

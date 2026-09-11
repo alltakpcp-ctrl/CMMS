@@ -31,7 +31,7 @@ export interface TriagemInput {
 
 export interface PlanejamentoInput {
   plan: string;
-  estimatedMinutes?: number;
+  estimatedHours?: number;
   plannedParts?: Array<{ partId: string; quantity: number }>;
   tools?: string[];
   ppe?: string[];
@@ -42,7 +42,7 @@ export interface ProgramacaoInput {
   scheduledStart: string;
   scheduledEnd: string;
   assigneeIds: string[];
-  estimatedMinutes?: number;
+  estimatedHours?: number;
 }
 
 export interface IniciarInput {

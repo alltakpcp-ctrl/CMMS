@@ -2,8 +2,17 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { calculateNextDueDate, DueDateResult } from "../../lib/maintenancePlans";
-import { MaintenancePeriodicity, WorkOrderStatus } from "../../domain/enums";
-import { CreateMaintenancePlanInput, ListMaintenancePlansQuery, UpdateMaintenancePlanInput } from "./schema";
+import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
+import { resolveAssigneeIds } from "../../lib/assignees";
+import { workOrderInclude } from "../workorders/service";
+import { AuthPayload } from "../../middlewares/authenticate";
+import { MaintenancePeriodicity, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import {
+  CreateMaintenancePlanInput,
+  GenerateWorkOrderFromPlanInput,
+  ListMaintenancePlansQuery,
+  UpdateMaintenancePlanInput,
+} from "./schema";
 
 async function assertAssetExists(assetId: string) {
   const asset = await prisma.asset.findUnique({ where: { id: assetId }, select: { id: true } });
@@ -20,9 +29,110 @@ export async function getMaintenancePlanById(id: string) {
   return plan;
 }
 
-export async function createMaintenancePlan(input: CreateMaintenancePlanInput) {
+// Núcleo compartilhado de "criar plano" (1º ciclo) e "gerar OS" (ciclos
+// seguintes): cria a WorkOrder já PROGRAMADA, vinculada ao plano, com o
+// responsável principal + apoio vindos de assigneeIds (mesmo padrão de
+// programacao() em workorders/service.ts). Não passa por
+// canTransition/applyTransition — atalho deliberado, mesmo espírito de
+// timelineOverride: quem agenda a preventiva já forneceu data/hora e
+// técnico, não faz sentido exigir triagem/planejamento manuais depois.
+async function generateWorkOrderFromPlan(
+  tx: Prisma.TransactionClient,
+  plan: { id: string; assetId: string; discipline: string; title: string; description: string | null; priority: string; estimatedHours: Prisma.Decimal | null; active: boolean },
+  input: GenerateWorkOrderFromPlanInput,
+  user: AuthPayload
+) {
+  if (!plan.active) {
+    throw new AppError(409, "PLAN_INACTIVE", "Plano de manutenção está inativo.");
+  }
+
+  const openWorkOrder = await tx.workOrder.findFirst({
+    where: {
+      maintenancePlanId: plan.id,
+      status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
+    },
+    select: { id: true, number: true },
+  });
+  if (openWorkOrder) {
+    throw new AppError(
+      409,
+      "PLAN_HAS_OPEN_WORK_ORDER",
+      `Já existe uma OS em aberto para este plano (${openWorkOrder.number}).`
+    );
+  }
+
+  const [principalId, ...supportIds] = await resolveAssigneeIds(tx, input.assigneeIds);
+
+  const number = await generateWorkOrderNumber(tx);
+
+  const workOrder = await tx.workOrder.create({
+    data: {
+      number,
+      type: WorkOrderType.PREVENTIVA,
+      disciplina: plan.discipline,
+      priority: plan.priority,
+      title: plan.title,
+      description: plan.description ?? "",
+      assetId: plan.assetId,
+      requesterId: user.userId,
+      status: WorkOrderStatus.PROGRAMADA,
+      maintenancePlanId: plan.id,
+      scheduledStart: input.scheduledStart,
+      scheduledEnd: input.scheduledEnd,
+      estimatedHours: plan.estimatedHours,
+      assignedToId: principalId,
+      assignees: { create: supportIds.map((assigneeId) => ({ userId: assigneeId })) },
+      numMaintainers: 1 + supportIds.length,
+    },
+    select: { id: true },
+  });
+
+  await tx.statusHistory.createMany({
+    data: [
+      { workOrderId: workOrder.id, fromStatus: null, toStatus: WorkOrderStatus.ABERTA, changedById: user.userId },
+      {
+        workOrderId: workOrder.id,
+        fromStatus: WorkOrderStatus.ABERTA,
+        toStatus: WorkOrderStatus.PROGRAMADA,
+        changedById: user.userId,
+        note: "Gerada automaticamente a partir do plano de manutenção preventiva.",
+      },
+    ],
+  });
+
+  return tx.workOrder.findUniqueOrThrow({ where: { id: workOrder.id }, include: workOrderInclude });
+}
+
+export async function createMaintenancePlan(input: CreateMaintenancePlanInput, user: AuthPayload) {
   await assertAssetExists(input.assetId);
-  return prisma.maintenancePlan.create({ data: input, include: { asset: true } });
+
+  return prisma.$transaction(async (tx) => {
+    const { scheduledStart, scheduledEnd, assigneeIds, ...planData } = input;
+
+    const plan = await tx.maintenancePlan.create({ data: planData, include: { asset: true } });
+    const workOrder = await generateWorkOrderFromPlan(
+      tx,
+      plan,
+      { scheduledStart, scheduledEnd, assigneeIds },
+      user
+    );
+
+    return { plan, workOrder };
+  });
+}
+
+export async function generateWorkOrderFromExistingPlan(
+  id: string,
+  input: GenerateWorkOrderFromPlanInput,
+  user: AuthPayload
+) {
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.maintenancePlan.findUnique({ where: { id } });
+    if (!plan) {
+      throw new AppError(404, "MAINTENANCE_PLAN_NOT_FOUND", "Plano de manutenção não encontrado.");
+    }
+    return generateWorkOrderFromPlan(tx, plan, input, user);
+  });
 }
 
 export async function updateMaintenancePlan(id: string, input: UpdateMaintenancePlanInput) {
@@ -96,7 +206,7 @@ export async function listMaintenancePlans(query: ListMaintenancePlansQuery) {
   return plans.map((plan) => {
     const lastFinishedAt = lastExecutionByPlanId.get(plan.id) ?? null;
     const dueDate: DueDateResult = calculateNextDueDate(
-      { id: plan.id, periodicity: plan.periodicity as MaintenancePeriodicity, createdAt: plan.createdAt },
+      { id: plan.id, periodicity: plan.periodicity as MaintenancePeriodicity | null, createdAt: plan.createdAt },
       lastFinishedAt ? { finishedAt: lastFinishedAt } : null
     );
     return { ...plan, ...dueDate };

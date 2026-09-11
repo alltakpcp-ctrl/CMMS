@@ -58,9 +58,13 @@ Setores de destino: **Mecânica**, **Elétrica**, **Predial**.
   devolução) é permitida a SUPERVISOR ou a TÉCNICO com a flag `canManageStock`, com
   observação (`reason`) obrigatória. **NÃO** há fluxo de aprovação de retirada nem
   perfil de almoxarife dedicado.
-- **Preventiva = abertura manual** no MVP. Deixar um campo/gancho no modelo
-  (`Asset.preventivePeriodicityDays`, opcional) preparado para futura automação,
-  mas **NÃO** implementar agendador/cron agora.
+- **Preventiva = sem cron/agendador automático** no MVP — o vencimento de um
+  `MaintenancePlan` é sempre calculado sob demanda (`lib/maintenancePlans.ts`),
+  nunca por um job em background. Dito isso, criar um `MaintenancePlan` (TECNICO
+  ou SUPERVISOR, via Agenda) **gera a 1ª OS na hora**, já `PROGRAMADA` (pula
+  triagem/planejamento — quem agenda já informa data/hora e técnico); ciclos
+  seguintes usam `POST /maintenance-plans/:id/gerar-os`. Ver §5 (`MaintenancePlan`)
+  e §6.
 
 ### Decisão de produção (deploy)
 - **Banco em produção = PostgreSQL no Neon.** SQLite fica APENAS para
@@ -120,7 +124,8 @@ Três perfis. Enum: `OPERADOR`, `TECNICO`, `SUPERVISOR`.
 | (1) Abrir solicitação | ✅ | ❌ | ✅ |
 | (2) Triagem / priorização | ❌ | ✅ | ✅ |
 | (2) Planejamento (peças, ferramentas, procedimentos) | ❌ | ✅ | ✅ |
-| (3) Programação / agendamento | ❌ | ❌ | ✅ |
+| (3) Programação / agendamento de OS corretiva/preditiva | ❌ | ❌ | ✅ |
+| Agenda de preventivas: criar plano (gera 1ª OS) / gerar novo ciclo | ❌ | ✅ | ✅ |
 | (4) Executar e registrar reparo | ❌ | ✅ | ❌ |
 | (5) Encerramento técnico | ❌ | ✅ | ❌ |
 | (5) Validar e dar baixa na OS | ❌ | ❌ | ✅ |
@@ -138,6 +143,10 @@ Três perfis. Enum: `OPERADOR`, `TECNICO`, `SUPERVISOR`.
   `EM_EXECUCAO` pelo próprio técnico (auto-atribuído, quando ainda não há
   assignedTo), sem passar pela programação do SUPERVISOR (ver §6 e
   `workOrderStateMachine.ts`).
+- Criar um `MaintenancePlan` (Agenda) é liberado a TECNICO **e** SUPERVISOR —
+  única exceção onde TECNICO participa da etapa (3), porque a ação já embute
+  agendamento completo (data/hora + técnico) e gera a OS na hora, `PROGRAMADA`.
+  Editar/desativar/excluir um plano existente continua SUPERVISOR-only.
 
 ---
 
@@ -174,7 +183,36 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
 - `scheduledStart` (datetime, opcional — etapa 3),
 - `scheduledEnd` (datetime, opcional — etapa 3),
 - `assignedToId` (→ User TECNICO, opcional — etapa 3),
+- `estimatedHours` (Decimal opcional — obrigatório apenas para PREVENTIVA na
+  programação; ver `workOrderStateMachine.ts`),
+- `maintenancePlanId` (→ MaintenancePlan, opcional — preenchido quando `type
+  = PREVENTIVA`: vinculado ao plano de origem se a OS foi gerada pela Agenda,
+  ou a um plano "rascunho" criado na hora se aberta direto sem plano prévio;
+  ver `MaintenancePlan` abaixo),
 - `createdAt`, `updatedAt`.
+
+### MaintenancePlan (plano de preventiva — agenda recorrente por ativo)
+- `id`, `assetId` (→ Asset), `discipline` (enum: MECANICA, ELETRICA, PREDIAL),
+  `title`, `description` (opcional), `priority`,
+- `periodicity` (enum: DIARIO, SEMANAL, MENSAL, TRIMESTRAL, SEMESTRAL, ANUAL —
+  **opcional**: `null` = plano "rascunho", criado automaticamente quando um
+  OPERADOR abre uma OS `PREVENTIVA` sem que exista plano prévio para o ativo;
+  supervisor completa a periodicidade depois, editando o plano),
+- `estimatedHours` (Decimal — obrigatório ao criar o plano pela Agenda; nulo
+  num plano rascunho até ser completado),
+- `responsible` (texto livre, opcional), `action01`..`action06` (checklist,
+  opcionais), `active` (bool, default true), `createdAt`, `updatedAt`.
+- Vencimento calculado sob demanda (`lib/maintenancePlans.ts`), nunca por cron
+  — próxima data = última `Execution` encerrada vinculada a uma `WorkOrder`
+  deste plano (ou `createdAt`, se nunca executado) + intervalo da
+  periodicidade. Plano rascunho (`periodicity = null`) não tem vencimento.
+- **Criar um plano gera a 1ª OS na hora**, já `PROGRAMADA` (pula
+  triagem/planejamento) — `POST /maintenance-plans` exige também
+  `scheduledStart`/`scheduledEnd`/`assigneeIds` só para essa geração, não
+  persistidos no plano. Ciclos seguintes usam `POST
+  /maintenance-plans/:id/gerar-os`, bloqueado (`409
+  PLAN_HAS_OPEN_WORK_ORDER`) enquanto existir uma OS do plano em status fora
+  de `ENCERRADA`/`CANCELADA`. Ver `maintenance-plans/service.ts`.
 
 ### Execution (registro de execução — 1:N com WorkOrder)
 - `id`, `workOrderId` (→ WorkOrder, **sem** unique — uma OS pode ter mais de um
@@ -192,8 +230,8 @@ Entidades e campos essenciais. Ajustar nomes de colunas para camelCase no Prisma
 
 ### Subtask (subtarefa dentro da OS — ortogonal a Execution)
 - `id`, `workOrderId` (→ WorkOrder, `onDelete: Cascade`),
-  `title`, `description` (opcional), `estimatedMinutes` (int, obrigatório na
-  abertura, min. 1 — estimativa que o técnico digita ao abrir),
+  `title`, `description` (opcional), `estimatedHours` (Decimal, obrigatório na
+  abertura — estimativa que o técnico digita ao abrir, em horas),
   `createdById` (→ User), `assignedToId` (→ User, obrigatório — dono atual da
   subtask), `finishedAt` (datetime, opcional), `createdAt`, `updatedAt`.
 - `status` (string validada via zod, nunca enum nativo — mesma decisão do §2):

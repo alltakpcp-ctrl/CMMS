@@ -54,8 +54,10 @@ export interface MaintenancePlan {
   title: string;
   description: string | null;
   priority: Priority;
-  periodicity: MaintenancePeriodicity;
-  estimatedMinutes: number | null;
+  // null = plano rascunho (criado a partir de uma OS PREVENTIVA aberta sem
+  // plano prévio) — sem periodicidade definida ainda.
+  periodicity: MaintenancePeriodicity | null;
+  estimatedHours: number | null;
   responsible: string | null;
   action01: string | null;
   action02: string | null;
@@ -71,7 +73,7 @@ export interface MaintenancePlan {
 // Retorno de GET /maintenance-plans (lista) — mesmo shape + campos calculados
 // por calculateNextDueDate no backend.
 export interface MaintenancePlanWithDueDate extends MaintenancePlan {
-  dueDate: string;
+  dueDate: string | null; // null quando periodicity é null (plano rascunho)
   isOverdue: boolean;
   deadline: string | null;
 }
@@ -126,7 +128,7 @@ export interface Subtask {
   title: string;
   description: string | null;
   status: SubtaskStatus;
-  estimatedMinutes: number;
+  estimatedHours: number;
   createdById: string;
   assignedToId: string;
   createdBy?: PublicUser;
@@ -227,7 +229,10 @@ export interface WorkOrder {
   plan: string | null;
   // Derivado no backend (assignees.length + 1) — não é mais um input do form.
   numMaintainers: number | null;
-  estimatedMinutes: number | null;
+  estimatedHours: number | null;
+  // Preenchido quando a OS é PREVENTIVA — vincula ao MaintenancePlan de
+  // origem (gerado pela Agenda ou criado como rascunho ao abrir a OS direto).
+  maintenancePlanId: string | null;
   tools: string[] | null;
   ppe: string[] | null;
   scheduledStart: string | null;

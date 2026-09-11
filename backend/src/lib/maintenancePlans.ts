@@ -9,7 +9,9 @@ import { nextBusinessDay } from "./businessDays";
 
 export interface MaintenancePlanForDueDate {
   id: string;
-  periodicity: MaintenancePeriodicity;
+  // null = plano rascunho (criado a partir de uma OS PREVENTIVA aberta sem
+  // plano prévio) — ainda sem periodicidade definida, não tem vencimento.
+  periodicity: MaintenancePeriodicity | null;
   createdAt: Date;
 }
 
@@ -21,7 +23,7 @@ export interface LastValidExecution {
 }
 
 export interface DueDateResult {
-  dueDate: Date; // já ajustada para o próximo dia útil, se necessário
+  dueDate: Date | null; // null quando o plano ainda não tem periodicidade (rascunho)
   isOverdue: boolean;
   deadline: Date | null; // só preenchido se isOverdue
 }
@@ -41,6 +43,10 @@ export function calculateNextDueDate(
   lastExecution: LastValidExecution | null,
   referenceDate: Date = new Date()
 ): DueDateResult {
+  if (!plan.periodicity) {
+    return { dueDate: null, isOverdue: false, deadline: null };
+  }
+
   const base = lastExecution?.finishedAt ?? plan.createdAt;
   const periodicityDays = PERIODICITY_DAYS[plan.periodicity];
 

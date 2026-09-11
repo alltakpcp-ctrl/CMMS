@@ -64,7 +64,7 @@ export async function createSubtask(workOrderId: string, input: CreateSubtaskInp
         workOrderId,
         title: input.title,
         description: input.description,
-        estimatedMinutes: input.estimatedMinutes,
+        estimatedHours: input.estimatedHours,
         createdById: user.userId,
         assignedToId,
       },
@@ -98,7 +98,7 @@ export async function updateSubtask(id: string, input: UpdateSubtaskInput, user:
     data: {
       title: input.title,
       description: input.description,
-      estimatedMinutes: input.estimatedMinutes,
+      estimatedHours: input.estimatedHours,
       assignedToId: input.assignedToId,
     },
   });

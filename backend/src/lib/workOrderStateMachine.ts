@@ -23,7 +23,7 @@ export interface TransitionContext {
   hasScheduledStart?: boolean;
   hasScheduledEnd?: boolean;
   hasAssignedTechnician?: boolean;
-  hasEstimatedMinutes?: boolean;
+  hasEstimatedHours?: boolean;
   priority?: string | null;
   type?: WorkOrderType;
 }
@@ -51,7 +51,7 @@ const TRANSITIONS: TransitionRule[] = [
     requiredContextFlags: ["hasScheduledStart", "hasScheduledEnd", "hasAssignedTechnician"],
     // Tempo estimado só é exigido para PREVENTIVA — corretiva/preditiva
     // seguem sem essa obrigatoriedade na programação.
-    guard: (context) => context.type !== WorkOrderType.PREVENTIVA || Boolean(context.hasEstimatedMinutes),
+    guard: (context) => context.type !== WorkOrderType.PREVENTIVA || Boolean(context.hasEstimatedHours),
     guardErrorCode: "MISSING_CONTEXT",
     guardErrorMessage: "Tempo estimado do serviço é obrigatório para programar manutenção preventiva.",
   },

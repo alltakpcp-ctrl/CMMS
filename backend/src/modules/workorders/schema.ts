@@ -37,7 +37,7 @@ export const planejamentoSchema = z.object({
   plan: z.string().min(1, "Plano é obrigatório."),
   // numMaintainers não é mais aceito como input — é derivado de
   // assigneeIds.length + 1 (responsável principal) em workorders/service.ts.
-  estimatedMinutes: z.number().int().positive().optional(),
+  estimatedHours: z.number().positive().optional(),
   plannedParts: z.array(plannedPartSchema).optional(),
   tools: z.array(z.string().min(1)).optional(),
   ppe: z.array(z.string().min(1)).optional(),
@@ -50,7 +50,7 @@ export const programacaoSchema = z.object({
   assigneeIds: z.array(z.string().min(1)).min(1, "Selecione ao menos um técnico."),
   // Obrigatório apenas para PREVENTIVA — reforçado em canTransition
   // (workOrderStateMachine.ts), que conhece o type da OS.
-  estimatedMinutes: z.number().int().positive().optional(),
+  estimatedHours: z.number().positive().optional(),
 });
 
 export const reprogramacaoSchema = z

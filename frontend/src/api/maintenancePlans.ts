@@ -1,15 +1,23 @@
 import { apiRequest } from "./client";
-import { MaintenancePlan, MaintenancePlanWithDueDate } from "../types";
+import { MaintenancePlan, MaintenancePlanWithDueDate, WorkOrder } from "../types";
 import { MaintenanceDiscipline, MaintenancePeriodicity, Priority } from "../domain/enums";
 
-export interface CreateMaintenancePlanInput {
+// Campos que geram a 1ª OS (já PROGRAMADA) junto com o plano — ver
+// GenerateWorkOrderFromPlanInput, reaproveitado também em "gerar-os".
+export interface GenerateWorkOrderFromPlanInput {
+  scheduledStart: string;
+  scheduledEnd: string;
+  assigneeIds: string[];
+}
+
+export interface CreateMaintenancePlanInput extends GenerateWorkOrderFromPlanInput {
   assetId: string;
   discipline: MaintenanceDiscipline;
   title: string;
   description?: string;
   priority: Priority;
   periodicity: MaintenancePeriodicity;
-  estimatedMinutes?: number;
+  estimatedHours: number;
   responsible?: string;
   action01?: string;
   action02?: string;
@@ -19,7 +27,15 @@ export interface CreateMaintenancePlanInput {
   action06?: string;
 }
 
-export type UpdateMaintenancePlanInput = Partial<CreateMaintenancePlanInput> & { active?: boolean };
+// Editar um plano não gera OS — sem os campos de agendamento.
+export type UpdateMaintenancePlanInput = Partial<Omit<CreateMaintenancePlanInput, keyof GenerateWorkOrderFromPlanInput>> & {
+  active?: boolean;
+};
+
+export interface CreateMaintenancePlanResult {
+  plan: MaintenancePlan;
+  workOrder: WorkOrder;
+}
 
 export interface ListMaintenancePlansQuery {
   assetId?: string;
@@ -47,7 +63,7 @@ export function getMaintenancePlan(token: string, id: string) {
 }
 
 export function createMaintenancePlan(token: string, input: CreateMaintenancePlanInput) {
-  return apiRequest<MaintenancePlan>("/maintenance-plans", { method: "POST", token, body: input });
+  return apiRequest<CreateMaintenancePlanResult>("/maintenance-plans", { method: "POST", token, body: input });
 }
 
 export function updateMaintenancePlan(token: string, id: string, input: UpdateMaintenancePlanInput) {
@@ -56,4 +72,8 @@ export function updateMaintenancePlan(token: string, id: string, input: UpdateMa
 
 export function deleteMaintenancePlan(token: string, id: string) {
   return apiRequest<null>(`/maintenance-plans/${id}`, { method: "DELETE", token });
+}
+
+export function generateWorkOrderFromPlan(token: string, id: string, input: GenerateWorkOrderFromPlanInput) {
+  return apiRequest<WorkOrder>(`/maintenance-plans/${id}/gerar-os`, { method: "POST", token, body: input });
 }

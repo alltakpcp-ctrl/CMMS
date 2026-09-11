@@ -19,7 +19,7 @@ export function AbrirSubtarefaForm({ workOrderId, onSuccess, onClose }: AbrirSub
   const { users } = useAssignableUsers();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [estimatedMinutes, setEstimatedMinutes] = useState(30);
+  const [estimatedHours, setEstimatedHours] = useState(0.5);
   const [assignedToId, setAssignedToId] = useState(user?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +33,7 @@ export function AbrirSubtarefaForm({ workOrderId, onSuccess, onClose }: AbrirSub
       await subtasksApi.createSubtask(token, workOrderId, {
         title,
         description: description || undefined,
-        estimatedMinutes,
+        estimatedHours,
         assignedToId: assignedToId || undefined,
       });
       onSuccess();
@@ -53,11 +53,12 @@ export function AbrirSubtarefaForm({ workOrderId, onSuccess, onClose }: AbrirSub
         onChange={(e) => setDescription(e.target.value)}
       />
       <Input
-        label="Estimativa (minutos)"
+        label="Estimativa (horas)"
         type="number"
-        min={1}
-        value={estimatedMinutes}
-        onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+        min={0.25}
+        step={0.25}
+        value={estimatedHours}
+        onChange={(e) => setEstimatedHours(Number(e.target.value))}
         required
       />
       <SearchableSelect

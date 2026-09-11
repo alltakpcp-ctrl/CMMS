@@ -9,7 +9,7 @@ import { Table } from "../../components/Table";
 import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { Card } from "../../components/Card";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, formatHours } from "../../lib/format";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { MaintenanceCalendar } from "./MaintenanceCalendar";
@@ -49,11 +49,11 @@ export default function PreventivasTecnico() {
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Preventivas</h1>
         <p className="text-sm text-slate-500">
-          Calendário de vencimentos dos planos de preventiva e suas OS já programadas.
+          Calendário de preventivas — adicione novas preventivas (gera a OS na hora) e veja as já programadas.
         </p>
       </div>
 
-      <MaintenanceCalendar readOnly />
+      <MaintenanceCalendar />
 
       <Card>
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Minhas OS preventivas programadas</h2>
@@ -74,7 +74,7 @@ export default function PreventivasTecnico() {
               { header: "Ativo", cell: (wo) => wo.asset.name },
               { header: "Início", cell: (wo) => formatDateTime(wo.scheduledStart) },
               { header: "Fim", cell: (wo) => formatDateTime(wo.scheduledEnd) },
-              { header: "Tempo estimado", cell: (wo) => (wo.estimatedMinutes ? `${wo.estimatedMinutes} min` : "—") },
+              { header: "Tempo estimado", cell: (wo) => formatHours(wo.estimatedHours) },
               {
                 header: "Status",
                 cell: (wo) => <Badge color={STATUS_COLORS[wo.status]}>{STATUS_LABELS[wo.status]}</Badge>,
