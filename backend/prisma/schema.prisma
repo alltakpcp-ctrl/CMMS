@@ -43,6 +43,8 @@ model User {
   subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
   subtasksClosedBy    Subtask[]       @relation("SubtaskClosedBy")
   purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
+  stockWithdrawalRequestsCreated  StockWithdrawalRequest[] @relation("stockWithdrawalRequestsCreated")
+  stockWithdrawalRequestsReviewed StockWithdrawalRequest[] @relation("stockWithdrawalRequestsReviewed")
   permissoesTrabalhoAprovadas PermissaoTrabalho[] @relation("PermissaoTrabalhoApprovedBy")
   assinaturasPT          PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaUser")
   assinaturasPTSolicitadas PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaRequestedBy")
@@ -132,6 +134,7 @@ model Part {
   partRequests     PartRequest[]
   plannedPartItems WorkOrderPlannedPart[]
   stockMovements   StockMovement[]
+  stockWithdrawalRequestItems StockWithdrawalRequestItem[]
 }
 
 model WorkOrder {
@@ -181,6 +184,7 @@ model WorkOrder {
   plannedPartItems WorkOrderPlannedPart[]
   assignees        WorkOrderAssignee[]
   stockMovements   StockMovement[]
+  stockWithdrawalRequests StockWithdrawalRequest[]
   subtasks         Subtask[]
   permissaoTrabalho PermissaoTrabalho?
 }
@@ -263,6 +267,8 @@ model Subtask {
   closedBy         User?     @relation("SubtaskClosedBy", fields: [closedById], references: [id])
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  stockWithdrawalRequests StockWithdrawalRequest[]
 
   @@index([workOrderId])
   @@index([assignedToId])
@@ -419,6 +425,46 @@ model PurchaseOrderComment {
   body            String
   supplierName    String?
   createdAt       DateTime      @default(now())
+}
+
+// Solicitação de baixa de estoque — status é String validada via zod, mesma
+// decisão de §2 do CLAUDE.md. Criada sempre que uma OS é encerrada
+// tecnicamente ou uma subtarefa é concluída (workorders/service.ts#encerramentoTecnico,
+// subtasks/service.ts#finishSubtask), declarando peças consumidas ou
+// notApplicable=true (nesse caso já nasce com status=APROVADA, pois não há
+// nada para o almoxarife revisar). O débito de estoque em si (recordStockMovement)
+// só acontece quando um usuário com a flag canManageStock aprova uma request
+// PENDENTE — ver stock-withdrawals/service.ts.
+model StockWithdrawalRequest {
+  id            String    @id @default(cuid())
+  workOrderId   String
+  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id])
+  subtaskId     String?
+  subtask       Subtask?  @relation(fields: [subtaskId], references: [id])
+  status        String    @default("PENDENTE") // PENDENTE | APROVADA | REJEITADA
+  notApplicable Boolean   @default(false)
+  requestedById String
+  requestedBy   User      @relation("stockWithdrawalRequestsCreated", fields: [requestedById], references: [id])
+  reviewedById  String?
+  reviewedBy    User?     @relation("stockWithdrawalRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNotes   String?
+  items         StockWithdrawalRequestItem[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workOrderId])
+  @@index([subtaskId])
+  @@index([status])
+}
+
+model StockWithdrawalRequestItem {
+  id        String                 @id @default(cuid())
+  requestId String
+  request   StockWithdrawalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  partId    String
+  part      Part                   @relation(fields: [partId], references: [id])
+  quantity  Int
 }
 
 // status é String validada via zod, nunca enum nativo — mesma decisão de §2

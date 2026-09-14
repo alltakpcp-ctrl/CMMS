@@ -77,12 +77,27 @@ Além do ciclo de OS, o sistema também cobre:
   `unitCost`, `location`, `sectorId` opcional, `active`). Toda alteração de
   saldo grava um `StockMovement` (kardex auditável) na MESMA transação, via
   helper `recordStockMovement(tx, input)` — nunca increment/decrement, sempre
-  valor absoluto; saldo negativo é bloqueado (422 `INSUFFICIENT_STOCK`). A
-  baixa por execução de OS é automática (tipo `SAIDA`). Movimentação manual
-  (entrada, ajuste, devolução) é permitida a SUPERVISOR ou a TÉCNICO com a
-  flag `canManageStock` (`supervisorOrCanManageStock()`), com `reason`
-  obrigatório. **Não** há perfil de almoxarife dedicado — é uma flag no
-  `User`, não um role.
+  valor absoluto; saldo negativo é bloqueado (422 `INSUFFICIENT_STOCK`).
+  Movimentação manual (entrada, ajuste, devolução) é permitida a SUPERVISOR
+  ou a TÉCNICO com a flag `canManageStock` (`supervisorOrCanManageStock()`),
+  com `reason` obrigatório. **Não** há perfil de almoxarife dedicado — é uma
+  flag no `User`, não um role.
+- **Consumo de peças = declaração obrigatória + aprovação, não baixa direta.**
+  Ao encerrar tecnicamente uma OS (`encerramentoTecnico`) ou concluir uma
+  subtarefa (`finishSubtask`), o técnico é obrigado a declarar peças usadas
+  (`parts`) ou marcar `partsNotApplicable` — o schema zod rejeita (400) se
+  nenhum dos dois vier preenchido. Essa declaração cria um
+  `StockWithdrawalRequest` (`stock-withdrawals/service.ts#createWithdrawalRequest`),
+  dentro da MESMA transação da transição/conclusão — não existe caminho para
+  encerrar sem declarar. Quando `notApplicable`, a request já nasce
+  `APROVADA` (nada a revisar). Quando há itens, nasce `PENDENTE` e só
+  debita o estoque de fato (`recordStockMovement`, cria `WorkOrderPart`)
+  quando alguém com `canManageStock` aprova via
+  `POST /stock-withdrawals/:id/review` (aba "Aprovações de baixa" em
+  `/estoque`) — rejeitar não debita, só grava o motivo. A checagem de saldo
+  insuficiente (`422 INSUFFICIENT_STOCK`) acontece nesse momento de
+  aprovação, não na declaração. A OS/subtarefa segue seu fluxo normal
+  (encerra/valida) independente do status da aprovação — são assíncronos.
 - **Preventiva = sem cron/agendador automático.** O vencimento de um
   `MaintenancePlan` é sempre calculado sob demanda (`lib/maintenancePlans.ts`),
   nunca por job em background. Criar um `MaintenancePlan` (TECNICO ou
@@ -129,6 +144,7 @@ Além do ciclo de OS, o sistema também cobre:
 │   │   │   ├── shifts/
 │   │   │   ├── parts/
 │   │   │   ├── stock/
+│   │   │   ├── stock-withdrawals/  # fila de aprovação de baixa (canManageStock) — ver §2
 │   │   │   ├── part-requests/
 │   │   │   ├── purchase-orders/
 │   │   │   ├── workorders/         # inclui publicController/publicRoutes (quadro público de login)
@@ -211,6 +227,7 @@ específicas via middleware dedicado (não via `authorize(role)`):
 | Cadastros (ativos, setores, usuários) | ❌ | ❌ | ✅ |
 | Cadastro de peças (criar/editar/excluir) | ❌ | 🔓 com `canManageStock` | ✅ |
 | Estoque (consulta) | ❌ | ✅ | ✅ |
+| Aprovar/rejeitar baixa de estoque (aba "Aprovações de baixa") | ❌ | 🔓 com `canManageStock` | ✅ |
 | Pedidos de compra — montar a partir de indicações | ❌ | 🔓 com `canReceivePartRequests` | 🔓 com `canReceivePartRequests` |
 | Pedidos de compra — revisar (`/pedidos/revisao`) | ❌ | ❌ | ✅ |
 | Pedidos de compra — comprar (`/pedidos/compras`) | ❌ | 🔓 com `canPurchase` | 🔓 com `canPurchase` |
@@ -342,6 +359,9 @@ na UI.
 `closedById`? (→ User), `createdAt`, `updatedAt`. `finishedAt` é
 **`@deprecated`** (só CONCLUIDA, substituído por `closedAt`/`closedById`).
 - `status`: `ABERTA` (default) → `CONCLUIDA` | `CANCELADA`, só a partir de `ABERTA`.
+  Concluir (`finishSubtask`) exige declarar consumo de peças (`parts` ou
+  `partsNotApplicable`, mesma regra da OS — ver §2), criando uma
+  `StockWithdrawalRequest` vinculada via `subtaskId`; cancelar não exige.
 - **Hard-block:** a OS não pode ir para `AGUARDANDO_VALIDACAO` nem
   `ENCERRADA` enquanto houver subtask `ABERTA` — `422 HAS_OPEN_SUBTASKS`,
   checado em `workorders/service.ts#applyTransition` antes de ambas as
@@ -353,9 +373,25 @@ na UI.
   TECNICO/SUPERVISOR.
 
 ### WorkOrderPart / WorkOrderPlannedPart
-`WorkOrderPart` = peças efetivamente usadas na execução (baixa via
-`recordStockMovement`, tipo `SAIDA`). `WorkOrderPlannedPart` = peças
-planejadas na etapa 2 (sem baixa de estoque ainda).
+`WorkOrderPart` = peças efetivamente usadas, criado somente quando a
+`StockWithdrawalRequest` correspondente é APROVADA (ver abaixo) — não mais
+criado direto no encerramento técnico. `WorkOrderPlannedPart` = peças
+planejadas na etapa 2 (sem baixa de estoque, sem relação com a aprovação).
+
+### StockWithdrawalRequest / StockWithdrawalRequestItem (solicitação de baixa)
+Criada obrigatoriamente ao encerrar tecnicamente uma OS ou concluir uma
+subtarefa (ver §2 "Consumo de peças"). `StockWithdrawalRequest`: `id`,
+`workOrderId` (→ WorkOrder, sempre preenchido), `subtaskId`? (→ Subtask,
+preenchido só quando a origem foi a conclusão de uma subtarefa), `status`
+(PENDENTE | APROVADA | REJEITADA), `notApplicable` (bool — true quando o
+usuário declarou que não usou peças; nesse caso a request já nasce
+APROVADA), `requestedById` (→ User), `reviewedById`?/`reviewedAt`?/
+`reviewNotes`? (preenchidos por quem tem `canManageStock` ao revisar),
+`items` (→ StockWithdrawalRequestItem[]), `createdAt`, `updatedAt`.
+`StockWithdrawalRequestItem`: `id`, `requestId`, `partId` (→ Part),
+`quantity`. Aprovar dispara `recordStockMovement` (tipo SAIDA) + cria
+`WorkOrderPart` para cada item; rejeitar só grava `reviewNotes`, sem tocar
+em estoque.
 
 ### StockMovement (kardex / livro-razão de estoque)
 `id`, `partId` (→ Part), `type` (ENTRADA | SAIDA | AJUSTE | DEVOLUCAO),
@@ -426,7 +462,7 @@ para `CANCELADA` (somente SUPERVISOR, com nota obrigatória).
 | TRIAGEM | EM_EXECUCAO | TECNICO | atalho: pula a programação do supervisor (qualquer prioridade) |
 | PLANEJADA | EM_EXECUCAO | TECNICO | mesmo atalho, quando já houve planejamento |
 | PROGRAMADA | EM_EXECUCAO | TECNICO (assignedTo ou apoio) | cria Execution, `startedAt = now()`, registra `startedById`/`startNote` |
-| EM_EXECUCAO | AGUARDANDO_VALIDACAO | TECNICO (assignedTo ou apoio) | preenche registro/peças; `finishedAt = now()`; **bloqueado** por `422 HAS_OPEN_SUBTASKS` se houver subtask ABERTA |
+| EM_EXECUCAO | AGUARDANDO_VALIDACAO | TECNICO (assignedTo ou apoio) | `finishedAt = now()`; **exige declarar consumo de peças** (`parts` ou `partsNotApplicable` — `400` se nenhum vier, ver §2) e cria a `StockWithdrawalRequest`; **bloqueado** por `422 HAS_OPEN_SUBTASKS` se houver subtask ABERTA |
 | AGUARDANDO_VALIDACAO | ENCERRADA | SUPERVISOR | valida e dá baixa; **mesmo bloqueio** de subtask aberta |
 | AGUARDANDO_VALIDACAO | EM_EXECUCAO | SUPERVISOR | reprova validação, nota obrigatória, reabre Execution |
 | qualquer (≠ ENCERRADA/CANCELADA) | CANCELADA | SUPERVISOR | nota obrigatória |

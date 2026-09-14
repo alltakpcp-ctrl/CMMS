@@ -77,6 +77,22 @@ export const registrarSchema = z
   .object({
     rootCause: z.string().min(1).optional(),
     repairDescription: z.string().min(1).optional(),
+  })
+  .refine((data) => Boolean(data.rootCause?.trim()) || Boolean(data.repairDescription?.trim()), {
+    message: "Informe a causa raiz e/ou a descrição do reparo.",
+  });
+
+// Peças usadas passam a ser declaradas só aqui (não mais em registrar()):
+// o consumo de peças virou obrigatório no encerramento técnico — ou informa
+// ao menos 1 peça, ou marca partsNotApplicable. A declaração gera uma
+// StockWithdrawalRequest (ver stock-withdrawals/service.ts#createWithdrawalRequest);
+// o débito de estoque em si só acontece quando o almoxarife aprovar.
+export const encerramentoTecnicoSchema = z
+  .object({
+    testNotes: z.string().min(1, "Notas de teste são obrigatórias."),
+    cleanupDone: z.boolean(),
+    endNote: z.string().trim().min(1).optional(),
+    outcome: z.nativeEnum(ExecutionOutcome).optional(),
     parts: z
       .array(
         z.object({
@@ -85,17 +101,12 @@ export const registrarSchema = z
         })
       )
       .optional(),
+    partsNotApplicable: z.boolean().optional(),
   })
-  .refine((data) => Boolean(data.rootCause?.trim()) || Boolean(data.repairDescription?.trim()), {
-    message: "Informe a causa raiz e/ou a descrição do reparo.",
+  .refine((data) => data.partsNotApplicable === true || (data.parts?.length ?? 0) > 0, {
+    message: "Informe as peças utilizadas ou marque que não houve consumo.",
+    path: ["parts"],
   });
-
-export const encerramentoTecnicoSchema = z.object({
-  testNotes: z.string().min(1, "Notas de teste são obrigatórias."),
-  cleanupDone: z.boolean(),
-  endNote: z.string().trim().min(1).optional(),
-  outcome: z.nativeEnum(ExecutionOutcome).optional(),
-});
 
 export const validarSchema = z
   .object({

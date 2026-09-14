@@ -13,6 +13,7 @@ import { shiftsRoutes } from "./modules/shifts/routes";
 import { partRequestsRoutes } from "./modules/part-requests/routes";
 import { purchaseOrdersRoutes } from "./modules/purchase-orders/routes";
 import { stockRoutes } from "./modules/stock/routes";
+import { stockWithdrawalsRoutes } from "./modules/stock-withdrawals/routes";
 import { subtaskNestedRoutes, subtaskRoutes } from "./modules/subtasks/routes";
 import { maintenancePlansRoutes } from "./modules/maintenance-plans/routes";
 import { errorHandler } from "./middlewares/errorHandler";
@@ -43,6 +44,7 @@ app.use("/shifts", shiftsRoutes);
 app.use("/part-requests", partRequestsRoutes);
 app.use("/purchase-orders", purchaseOrdersRoutes);
 app.use("/stock", stockRoutes);
+app.use("/stock-withdrawals", stockWithdrawalsRoutes);
 app.use("/subtasks", subtaskRoutes);
 app.use("/maintenance-plans", maintenancePlansRoutes);
 

@@ -15,6 +15,11 @@ export interface UpdateSubtaskInput {
   assignedToId?: string;
 }
 
+export interface FinishSubtaskInput {
+  parts?: Array<{ partId: string; quantity: number }>;
+  partsNotApplicable?: boolean;
+}
+
 export function listSubtasks(token: string, workOrderId: string) {
   return apiRequest<Subtask[]>(`/workorders/${workOrderId}/subtasks`, { token });
 }
@@ -27,8 +32,8 @@ export function updateSubtask(token: string, id: string, input: UpdateSubtaskInp
   return apiRequest<Subtask>(`/subtasks/${id}`, { method: "PATCH", token, body: input });
 }
 
-export function finishSubtask(token: string, id: string) {
-  return apiRequest<Subtask>(`/subtasks/${id}/finish`, { method: "POST", token });
+export function finishSubtask(token: string, id: string, input: FinishSubtaskInput) {
+  return apiRequest<Subtask>(`/subtasks/${id}/finish`, { method: "POST", token, body: input });
 }
 
 export function cancelSubtask(token: string, id: string) {

@@ -18,5 +18,26 @@ export const updateSubtaskSchema = z.object({
   assignedToId: z.string().min(1).optional(),
 });
 
+// Consumo de peças declarado obrigatoriamente ao concluir (não ao cancelar) —
+// mesma regra do encerramento técnico da OS (workorders/schema.ts). Gera uma
+// StockWithdrawalRequest (ver stock-withdrawals/service.ts#createWithdrawalRequest).
+export const finishSubtaskSchema = z
+  .object({
+    parts: z
+      .array(
+        z.object({
+          partId: z.string().min(1),
+          quantity: z.number().int().positive(),
+        })
+      )
+      .optional(),
+    partsNotApplicable: z.boolean().optional(),
+  })
+  .refine((data) => data.partsNotApplicable === true || (data.parts?.length ?? 0) > 0, {
+    message: "Informe as peças utilizadas ou marque que não houve consumo.",
+    path: ["parts"],
+  });
+
 export type CreateSubtaskInput = z.infer<typeof createSubtaskSchema>;
 export type UpdateSubtaskInput = z.infer<typeof updateSubtaskSchema>;
+export type FinishSubtaskInput = z.infer<typeof finishSubtaskSchema>;

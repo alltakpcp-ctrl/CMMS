@@ -72,6 +72,13 @@ export const PurchaseOrderStatus = {
 } as const;
 export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
 
+export const StockWithdrawalStatus = {
+  PENDENTE: "PENDENTE",
+  APROVADA: "APROVADA",
+  REJEITADA: "REJEITADA",
+} as const;
+export type StockWithdrawalStatus = (typeof StockWithdrawalStatus)[keyof typeof StockWithdrawalStatus];
+
 export const StockMovementType = {
   ENTRADA: "ENTRADA",
   SAIDA: "SAIDA",

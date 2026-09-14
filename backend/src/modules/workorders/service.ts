@@ -6,7 +6,7 @@ import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
 import { resolveAssigneeIds } from "../../lib/assignees";
-import { recordStockMovement } from "../stock/service";
+import { createWithdrawalRequest } from "../stock-withdrawals/service";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 import {
@@ -44,6 +44,7 @@ export const workOrderInclude = {
   },
   parts: { include: { part: true } },
   plannedPartItems: { include: { part: true } },
+  stockWithdrawalRequests: { include: { items: { include: { part: true } } } },
 } satisfies Prisma.WorkOrderInclude;
 
 export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
@@ -545,8 +546,9 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
 }
 
 // Não é uma transição de status (permanece EM_EXECUCAO) — spec 02.8 separa o
-// registro de causa/reparo/peças (aqui) do fechamento técnico (encerramentoTecnico).
-// Por isso não passa pela máquina de estados nem grava StatusHistory.
+// registro de causa/reparo (aqui) do fechamento técnico (encerramentoTecnico).
+// Peças usadas são declaradas só no encerramento técnico (obrigatório lá),
+// não aqui. Por isso não passa pela máquina de estados nem grava StatusHistory.
 export async function registrar(id: string, input: RegistrarInput, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
     const workOrder = await tx.workOrder.findUnique({
@@ -599,30 +601,6 @@ export async function registrar(id: string, input: RegistrarInput, user: AuthPay
       },
     });
 
-    // GANCHO FUTURO (§5.6): a baixa abaixo é direta e imediata (decisão de MVP,
-    // §2 do CLAUDE.md). Um futuro perfil ALMOXARIFE entraria aqui como uma
-    // etapa intermediária de aprovação — em vez de decrementar `stockQty` na
-    // hora, criaria uma "solicitação de retirada" pendente, e só o almoxarife
-    // aprovando é que executaria o decremento. NÃO implementado no MVP.
-    for (const item of input.parts ?? []) {
-      const part = await tx.part.findUnique({ where: { id: item.partId } });
-      if (!part) {
-        throw new AppError(404, "PART_NOT_FOUND", `Peça ${item.partId} não encontrada.`);
-      }
-      if (part.stockQty < item.quantity) {
-        throw new AppError(422, "INSUFFICIENT_STOCK", `Saldo insuficiente para a peça ${part.description}.`);
-      }
-      await tx.workOrderPart.create({ data: { workOrderId: id, partId: item.partId, quantity: item.quantity } });
-      await recordStockMovement(tx, {
-        partId: item.partId,
-        type: "SAIDA",
-        quantity: item.quantity,
-        workOrderId: id,
-        userId: user.userId,
-        reason: "Baixa por execução de OS",
-      });
-    }
-
     return tx.workOrder.findUniqueOrThrow({ where: { id }, include: workOrderInclude });
   });
 }
@@ -652,6 +630,17 @@ export function encerramentoTecnico(id: string, input: EncerramentoTecnicoInput,
           endNote: input.endNote ?? null,
           outcome: input.outcome ?? null,
         },
+      });
+
+      // Declaração de consumo de peças obrigatória no encerramento técnico
+      // (encerramentoTecnicoSchema já garante parts ou partsNotApplicable).
+      // A OS segue seu fluxo normalmente — a baixa de estoque em si fica
+      // pendente de aprovação de quem tem canManageStock (ver §2 do CLAUDE.md).
+      await createWithdrawalRequest(tx, {
+        workOrderId: id,
+        requestedById: user.userId,
+        parts: input.parts,
+        notApplicable: input.partsNotApplicable,
       });
     },
   });

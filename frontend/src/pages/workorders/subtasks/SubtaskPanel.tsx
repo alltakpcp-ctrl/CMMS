@@ -14,8 +14,13 @@ import { getErrorMessage } from "../../../lib/errors";
 import { formatDuration, formatDateTime, formatHours } from "../../../lib/format";
 import { AbrirSubtarefaForm } from "./AbrirSubtarefaForm";
 import { ReatribuirSubtarefaForm } from "./ReatribuirSubtarefaForm";
+import { FinalizarSubtarefaForm } from "./FinalizarSubtarefaForm";
 
-type ModalState = { type: "abrir" } | { type: "reatribuir"; subtask: Subtask } | null;
+type ModalState =
+  | { type: "abrir" }
+  | { type: "reatribuir"; subtask: Subtask }
+  | { type: "finalizar"; subtask: Subtask }
+  | null;
 
 function diffMinutes(from: string, to: Date): number {
   return Math.floor((to.getTime() - new Date(from).getTime()) / 60000);
@@ -82,17 +87,6 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
     closeModal();
     showSuccess("Subtarefa atualizada com sucesso.");
     reloadSubtasks();
-  }
-
-  async function handleFinish(subtask: Subtask) {
-    if (!token) return;
-    try {
-      await subtasksApi.finishSubtask(token, subtask.id);
-      showSuccess("Subtarefa finalizada.");
-      reloadSubtasks();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    }
   }
 
   async function handleCancel(subtask: Subtask) {
@@ -172,7 +166,7 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
                     <Button variant="secondary" onClick={() => setModal({ type: "reatribuir", subtask })}>
                       Reatribuir
                     </Button>
-                    <Button variant="primary" onClick={() => handleFinish(subtask)}>
+                    <Button variant="primary" onClick={() => setModal({ type: "finalizar", subtask })}>
                       Finalizar
                     </Button>
                     <Button variant="danger" onClick={() => handleCancel(subtask)}>
@@ -194,6 +188,11 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
       {modal?.type === "reatribuir" && (
         <Modal title="Reatribuir subtarefa" onClose={closeModal}>
           <ReatribuirSubtarefaForm subtask={modal.subtask} onSuccess={handleModalSuccess} onClose={closeModal} />
+        </Modal>
+      )}
+      {modal?.type === "finalizar" && (
+        <Modal title="Finalizar subtarefa" onClose={closeModal}>
+          <FinalizarSubtarefaForm subtask={modal.subtask} onSuccess={handleModalSuccess} onClose={closeModal} />
         </Modal>
       )}
     </Card>

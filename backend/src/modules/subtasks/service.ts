@@ -2,7 +2,8 @@ import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
 import { AuthPayload } from "../../middlewares/authenticate";
 import { Role } from "../../domain/enums";
-import { CreateSubtaskInput, UpdateSubtaskInput } from "./schema";
+import { createWithdrawalRequest } from "../stock-withdrawals/service";
+import { CreateSubtaskInput, FinishSubtaskInput, UpdateSubtaskInput } from "./schema";
 
 // Dono (assignedToId) ou SUPERVISOR podem escrever; TECNICO fora da subtask é bloqueado.
 function assertOwnerOrSupervisor(subtask: { assignedToId: string }, user: AuthPayload) {
@@ -104,13 +105,23 @@ export async function updateSubtask(id: string, input: UpdateSubtaskInput, user:
   });
 }
 
-export async function finishSubtask(id: string, user: AuthPayload) {
+export async function finishSubtask(id: string, input: FinishSubtaskInput, user: AuthPayload) {
   const subtask = await getOpenSubtaskOrThrow(id);
   assertOwnerOrSupervisor(subtask, user);
 
-  return prisma.subtask.update({
-    where: { id },
-    data: { status: "CONCLUIDA", finishedAt: new Date(), closedAt: new Date(), closedById: user.userId },
+  return prisma.$transaction(async (tx) => {
+    await createWithdrawalRequest(tx, {
+      workOrderId: subtask.workOrderId,
+      subtaskId: id,
+      requestedById: user.userId,
+      parts: input.parts,
+      notApplicable: input.partsNotApplicable,
+    });
+
+    return tx.subtask.update({
+      where: { id },
+      data: { status: "CONCLUIDA", finishedAt: new Date(), closedAt: new Date(), closedById: user.userId },
+    });
   });
 }
 

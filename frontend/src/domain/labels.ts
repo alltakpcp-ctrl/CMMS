@@ -9,6 +9,7 @@ import {
   Role,
   StockMovementType,
   StockStatus,
+  StockWithdrawalStatus,
   SubtaskStatus,
   WorkOrderStatus,
   WorkOrderType,
@@ -108,6 +109,18 @@ export const PURCHASE_ORDER_STATUS_COLORS: Record<PurchaseOrderStatus, "slate" |
   DEVOLVIDO: "slate",
   REJEITADO: "red",
   ENVIADO_COMPRAS: "green",
+};
+
+export const STOCK_WITHDRAWAL_STATUS_LABELS: Record<StockWithdrawalStatus, string> = {
+  PENDENTE: "Aguardando aprovação",
+  APROVADA: "Aprovada",
+  REJEITADA: "Rejeitada",
+};
+
+export const STOCK_WITHDRAWAL_STATUS_COLORS: Record<StockWithdrawalStatus, "slate" | "amber" | "green" | "red"> = {
+  PENDENTE: "amber",
+  APROVADA: "green",
+  REJEITADA: "red",
 };
 
 export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {

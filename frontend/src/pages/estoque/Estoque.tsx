@@ -2,7 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as stockApi from "../../api/stock";
 import * as partsApi from "../../api/parts";
-import { Part, StockMovement } from "../../types";
+import * as stockWithdrawalsApi from "../../api/stockWithdrawals";
+import { Part, StockMovement, StockWithdrawalRequest } from "../../types";
 import { Role, StockStatus } from "../../domain/enums";
 import {
   STOCK_MOVEMENT_TYPE_COLORS,
@@ -58,7 +59,7 @@ export default function Estoque() {
   const { showError, showSuccess } = useToast();
   const podeMovimentar = user?.role === Role.SUPERVISOR || user?.canManageStock === true;
 
-  const [tab, setTab] = useState<"movimentacao" | "extrato">("movimentacao");
+  const [tab, setTab] = useState<"movimentacao" | "extrato" | "aprovacoes">("movimentacao");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -77,6 +78,12 @@ export default function Estoque() {
   const [ledger, setLedger] = useState<StockMovement[]>([]);
   const [loadingLedger, setLoadingLedger] = useState(false);
 
+  const [withdrawals, setWithdrawals] = useState<StockWithdrawalRequest[]>([]);
+  const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+  const [reviewing, setReviewing] = useState<StockWithdrawalRequest | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
   function reload() {
     if (!token) return;
     setLoading(true);
@@ -88,6 +95,44 @@ export default function Estoque() {
   }
 
   useEffect(reload, [token]);
+
+  function reloadWithdrawals() {
+    if (!token) return;
+    setLoadingWithdrawals(true);
+    stockWithdrawalsApi
+      .listPendingStockWithdrawals(token)
+      .then(setWithdrawals)
+      .catch((err) => showError(getErrorMessage(err)))
+      .finally(() => setLoadingWithdrawals(false));
+  }
+
+  useEffect(() => {
+    if (tab === "aprovacoes") reloadWithdrawals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, token]);
+
+  async function handleReviewWithdrawal(action: "APROVAR" | "REJEITAR") {
+    if (!token || !reviewing) return;
+    if (action === "REJEITAR" && !reviewNotes.trim()) {
+      showError("Motivo é obrigatório ao rejeitar.");
+      return;
+    }
+    setReviewSubmitting(true);
+    try {
+      await stockWithdrawalsApi.reviewStockWithdrawal(token, reviewing.id, {
+        action,
+        reviewNotes: reviewNotes.trim() || undefined,
+      });
+      showSuccess(action === "APROVAR" ? "Baixa aprovada — estoque atualizado." : "Solicitação rejeitada.");
+      setReviewing(null);
+      reloadWithdrawals();
+      reload();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
 
   function openModal(type: ModalType) {
     setEntryForm(emptyEntryForm);
@@ -280,6 +325,16 @@ export default function Estoque() {
         >
           Extrato
         </button>
+        {podeMovimentar && (
+          <button
+            onClick={() => setTab("aprovacoes")}
+            className={`px-4 py-2 text-sm font-medium ${
+              tab === "aprovacoes" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Aprovações de baixa
+          </button>
+        )}
       </div>
 
       {tab === "movimentacao" && (
@@ -380,6 +435,87 @@ export default function Estoque() {
             />
           )}
         </div>
+      )}
+
+      {tab === "aprovacoes" && podeMovimentar && (
+        <div className="space-y-4">
+          {loadingWithdrawals && <p className="text-sm text-slate-500">Carregando…</p>}
+
+          {!loadingWithdrawals && withdrawals.length === 0 && (
+            <EmptyState title="Nenhuma solicitação de baixa pendente" />
+          )}
+
+          {!loadingWithdrawals && withdrawals.length > 0 && (
+            <Table
+              rows={withdrawals}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => {
+                setReviewing(r);
+                setReviewNotes("");
+              }}
+              columns={[
+                { header: "OS", cell: (r) => r.workOrder?.number ?? "—" },
+                { header: "Subtarefa", cell: (r) => r.subtask?.title ?? "—" },
+                { header: "Solicitado por", cell: (r) => r.requestedBy.name },
+                { header: "Itens", cell: (r) => r.items.length },
+                { header: "Data", cell: (r) => formatDateTime(r.createdAt) },
+              ]}
+            />
+          )}
+        </div>
+      )}
+
+      {reviewing && (
+        <Modal
+          title={`Solicitação de baixa — OS ${reviewing.workOrder?.number ?? "—"}`}
+          onClose={() => setReviewing(null)}
+        >
+          <div className="space-y-4">
+            {reviewing.subtask && (
+              <p className="text-sm text-slate-500">Subtarefa: {reviewing.subtask.title}</p>
+            )}
+            <p className="text-sm text-slate-500">Solicitado por: {reviewing.requestedBy.name}</p>
+
+            <div className="space-y-2">
+              {reviewing.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm"
+                >
+                  <span>
+                    {item.part.code} — {item.part.description}
+                  </span>
+                  <span className="font-medium">
+                    {item.quantity} {item.part.unit}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <Textarea
+              label="Motivo (obrigatório ao rejeitar)"
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setReviewing(null)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                disabled={reviewSubmitting}
+                onClick={() => handleReviewWithdrawal("REJEITAR")}
+              >
+                Rejeitar
+              </Button>
+              <Button type="button" disabled={reviewSubmitting} onClick={() => handleReviewWithdrawal("APROVAR")}>
+                {reviewSubmitting ? "Salvando…" : "Aprovar"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {modal === "entry" && (

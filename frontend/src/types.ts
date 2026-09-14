@@ -169,6 +169,34 @@ export interface WorkOrderPlannedPart {
   part: Part;
 }
 
+export type StockWithdrawalStatus = "PENDENTE" | "APROVADA" | "REJEITADA";
+
+export interface StockWithdrawalRequestItem {
+  id: string;
+  partId: string;
+  quantity: number;
+  part: Part;
+}
+
+export interface StockWithdrawalRequest {
+  id: string;
+  workOrderId: string;
+  workOrder?: { id: string; number: string; title: string };
+  subtaskId: string | null;
+  subtask?: { id: string; title: string } | null;
+  status: StockWithdrawalStatus;
+  notApplicable: boolean;
+  requestedById: string;
+  requestedBy: PublicUser;
+  reviewedById: string | null;
+  reviewedBy: PublicUser | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  items: StockWithdrawalRequestItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkOrderAssignee {
   id: string;
   workOrderId: string;
@@ -256,6 +284,7 @@ export interface WorkOrder {
   executions: Execution[];
   parts: WorkOrderPart[];
   plannedPartItems: WorkOrderPlannedPart[];
+  stockWithdrawalRequests: StockWithdrawalRequest[];
   statusHistory?: StatusHistoryEntry[];
   trabalhoEmAltura: boolean;
   permissaoTrabalho: PermissaoTrabalho | null;

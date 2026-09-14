@@ -142,22 +142,44 @@ describe("fluxo completo da OS (caminho feliz)", () => {
       .send({
         rootCause: "Causa raiz de teste.",
         repairDescription: "Reparo de teste.",
-        parts: [{ partId, quantity: 1 }],
       });
     expect(registrar.status).toBe(200);
     expect(registrar.body.status).toBe("EM_EXECUCAO");
-    expect(registrar.body.parts).toHaveLength(1);
 
-    const partAfter = await prisma.part.findUniqueOrThrow({ where: { id: partId } });
-    expect(partAfter.stockQty).toBe(1);
-
+    // Consumo de peças agora é declarado (obrigatoriamente) no encerramento
+    // técnico — a baixa em si fica pendente de aprovação do almoxarife.
     const encerramento = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado com sucesso.", cleanupDone: true });
+      .send({
+        testNotes: "Testado com sucesso.",
+        cleanupDone: true,
+        parts: [{ partId, quantity: 1 }],
+      });
     expect(encerramento.status).toBe(200);
     expect(encerramento.body.status).toBe("AGUARDANDO_VALIDACAO");
     expect(encerramento.body.execution.finishedAt).toBeTruthy();
+
+    const partPending = await prisma.part.findUniqueOrThrow({ where: { id: partId } });
+    expect(partPending.stockQty).toBe(2);
+
+    const pending = await request(app)
+      .get("/stock-withdrawals")
+      .set("Authorization", `Bearer ${supervisorToken}`);
+    expect(pending.status).toBe(200);
+    const withdrawal = pending.body.find((r: { workOrderId: string }) => r.workOrderId === id);
+    expect(withdrawal).toBeTruthy();
+    expect(withdrawal.status).toBe("PENDENTE");
+
+    const approveWithdrawal = await request(app)
+      .post(`/stock-withdrawals/${withdrawal.id}/review`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ action: "APROVAR" });
+    expect(approveWithdrawal.status).toBe(200);
+    expect(approveWithdrawal.body.status).toBe("APROVADA");
+
+    const partAfter = await prisma.part.findUniqueOrThrow({ where: { id: partId } });
+    expect(partAfter.stockQty).toBe(1);
 
     const validar = await request(app)
       .post(`/workorders/${id}/validar`)
@@ -168,6 +190,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
 
     const detail = await request(app).get(`/workorders/${id}`).set("Authorization", `Bearer ${operadorToken}`);
     expect(detail.status).toBe(200);
+    expect(detail.body.parts).toHaveLength(1);
     expect(detail.body.statusHistory).toHaveLength(7);
     expect(detail.body.statusHistory[0].fromStatus).toBeNull();
     expect(detail.body.statusHistory[0].toStatus).toBe("ABERTA");
@@ -223,42 +246,27 @@ describe("caminhos de erro", () => {
     expect(res.body.error.code).toBe("INVALID_TRANSITION");
   });
 
-  it("rejeita registro de peça com saldo insuficiente (422)", async () => {
-    const created = await request(app)
-      .post("/workorders")
-      .set("Authorization", `Bearer ${operadorToken}`)
-      .send({ type: WorkOrderType.CORRETIVA, title: "Erro de estoque", description: "desc", assetId });
-    const id = created.body.id;
+  it("rejeita aprovação de baixa com saldo insuficiente (422)", async () => {
+    const id = await criarOSEmExecucao("Erro de estoque");
 
-    await request(app)
-      .post(`/workorders/${id}/triagem`)
+    // Declarar consumo não falha mais aqui — a checagem de saldo passou para
+    // o momento da aprovação (recordStockMovement dentro do review).
+    const encerramento = await request(app)
+      .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ priority: "ALTA", targetSectorId: sectorId });
-    await request(app)
-      .post(`/workorders/${id}/planejamento`)
-      .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ plan: "Plano." });
-    await request(app)
-      .post(`/workorders/${id}/programacao`)
-      .set("Authorization", `Bearer ${supervisorToken}`)
-      .send({
-        scheduledStart: new Date().toISOString(),
-        scheduledEnd: new Date(Date.now() + 3600_000).toISOString(),
-        assigneeIds: [tecnicoId],
-      });
-    await request(app)
-      .post(`/workorders/${id}/iniciar`)
-      .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ riskAnalysis: "risco" });
+      .send({ testNotes: "Testado.", cleanupDone: true, parts: [{ partId, quantity: 9999 }] });
+    expect(encerramento.status).toBe(200);
+
+    const pending = await request(app)
+      .get("/stock-withdrawals")
+      .set("Authorization", `Bearer ${supervisorToken}`);
+    const withdrawal = pending.body.find((r: { workOrderId: string }) => r.workOrderId === id);
+    expect(withdrawal).toBeTruthy();
 
     const res = await request(app)
-      .post(`/workorders/${id}/registrar`)
-      .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({
-        rootCause: "causa",
-        repairDescription: "reparo",
-        parts: [{ partId, quantity: 9999 }],
-      });
+      .post(`/stock-withdrawals/${withdrawal.id}/review`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ action: "APROVAR" });
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe("INSUFFICIENT_STOCK");
@@ -281,7 +289,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
     const res = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado.", cleanupDone: true });
+      .send({ testNotes: "Testado.", cleanupDone: true, partsNotApplicable: true });
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe("HAS_OPEN_SUBTASKS");
@@ -311,7 +319,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
     const res = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado.", cleanupDone: true });
+      .send({ testNotes: "Testado.", cleanupDone: true, partsNotApplicable: true });
 
     expect(res.status).toBe(422);
     expect(res.body.error.message).toContain("2 subtarefa(s)");
@@ -350,7 +358,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
     const res = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado.", cleanupDone: true });
+      .send({ testNotes: "Testado.", cleanupDone: true, partsNotApplicable: true });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("AGUARDANDO_VALIDACAO");
@@ -362,7 +370,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
     const res = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado.", cleanupDone: true });
+      .send({ testNotes: "Testado.", cleanupDone: true, partsNotApplicable: true });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("AGUARDANDO_VALIDACAO");
@@ -374,7 +382,7 @@ describe("bloqueio de encerramento por subtarefa em aberto", () => {
     const encerramento = await request(app)
       .post(`/workorders/${id}/encerramento-tecnico`)
       .set("Authorization", `Bearer ${tecnicoToken}`)
-      .send({ testNotes: "Testado.", cleanupDone: true });
+      .send({ testNotes: "Testado.", cleanupDone: true, partsNotApplicable: true });
     expect(encerramento.status).toBe(200);
     expect(encerramento.body.status).toBe("AGUARDANDO_VALIDACAO");
 

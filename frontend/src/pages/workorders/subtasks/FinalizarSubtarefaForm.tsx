@@ -1,17 +1,19 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../../../auth/AuthContext";
-import * as workOrdersApi from "../../../api/workorders";
-import { Textarea } from "../../../components/Textarea";
-import { Checkbox } from "../../../components/Checkbox";
-import { Button } from "../../../components/Button";
+import * as subtasksApi from "../../../api/subtasks";
 import { PartsConsumptionFields, PartLine } from "../../../components/PartsConsumptionFields";
+import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
-import { ActionFormProps } from "./types";
+import { Subtask } from "../../../types";
 
-export function EncerramentoForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
+interface FinalizarSubtarefaFormProps {
+  subtask: Subtask;
+  onSuccess: () => void;
+  onClose: () => void;
+}
+
+export function FinalizarSubtarefaForm({ subtask, onSuccess, onClose }: FinalizarSubtarefaFormProps) {
   const { token } = useAuth();
-  const [testNotes, setTestNotes] = useState("");
-  const [cleanupDone, setCleanupDone] = useState(false);
   const [lines, setLines] = useState<PartLine[]>([]);
   const [partsNotApplicable, setPartsNotApplicable] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,13 +32,11 @@ export function EncerramentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await workOrdersApi.encerramentoTecnico(token, workOrder.id, {
-        testNotes,
-        cleanupDone,
+      await subtasksApi.finishSubtask(token, subtask.id, {
         parts: partsNotApplicable ? undefined : validLines,
         partsNotApplicable,
       });
-      onSuccess(updated);
+      onSuccess();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -46,18 +46,6 @@ export function EncerramentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Textarea
-        label="Notas de teste com a operação"
-        value={testNotes}
-        onChange={(e) => setTestNotes(e.target.value)}
-        required
-      />
-      <Checkbox
-        label="Limpeza e organização do local (5S) realizada"
-        checked={cleanupDone}
-        onChange={(e) => setCleanupDone(e.target.checked)}
-      />
-
       <PartsConsumptionFields
         lines={lines}
         notApplicable={partsNotApplicable}
@@ -72,7 +60,7 @@ export function EncerramentoForm({ workOrder, onSuccess, onClose }: ActionFormPr
           Cancelar
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Salvando…" : "Enviar para validação"}
+          {submitting ? "Salvando…" : "Finalizar"}
         </Button>
       </div>
     </form>

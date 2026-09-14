@@ -53,12 +53,13 @@ export interface IniciarInput {
 export interface RegistrarInput {
   rootCause: string;
   repairDescription: string;
-  parts?: Array<{ partId: string; quantity: number }>;
 }
 
 export interface EncerramentoTecnicoInput {
   testNotes: string;
   cleanupDone: boolean;
+  parts?: Array<{ partId: string; quantity: number }>;
+  partsNotApplicable?: boolean;
 }
 
 export interface ValidarInput {

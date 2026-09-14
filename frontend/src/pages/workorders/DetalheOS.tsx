@@ -7,6 +7,8 @@ import {
   PRIORITY_LABELS,
   STATUS_COLORS,
   STATUS_LABELS,
+  STOCK_WITHDRAWAL_STATUS_COLORS,
+  STOCK_WITHDRAWAL_STATUS_LABELS,
   TYPE_LABELS,
 } from "../../domain/labels";
 import * as workOrdersApi from "../../api/workorders";
@@ -303,6 +305,31 @@ export default function DetalheOS() {
                   </tbody>
                 </table>
               </div>
+            </Card>
+          )}
+
+          {workOrder.stockWithdrawalRequests.length > 0 && (
+            <Card>
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Solicitações de baixa de estoque</h2>
+              <ul className="space-y-2">
+                {workOrder.stockWithdrawalRequests.map((wr) => (
+                  <li key={wr.id} className="rounded border border-slate-200 p-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>
+                        {wr.notApplicable
+                          ? "Nenhuma peça utilizada"
+                          : `${wr.items.length} item(ns) declarado(s)`}
+                      </span>
+                      <Badge color={STOCK_WITHDRAWAL_STATUS_COLORS[wr.status]}>
+                        {STOCK_WITHDRAWAL_STATUS_LABELS[wr.status]}
+                      </Badge>
+                    </div>
+                    {wr.reviewNotes && (
+                      <p className="mt-1 text-xs text-slate-500">Motivo: {wr.reviewNotes}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
         </div>

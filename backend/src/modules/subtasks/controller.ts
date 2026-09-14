@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { AppError } from "../../lib/AppError";
 import * as subtaskService from "./service";
-import { createSubtaskSchema, updateSubtaskSchema } from "./schema";
+import { createSubtaskSchema, finishSubtaskSchema, updateSubtaskSchema } from "./schema";
 
 function requireUser(req: Request) {
   if (!req.user) {
@@ -26,7 +26,8 @@ export async function updateSubtaskController(req: Request, res: Response) {
 }
 
 export async function finishSubtaskController(req: Request, res: Response) {
-  res.json(await subtaskService.finishSubtask(req.params.id, requireUser(req)));
+  const input = finishSubtaskSchema.parse(req.body);
+  res.json(await subtaskService.finishSubtask(req.params.id, input, requireUser(req)));
 }
 
 export async function cancelSubtaskController(req: Request, res: Response) {
