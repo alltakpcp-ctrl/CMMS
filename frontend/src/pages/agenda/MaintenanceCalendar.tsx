@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as maintenancePlansApi from "../../api/maintenancePlans";
 import { MaintenancePlanWithDueDate } from "../../types";
-import { Priority } from "../../domain/enums";
+import { MaintenancePeriodicity, PERIODICITY_DAYS, Priority } from "../../domain/enums";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { addDays, addMonths, getMonthMatrix, getWeekDays, isoDateKey, startOfToday } from "../../lib/calendar";
+import { addUtcDays, nextBusinessDay } from "../../lib/businessDays";
 import { CalendarMonthView } from "./CalendarMonthView";
 import { CalendarListView } from "./CalendarListView";
 import { CalendarSidebarFilters } from "./CalendarSidebarFilters";
@@ -122,24 +123,87 @@ export function MaintenanceCalendar() {
   const draftPlans = useMemo(() => filteredPlans.filter((plan) => plan.dueDate === null), [filteredPlans]);
   const scheduledPlans = useMemo(() => filteredPlans.filter((plan) => plan.dueDate !== null), [filteredPlans]);
 
+  // Início/fim (componentes UTC, só a data importa) do período atualmente
+  // visível no calendário — usado para projetar as ocorrências futuras de
+  // cada plano recorrente (ver eventsByDay abaixo). Cresce/encolhe conforme
+  // o usuário navega (mês/semana/dia), então a projeção nunca é ilimitada.
+  const visibleRange = useMemo(() => {
+    function toUtcDay(date: Date): Date {
+      return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    }
+    if (view === "month") {
+      const weeks = getMonthMatrix(reference);
+      return { start: toUtcDay(weeks[0][0]), end: toUtcDay(weeks[weeks.length - 1][6]) };
+    }
+    if (view === "week") {
+      const days = getWeekDays(reference);
+      return { start: toUtcDay(days[0]), end: toUtcDay(days[6]) };
+    }
+    const day = toUtcDay(reference);
+    return { start: day, end: day };
+  }, [view, reference]);
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, MaintenancePlanWithDueDate[]>();
+
+    function addEvent(key: string, plan: MaintenancePlanWithDueDate) {
+      const list = map.get(key);
+      if (list) list.push(plan);
+      else map.set(key, [plan]);
+    }
+
     for (const plan of scheduledPlans) {
-      // Enquanto houver uma OS já agendada para o plano, o evento é
-      // posicionado na data real de início programado dela — não na data de
+      // Enquanto houver uma OS já agendada para o plano, o ciclo real é
+      // posicionado na data de início programado dela — não na data de
       // vencimento calculada (que passa a valer de novo só depois que a OS
       // é encerrada e um novo ciclo ainda não foi gerado).
-      const calendarDate = plan.openWorkOrder?.scheduledStart ?? plan.dueDate;
-      const key = isoDateKey(calendarDate as string);
-      const list = map.get(key);
-      if (list) {
-        list.push(plan);
-      } else {
-        map.set(key, [plan]);
+      const anchorIso = plan.openWorkOrder?.scheduledStart ?? plan.dueDate;
+      if (!anchorIso) continue;
+      const anchor = new Date(anchorIso);
+      // Truncado para meia-noite UTC só para a aritmética de dias abaixo —
+      // evita que a hora real de um openWorkOrder.scheduledStart (que não é
+      // necessariamente meia-noite) distorça a divisão por dias e pule por
+      // engano a 1ª ocorrência da faixa visível. O evento real (k=0)
+      // continua usando `anchor` (com a hora original) para não mudar o
+      // comportamento existente.
+      const anchorDay = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate()));
+      const intervalDays = PERIODICITY_DAYS[plan.periodicity as MaintenancePeriodicity];
+
+      // Réplica visual do compromisso a cada distância da periodicidade,
+      // dentro do período visível — aproximação de planejamento (assume que
+      // cada ciclo futuro fecha exatamente no vencimento; o vencimento real
+      // de cada ciclo só é recalculado no backend quando o ciclo anterior de
+      // fato encerra, podendo antecipar/atrasar as ocorrências seguintes).
+      // k=0 é sempre o ciclo real (dueDate/openWorkOrder do backend); k>=1
+      // são só projeção, sem ação de "Gerar OS" (ver MaintenancePlanEventPopover).
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const daysFromAnchorToRangeStart = Math.round(
+        (visibleRange.start.getTime() - anchorDay.getTime()) / msPerDay
+      );
+      const startK = Math.max(0, Math.ceil(daysFromAnchorToRangeStart / intervalDays));
+
+      for (let k = startK; ; k++) {
+        const occurrence = k === 0 ? anchor : nextBusinessDay(addUtcDays(anchorDay, k * intervalDays));
+        if (occurrence.getTime() > visibleRange.end.getTime()) break;
+        if (occurrence.getTime() < visibleRange.start.getTime()) continue;
+
+        const key = isoDateKey(occurrence.toISOString());
+        if (k === 0) {
+          addEvent(key, plan);
+        } else {
+          addEvent(key, {
+            ...plan,
+            dueDate: occurrence.toISOString(),
+            openWorkOrder: null,
+            isOverdue: false,
+            deadline: null,
+            isProjected: true,
+          });
+        }
       }
     }
     return map;
-  }, [scheduledPlans]);
+  }, [scheduledPlans, visibleRange]);
 
   const today = startOfToday();
 

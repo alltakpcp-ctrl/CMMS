@@ -117,6 +117,14 @@ export function MaintenancePlanEventPopover({
         </div>
       </dl>
 
+      {plan.isProjected && (
+        <p className="mt-3 rounded bg-slate-50 px-2 py-1.5 text-xs text-slate-500">
+          Data projetada a partir da periodicidade — o vencimento real deste ciclo só é
+          calculado quando o ciclo anterior for encerrado, e pode antecipar ou atrasar
+          esta data.
+        </p>
+      )}
+
       {actions.length > 0 && (
         <div className="mt-3 border-t border-slate-100 pt-3">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Checklist</p>
@@ -130,7 +138,9 @@ export function MaintenancePlanEventPopover({
 
       {(onGenerateWorkOrder || onEdit) && (
         <div className="mt-4 flex justify-end gap-2">
-          {plan.active && onGenerateWorkOrder && <Button onClick={onGenerateWorkOrder}>Gerar OS</Button>}
+          {!plan.isProjected && plan.active && onGenerateWorkOrder && (
+            <Button onClick={onGenerateWorkOrder}>Gerar OS</Button>
+          )}
           {onEdit && (
             <Button variant="secondary" onClick={onEdit}>
               Editar

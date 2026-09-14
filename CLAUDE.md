@@ -522,6 +522,20 @@ por `RequireRole` em `App.tsx`:
   seguintes (`agenda/GerarOsForm.tsx` → `POST /maintenance-plans/:id/gerar-os`).
   Planos rascunho (`periodicity = null`) aparecem numa lista separada, fora
   da grade do calendário, até o supervisor completar a periodicidade.
+  **Réplica visual do compromisso recorrente:** para um plano com
+  periodicidade definida, o calendário não mostra só o próximo vencimento —
+  `eventsByDay` (em `MaintenanceCalendar.tsx`) projeta uma ocorrência a cada
+  intervalo da periodicidade (`PERIODICITY_DAYS`, ajustada a dia útil por
+  `frontend/src/lib/businessDays.ts` — cópia intencional da lógica de
+  `backend/src/lib/businessDays.ts`, já que são builds TS separados) dentro
+  do período atualmente visível (mês/semana/dia — cresce/encolhe conforme o
+  usuário navega, nunca é uma lista ilimitada). Só a 1ª ocorrência (a real,
+  vinda de `dueDate`/`openWorkOrder` calculados no backend) é acionável
+  ("Gerar OS"); as seguintes são só projeção (`plan.isProjected`, campo
+  client-side que nunca vem do backend) — aproximação que assume que cada
+  ciclo futuro fecha exatamente no vencimento, já que o vencimento real de
+  cada ciclo só é recalculado quando o ciclo anterior de fato encerra (ver
+  `autoGenerateNextPreventiveCycle` no §2).
 - **`/agenda/programacao`** (SUPERVISOR) → `agenda/AgendaProgramacao.tsx`:
   só duas listas (OS `PLANEJADA` a programar / OS `PROGRAMADA`), **sem**
   formulário embutido — clicar na linha navega para `/ordens/:id`. O

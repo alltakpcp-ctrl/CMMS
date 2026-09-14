@@ -87,6 +87,13 @@ export interface MaintenancePlanWithDueDate extends MaintenancePlan {
     scheduledEnd: string | null;
     status: WorkOrderStatus;
   } | null;
+  // Client-side only (nunca vem do backend): marca uma ocorrência projetada
+  // pelo calendário — ver MaintenanceCalendar.tsx#eventsByDay. Replica
+  // visualmente o compromisso em cada data futura na distância da
+  // periodicidade, dentro do período visível; só a 1ª ocorrência (sem essa
+  // flag) corresponde ao ciclo real (dueDate/openWorkOrder calculados pelo
+  // backend) e é acionável (ex.: "Gerar OS").
+  isProjected?: boolean;
 }
 
 export interface Part {
