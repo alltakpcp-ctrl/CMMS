@@ -1,6 +1,6 @@
 import { apiRequest } from "./client";
 import { Paginated, WorkOrder } from "../types";
-import { Disciplina, Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { Disciplina, MaintenancePeriodicity, Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export interface CreateWorkOrderInput {
   type: WorkOrderType;
@@ -27,6 +27,10 @@ export interface TriagemInput {
   priority: Priority;
   targetSectorId: string;
   trabalhoEmAltura?: boolean;
+  // Só se aplica a OS PREVENTIVA — grava/atualiza a periodicidade do
+  // MaintenancePlan vinculado, habilitando a geração automática do próximo
+  // ciclo quando esta OS for encerrada.
+  periodicity?: MaintenancePeriodicity;
 }
 
 export interface PlanejamentoInput {

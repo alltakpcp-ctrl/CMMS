@@ -272,6 +272,7 @@ export interface WorkOrder {
   // Preenchido quando a OS é PREVENTIVA — vincula ao MaintenancePlan de
   // origem (gerado pela Agenda ou criado como rascunho ao abrir a OS direto).
   maintenancePlanId: string | null;
+  maintenancePlan?: { id: string; periodicity: MaintenancePeriodicity | null; active: boolean } | null;
   tools: string[] | null;
   ppe: string[] | null;
   scheduledStart: string | null;

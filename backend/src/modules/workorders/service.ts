@@ -6,9 +6,12 @@ import { generateWorkOrderNumber } from "../../lib/workOrderNumber";
 import { canTransition, TransitionContext } from "../../lib/workOrderStateMachine";
 import { assertActiveSector } from "../../lib/sectors";
 import { resolveAssigneeIds } from "../../lib/assignees";
+import { workOrderInclude } from "../../lib/workOrderInclude";
+import { calculateNextDueDate } from "../../lib/maintenancePlans";
+import { generateWorkOrderFromPlan } from "../../lib/generateWorkOrderFromPlan";
 import { createWithdrawalRequest } from "../stock-withdrawals/service";
 import { AuthPayload } from "../../middlewares/authenticate";
-import { Role, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import { MaintenancePeriodicity, Role, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 import {
   CancelarInput,
   CreateWorkOrderInput,
@@ -24,28 +27,11 @@ import {
   ValidarInput,
 } from "./schema";
 
-// Exportado para reaproveitar em maintenance-plans/service.ts, que também
-// cria/gera WorkOrder (geração automática a partir de um plano de preventiva)
-// e precisa devolver o mesmo formato usado pelo resto da API de OS.
-export const workOrderInclude = {
-  asset: true,
-  targetSector: true,
-  requester: { select: publicUserSelect },
-  assignedTo: { select: publicUserSelect },
-  assignees: { include: { user: { select: { id: true, name: true } } } },
-  executions: {
-    orderBy: { startedAt: "asc" },
-    include: {
-      logs: {
-        include: { author: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  },
-  parts: { include: { part: true } },
-  plannedPartItems: { include: { part: true } },
-  stockWithdrawalRequests: { include: { items: { include: { part: true } } } },
-} satisfies Prisma.WorkOrderInclude;
+// Reexportado por compatibilidade — o include em si mora em
+// lib/workOrderInclude.ts (compartilhado com lib/generateWorkOrderFromPlan.ts
+// sem criar dependência circular entre workorders/service.ts e
+// maintenance-plans/service.ts).
+export { workOrderInclude };
 
 export async function createWorkOrder(input: CreateWorkOrderInput, user: AuthPayload) {
   const asset = await prisma.asset.findUnique({ where: { id: input.assetId } });
@@ -313,6 +299,22 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
     userId: user.userId,
     mutate: async (tx, workOrder) => {
       await assertActiveSector(tx, input.targetSectorId);
+
+      // Indicador de periodicidade: TECNICO/SUPERVISOR podem definir (ou
+      // atualizar) já na triagem a periodicidade do MaintenancePlan vinculado
+      // — mesmo plano criado como "rascunho" em createWorkOrder() quando a OS
+      // PREVENTIVA foi aberta sem um plano ativo prévio para o ativo. Isso
+      // habilita a geração automática do próximo ciclo (autoGenerateNextPreventiveCycle)
+      // quando esta OS for encerrada.
+      if (input.periodicity) {
+        if (workOrder.type !== WorkOrderType.PREVENTIVA) {
+          throw new AppError(422, "PERIODICITY_NOT_APPLICABLE", "Periodicidade só se aplica a OS preventiva.");
+        }
+        await tx.maintenancePlan.update({
+          where: { id: workOrder.maintenancePlanId! },
+          data: { periodicity: input.periodicity },
+        });
+      }
 
       if (input.priority === workOrder.priority) {
         return {
@@ -646,6 +648,55 @@ export function encerramentoTecnico(id: string, input: EncerramentoTecnicoInput,
   });
 }
 
+// Replicação automática na Agenda: quando uma OS PREVENTIVA vinculada a um
+// MaintenancePlan ativo com periodicidade definida é encerrada, gera sozinho
+// o próximo ciclo (equivalente ao "Gerar OS" manual da Agenda), repetindo o
+// mesmo técnico responsável + apoio e a mesma duração (scheduledEnd −
+// scheduledStart) do ciclo que fechou. Roda DEPOIS que a transição para
+// ENCERRADA já commitou (fora da transação de applyTransition, mesmo
+// espírito do comentário sobre efeitos colaterais em applyTransition) — uma
+// falha aqui nunca pode impedir o encerramento em si, por isso é chamada com
+// .catch() em vez de ser aguardada dentro da transação de validar().
+async function autoGenerateNextPreventiveCycle(workOrder: WorkOrder, user: AuthPayload): Promise<void> {
+  if (!workOrder.maintenancePlanId) return;
+
+  await prisma.$transaction(async (tx) => {
+    const plan = await tx.maintenancePlan.findUnique({ where: { id: workOrder.maintenancePlanId! } });
+    if (!plan || !plan.active || !plan.periodicity) return;
+
+    const lastExecution = await tx.execution.findFirst({
+      where: { workOrderId: workOrder.id, finishedAt: { not: null } },
+      orderBy: { finishedAt: "desc" },
+      select: { finishedAt: true },
+    });
+    if (!lastExecution?.finishedAt) return;
+
+    if (!workOrder.assignedToId) return;
+
+    const due = calculateNextDueDate(
+      { id: plan.id, periodicity: plan.periodicity as MaintenancePeriodicity, createdAt: plan.createdAt },
+      { finishedAt: lastExecution.finishedAt }
+    );
+    if (!due.dueDate) return;
+
+    const durationMs =
+      workOrder.scheduledStart && workOrder.scheduledEnd
+        ? workOrder.scheduledEnd.getTime() - workOrder.scheduledStart.getTime()
+        : Number(plan.estimatedHours ?? 2) * 3_600_000;
+
+    const scheduledStart = due.dueDate;
+    const scheduledEnd = new Date(scheduledStart.getTime() + durationMs);
+
+    const support = await tx.workOrderAssignee.findMany({
+      where: { workOrderId: workOrder.id },
+      select: { userId: true },
+    });
+    const assigneeIds = [workOrder.assignedToId, ...support.map((a) => a.userId)];
+
+    await generateWorkOrderFromPlan(tx, plan, { scheduledStart, scheduledEnd, assigneeIds }, user);
+  });
+}
+
 export function validar(id: string, input: ValidarInput, user: AuthPayload) {
   if (input.approve) {
     return applyTransition({
@@ -653,6 +704,11 @@ export function validar(id: string, input: ValidarInput, user: AuthPayload) {
       to: WorkOrderStatus.ENCERRADA,
       role: user.role,
       userId: user.userId,
+    }).then(async (updated) => {
+      await autoGenerateNextPreventiveCycle(updated, user).catch((err) => {
+        console.error(`Falha ao gerar automaticamente o próximo ciclo da OS ${updated.number}:`, err);
+      });
+      return updated;
     });
   }
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Disciplina, ExecutionOutcome, Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
+import { Disciplina, ExecutionOutcome, MaintenancePeriodicity, Priority, WorkOrderStatus, WorkOrderType } from "../../domain/enums";
 
 export const createWorkOrderSchema = z.object({
   type: z.nativeEnum(WorkOrderType),
@@ -26,6 +26,10 @@ export const triagemSchema = z.object({
   priority: z.nativeEnum(Priority),
   targetSectorId: z.string().min(1, "Setor é obrigatório."),
   trabalhoEmAltura: z.boolean().optional().default(false),
+  // Só se aplica a OS PREVENTIVA — validado em workorders/service.ts#triagem
+  // (o schema não conhece o type da OS em si). Preenchida, grava/atualiza a
+  // periodicidade do MaintenancePlan vinculado.
+  periodicity: z.nativeEnum(MaintenancePeriodicity).optional(),
 });
 
 export const plannedPartSchema = z.object({

@@ -103,9 +103,32 @@ Além do ciclo de OS, o sistema também cobre:
   nunca por job em background. Criar um `MaintenancePlan` (TECNICO ou
   SUPERVISOR, via Agenda) **gera a 1ª OS na hora**, já `PROGRAMADA` (pula
   triagem/planejamento — quem agenda já informa data/hora e técnico); ciclos
-  seguintes usam `POST /maintenance-plans/:id/gerar-os`. `Asset.preventivePeriodicityDays`
-  existe no schema como gancho para um futuro cron, mas **não é lido por
-  nenhum código hoje** — não confundir com um mecanismo ativo.
+  seguintes usam `POST /maintenance-plans/:id/gerar-os` (manual) **ou** são
+  gerados sozinhos ao encerrar o ciclo anterior, se o plano vinculado estiver
+  `active` e com `periodicity` definida — ver "Indicador de periodicidade"
+  logo abaixo. `Asset.preventivePeriodicityDays` existe no schema como gancho
+  para um futuro cron, mas **não é lido por nenhum código hoje** — não
+  confundir com o mecanismo acima (que é orientado a evento, não a polling).
+- **Indicador de periodicidade + replicação automática na Agenda.** A
+  periodicidade de um `MaintenancePlan` não é definida só na Agenda: TECNICO
+  ou SUPERVISOR também podem defini-la/atualizá-la na **Triagem** de uma OS
+  PREVENTIVA (`POST /:id/triagem`, campo opcional `periodicity` —
+  `workorders/service.ts#triagem`), já que todo `WorkOrder` PREVENTIVA sempre
+  tem um `maintenancePlanId` vinculado (rascunho ou plano ativo, ver
+  `createWorkOrder`). Quando esse plano está `active` e com `periodicity`
+  preenchida, encerrar (validar aprovando) qualquer OS PREVENTIVA vinculada a
+  ele dispara `workorders/service.ts#autoGenerateNextPreventiveCycle`: gera
+  sozinho o próximo ciclo (mesma função `generateWorkOrderFromPlan`, hoje em
+  `lib/generateWorkOrderFromPlan.ts`, usada também pelo "Gerar OS" manual),
+  repetindo o(s) mesmo(s) técnico(s) (responsável + apoio) e a mesma duração
+  (`scheduledEnd − scheduledStart`) do ciclo que fechou, com a data de início
+  calculada por `calculateNextDueDate`. Roda depois que a transição para
+  `ENCERRADA` já commitou (efeito colateral pós-commit, com erros só
+  logados) — uma falha na geração automática nunca bloqueia o encerramento
+  em si. `lib/workOrderInclude.ts` e `lib/generateWorkOrderFromPlan.ts`
+  existem à parte de `workorders/service.ts` e `maintenance-plans/service.ts`
+  justamente para os dois módulos poderem compartilhar essa função sem
+  criar import circular entre eles.
 
 ### Decisão de produção (deploy)
 - **Projeto Neon atual: "SUP.CMMS"** (host `ep-quiet-rice-a697z5p7`, região
@@ -155,7 +178,9 @@ Além do ciclo de OS, o sistema também cobre:
 │   │   │   └── <mod>/routes.ts, controller.ts, service.ts, schema.ts
 │   │   ├── lib/            # helpers puros: workOrderStateMachine, maintenancePlans,
 │   │   │                   #   businessDays, indicators, workOrderNumber, purchaseOrderNumber,
-│   │   │                   #   assignees (resolveAssigneeIds), AppError, publicUser
+│   │   │                   #   assignees (resolveAssigneeIds), AppError, publicUser,
+│   │   │                   #   workOrderInclude, generateWorkOrderFromPlan (compartilhados
+│   │   │                   #   entre workorders/ e maintenance-plans/ sem import circular)
 │   │   ├── app.ts           # monta todos os routers (fonte de verdade dos prefixos de rota)
 │   │   └── server.ts
 │   ├── .env.example
@@ -456,14 +481,14 @@ para `CANCELADA` (somente SUPERVISOR, com nota obrigatória).
 | De | Para | Quem | Efeito colateral |
 |---|---|---|---|
 | — | ABERTA | OPERADOR/SUPERVISOR | cria OS, gera `number` |
-| ABERTA | TRIAGEM | TECNICO/SUPERVISOR | define priority + targetSectorId + trabalhoEmAltura |
+| ABERTA | TRIAGEM | TECNICO/SUPERVISOR | define priority + targetSectorId + trabalhoEmAltura; opcionalmente também define/atualiza a `periodicity` do `MaintenancePlan` vinculado, se a OS for PREVENTIVA (ver §2 "Indicador de periodicidade") |
 | TRIAGEM | PLANEJADA | TECNICO/SUPERVISOR | preenche `plan`, tools/ppe, peças planejadas, substitui `assignees` de apoio |
 | PLANEJADA | PROGRAMADA | SUPERVISOR | exige scheduledStart/End + ≥1 assigneeId (1º = principal); tempo estimado obrigatório só se PREVENTIVA; acrescenta `assignees` de apoio (não substitui) |
 | TRIAGEM | EM_EXECUCAO | TECNICO | atalho: pula a programação do supervisor (qualquer prioridade) |
 | PLANEJADA | EM_EXECUCAO | TECNICO | mesmo atalho, quando já houve planejamento |
 | PROGRAMADA | EM_EXECUCAO | TECNICO (assignedTo ou apoio) | cria Execution, `startedAt = now()`, registra `startedById`/`startNote` |
 | EM_EXECUCAO | AGUARDANDO_VALIDACAO | TECNICO (assignedTo ou apoio) | `finishedAt = now()`; **exige declarar consumo de peças** (`parts` ou `partsNotApplicable` — `400` se nenhum vier, ver §2) e cria a `StockWithdrawalRequest`; **bloqueado** por `422 HAS_OPEN_SUBTASKS` se houver subtask ABERTA |
-| AGUARDANDO_VALIDACAO | ENCERRADA | SUPERVISOR | valida e dá baixa; **mesmo bloqueio** de subtask aberta |
+| AGUARDANDO_VALIDACAO | ENCERRADA | SUPERVISOR | valida e dá baixa; **mesmo bloqueio** de subtask aberta; se PREVENTIVA com plano `active` + `periodicity` definida, dispara pós-commit a geração automática do próximo ciclo (ver §2 "Indicador de periodicidade") |
 | AGUARDANDO_VALIDACAO | EM_EXECUCAO | SUPERVISOR | reprova validação, nota obrigatória, reabre Execution |
 | qualquer (≠ ENCERRADA/CANCELADA) | CANCELADA | SUPERVISOR | nota obrigatória |
 
