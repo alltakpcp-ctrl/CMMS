@@ -84,11 +84,16 @@ Além do ciclo de OS, o sistema também cobre:
   flag no `User`, não um role.
 - **Dashboard do estoque** (`GET /stock/dashboard`, TECNICO/SUPERVISOR — mesmo
   gate de `/stock/low-stock` e `/stock/ledger/:partId`) agrega, a partir de
-  `Part`/`StockMovement`: contagem/saldo por `StockStatus`, saldo por armário
-  (`stock/service.ts#extractArmario` faz parsing do prefixo "Armário X" do
-  texto livre de `Part.location`, gerado por `scripts/import-parts-controle.ts`
-  — peças com outro formato de localização ou sem localização caem em "Sem
-  armário"), saldo por setor, top 20 peças mais consumidas (soma de
+  `Part`/`StockMovement`/`WorkOrder`: contagem/saldo por `StockStatus`, saldo
+  por armário (`stock/service.ts#extractArmario` faz parsing do prefixo
+  "Armário X" do texto livre de `Part.location`, gerado por
+  `scripts/import-parts-controle.ts` — peças com outro formato de localização
+  ou sem localização caem em "Sem armário"), top 10 ativos que mais consomem
+  peças (cada `StockMovement` SAIDA sempre tem `workOrderId` preenchido —
+  `StockWithdrawalRequest.workOrderId` é obrigatório — e `WorkOrder.assetId`
+  também é obrigatório, então dá pra atrelar consumo de peça ao ativo sem
+  campo novo no schema; cada ativo do ranking já vem com sua peça mais
+  consumida embutida, não só o total), top 20 peças mais consumidas (soma de
   `StockMovement` tipo SAIDA, que só existe após aprovação de uma
   `StockWithdrawalRequest` — não inclui `AJUSTE` de baixa manual) e peças
   "sem giro" (saldo > 0 sem nenhuma SAIDA nos últimos 90 dias, constante

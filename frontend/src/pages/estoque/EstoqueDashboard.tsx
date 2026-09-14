@@ -66,12 +66,14 @@ export function EstoqueDashboard() {
     displayValue: `${p.totalQuantity} ${p.unit}`,
   }));
 
-  const sectorItems: BarItem[] = data.bySector.map((s) => ({
-    key: s.sectorId ?? s.sectorName,
-    label: s.sectorName,
-    value: s.stockQty,
-    displayValue: `${s.stockQty} un.`,
-    note: `${s.count} peça(s)`,
+  const topConsumingAssetItems: BarItem[] = data.topConsumingAssets.map((a) => ({
+    key: a.assetId,
+    label: `${a.assetCode} — ${a.assetName}`,
+    value: a.totalQuantity,
+    displayValue: `${a.totalQuantity} un.`,
+    note: a.topPart
+      ? `mais consumida: ${a.topPart.code} — ${a.topPart.description} (${a.topPart.quantity} un.)`
+      : `${a.distinctPartsCount} peça(s) diferentes`,
   }));
 
   const statusTotal = data.byStatus.reduce((sum, s) => sum + s.count, 0);
@@ -156,11 +158,14 @@ export function EstoqueDashboard() {
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Saldo por setor</h2>
-          {sectorItems.length > 0 ? (
-            <PhaseDurationChart items={sectorItems} barColor="#4a3aa7" />
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Top 10 ativos que mais consomem peças</h2>
+          {topConsumingAssetItems.length > 0 ? (
+            <PhaseDurationChart items={topConsumingAssetItems} barColor="#4a3aa7" />
           ) : (
-            <EmptyState title="Nenhuma peça cadastrada" />
+            <EmptyState
+              title="Nenhum consumo de peça registrado ainda"
+              description="Calculado a partir das baixas de peças aprovadas, atreladas ao ativo da OS."
+            />
           )}
         </Card>
       </div>

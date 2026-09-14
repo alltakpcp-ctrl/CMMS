@@ -186,10 +186,9 @@ export async function getPartLedger(partId: string) {
 }
 
 export async function getStockDashboard() {
-  const [parts, topUsedGroups, lastOutboundByPart, recentMovements] = await Promise.all([
+  const [parts, topUsedGroups, lastOutboundByPart, recentMovements, saidaWithAsset] = await Promise.all([
     prisma.part.findMany({
       where: { active: true },
-      include: { sector: { select: { id: true, name: true } } },
       orderBy: { code: "asc" },
     }),
     prisma.stockMovement.groupBy({
@@ -210,6 +209,17 @@ export async function getStockDashboard() {
       include: {
         part: { select: { code: true, description: true } },
         user: { select: { name: true } },
+      },
+    }),
+    // Peça SAIDA sempre carrega workOrderId (StockWithdrawalRequest.workOrderId
+    // é obrigatório — ver CLAUDE.md §5) e WorkOrder.assetId é obrigatório, então
+    // dá pra atrelar consumo de peça à máquina sem nenhum campo novo no schema.
+    prisma.stockMovement.findMany({
+      where: { type: "SAIDA", workOrderId: { not: null } },
+      select: {
+        partId: true,
+        quantity: true,
+        workOrder: { select: { assetId: true, asset: { select: { code: true, name: true } } } },
       },
     }),
   ]);
@@ -247,17 +257,57 @@ export async function getStockDashboard() {
     .map(([armario, v]) => ({ armario, ...v }))
     .sort((a, b) => b.stockQty - a.stockQty);
 
-  const sectorMap = new Map<string, { sectorId: string | null; count: number; stockQty: number }>();
-  for (const p of partsWithStatus) {
-    const label = p.sector?.name ?? "Sem setor";
-    const entry = sectorMap.get(label) ?? { sectorId: p.sector?.id ?? null, count: 0, stockQty: 0 };
-    entry.count += 1;
-    entry.stockQty += p.stockQty;
-    sectorMap.set(label, entry);
+  const assetConsumptionMap = new Map<
+    string,
+    { assetId: string; code: string; name: string; totalQuantity: number; partTotals: Map<string, number> }
+  >();
+  for (const m of saidaWithAsset) {
+    if (!m.workOrder) continue;
+    const { assetId, asset } = m.workOrder;
+    const entry = assetConsumptionMap.get(assetId) ?? {
+      assetId,
+      code: asset.code,
+      name: asset.name,
+      totalQuantity: 0,
+      partTotals: new Map<string, number>(),
+    };
+    entry.totalQuantity += m.quantity;
+    entry.partTotals.set(m.partId, (entry.partTotals.get(m.partId) ?? 0) + m.quantity);
+    assetConsumptionMap.set(assetId, entry);
   }
-  const bySector = [...sectorMap.entries()]
-    .map(([sectorName, v]) => ({ sectorName, ...v }))
-    .sort((a, b) => b.stockQty - a.stockQty);
+  const topAssetsRaw = [...assetConsumptionMap.values()]
+    .sort((a, b) => b.totalQuantity - a.totalQuantity)
+    .slice(0, 10)
+    .map((a) => {
+      let topPartId: string | null = null;
+      let topPartQty = 0;
+      for (const [partId, qty] of a.partTotals) {
+        if (qty > topPartQty) {
+          topPartId = partId;
+          topPartQty = qty;
+        }
+      }
+      return { ...a, topPartId, topPartQty };
+    });
+  const topPartsForAssetsById = new Map(
+    (
+      await prisma.part.findMany({
+        where: { id: { in: topAssetsRaw.map((a) => a.topPartId).filter((id): id is string => id !== null) } },
+        select: { id: true, code: true, description: true },
+      })
+    ).map((p) => [p.id, p])
+  );
+  const topConsumingAssets = topAssetsRaw.map((a) => {
+    const bestPart = a.topPartId ? topPartsForAssetsById.get(a.topPartId) : undefined;
+    return {
+      assetId: a.assetId,
+      assetCode: a.code,
+      assetName: a.name,
+      totalQuantity: a.totalQuantity,
+      distinctPartsCount: a.partTotals.size,
+      topPart: bestPart ? { code: bestPart.code, description: bestPart.description, quantity: a.topPartQty } : null,
+    };
+  });
 
   const topUsedPartIds = topUsedGroups.map((g) => g.partId);
   const topUsedPartsById = new Map(
@@ -313,7 +363,7 @@ export async function getStockDashboard() {
     },
     byStatus,
     byArmario,
-    bySector,
+    topConsumingAssets,
     topUsedParts,
     deadStock,
     recentMovements: recentMovements.map((m) => ({

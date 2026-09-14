@@ -352,7 +352,14 @@ export interface StockDashboard {
   };
   byStatus: { status: StockStatus; count: number; stockQty: number }[];
   byArmario: { armario: string; count: number; stockQty: number }[];
-  bySector: { sectorName: string; sectorId: string | null; count: number; stockQty: number }[];
+  topConsumingAssets: {
+    assetId: string;
+    assetCode: string;
+    assetName: string;
+    totalQuantity: number;
+    distinctPartsCount: number;
+    topPart: { code: string; description: string; quantity: number } | null;
+  }[];
   topUsedParts: {
     partId: string;
     code: string;
