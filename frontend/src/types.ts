@@ -76,6 +76,17 @@ export interface MaintenancePlanWithDueDate extends MaintenancePlan {
   dueDate: string | null; // null quando periodicity é null (plano rascunho)
   isOverdue: boolean;
   deadline: string | null;
+  // OS em aberto (fora de ENCERRADA/CANCELADA) vinculada ao plano, se houver
+  // — no máximo uma, por regra de negócio (ver PLAN_HAS_OPEN_WORK_ORDER). O
+  // calendário usa openWorkOrder.scheduledStart, quando existir, no lugar de
+  // dueDate para posicionar o evento na data real já agendada.
+  openWorkOrder: {
+    id: string;
+    number: string;
+    scheduledStart: string | null;
+    scheduledEnd: string | null;
+    status: WorkOrderStatus;
+  } | null;
 }
 
 export interface Part {

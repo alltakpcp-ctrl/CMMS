@@ -88,10 +88,23 @@ export function MaintenancePlanEventPopover({
           <dt className="text-slate-500">Prioridade</dt>
           <dd className="text-slate-800">{PRIORITY_LABELS[plan.priority]}</dd>
         </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-slate-500">Vencimento</dt>
-          <dd className="text-slate-800">{formatDate(plan.dueDate)}</dd>
-        </div>
+        {plan.openWorkOrder?.scheduledStart ? (
+          <>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Início programado</dt>
+              <dd className="text-slate-800">{formatDate(plan.openWorkOrder.scheduledStart)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Fim programado</dt>
+              <dd className="text-slate-800">{formatDate(plan.openWorkOrder.scheduledEnd)}</dd>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">Vencimento</dt>
+            <dd className="text-slate-800">{formatDate(plan.dueDate)}</dd>
+          </div>
+        )}
         {plan.isOverdue && (
           <div className="flex justify-between gap-3">
             <dt className="text-red-600">Vencido — prazo limite</dt>

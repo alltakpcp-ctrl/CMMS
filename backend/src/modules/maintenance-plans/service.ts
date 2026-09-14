@@ -187,6 +187,40 @@ async function lastValidExecutionByPlanId(planIds: string[]): Promise<Map<string
   return result;
 }
 
+interface OpenWorkOrderSummary {
+  id: string;
+  number: string;
+  scheduledStart: Date | null;
+  scheduledEnd: Date | null;
+  status: string;
+}
+
+// OS em aberto (fora de ENCERRADA/CANCELADA) por plano, numa única query —
+// generateWorkOrderFromPlan() garante no máximo uma por plano (409
+// PLAN_HAS_OPEN_WORK_ORDER bloqueia gerar um novo ciclo enquanto existir
+// uma). Usado pelo calendário da Agenda para posicionar o evento na data
+// real já agendada da OS, em vez da data de vencimento calculada do plano —
+// ver MaintenanceCalendar.tsx no frontend.
+async function openWorkOrderByPlanId(planIds: string[]): Promise<Map<string, OpenWorkOrderSummary>> {
+  if (planIds.length === 0) return new Map();
+
+  const workOrders = await prisma.workOrder.findMany({
+    where: {
+      maintenancePlanId: { in: planIds },
+      status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
+    },
+    select: { id: true, number: true, scheduledStart: true, scheduledEnd: true, status: true, maintenancePlanId: true },
+  });
+
+  const result = new Map<string, OpenWorkOrderSummary>();
+  for (const workOrder of workOrders) {
+    if (workOrder.maintenancePlanId) {
+      result.set(workOrder.maintenancePlanId, workOrder);
+    }
+  }
+  return result;
+}
+
 export async function listMaintenancePlans(query: ListMaintenancePlansQuery) {
   const where: Prisma.MaintenancePlanWhereInput = {
     assetId: query.assetId,
@@ -201,7 +235,11 @@ export async function listMaintenancePlans(query: ListMaintenancePlansQuery) {
     orderBy: { createdAt: "asc" },
   });
 
-  const lastExecutionByPlanId = await lastValidExecutionByPlanId(plans.map((p) => p.id));
+  const planIds = plans.map((p) => p.id);
+  const [lastExecutionByPlanId, openWorkOrderByPlan] = await Promise.all([
+    lastValidExecutionByPlanId(planIds),
+    openWorkOrderByPlanId(planIds),
+  ]);
 
   return plans.map((plan) => {
     const lastFinishedAt = lastExecutionByPlanId.get(plan.id) ?? null;
@@ -209,6 +247,6 @@ export async function listMaintenancePlans(query: ListMaintenancePlansQuery) {
       { id: plan.id, periodicity: plan.periodicity as MaintenancePeriodicity | null, createdAt: plan.createdAt },
       lastFinishedAt ? { finishedAt: lastFinishedAt } : null
     );
-    return { ...plan, ...dueDate };
+    return { ...plan, ...dueDate, openWorkOrder: openWorkOrderByPlan.get(plan.id) ?? null };
   });
 }

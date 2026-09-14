@@ -3,7 +3,14 @@ import request from "supertest";
 import bcrypt from "bcrypt";
 import { app } from "../app";
 import { prisma } from "../config/prisma";
-import { MaintenanceDiscipline, MaintenancePeriodicity, Priority, Role, WorkOrderType } from "../domain/enums";
+import {
+  MaintenanceDiscipline,
+  MaintenancePeriodicity,
+  Priority,
+  Role,
+  WorkOrderStatus,
+  WorkOrderType,
+} from "../domain/enums";
 
 let supervisorToken: string;
 let requesterId: string;
@@ -62,6 +69,70 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
+});
+
+describe("GET /maintenance-plans", () => {
+  it("expõe a OS em aberto do plano (openWorkOrder), com a data real de início programado", async () => {
+    const planId = await createPlan();
+    const scheduledStart = new Date("2026-10-01T13:00:00.000Z");
+    const scheduledEnd = new Date("2026-10-01T15:00:00.000Z");
+
+    const workOrder = await prisma.workOrder.create({
+      data: {
+        number: `OS-TEST-PLAN-OPEN-${planId}`,
+        type: WorkOrderType.PREVENTIVA,
+        priority: Priority.MEDIA,
+        status: WorkOrderStatus.PROGRAMADA,
+        title: "OS aberta vinculada a plano",
+        description: "desc",
+        requesterId,
+        assetId,
+        maintenancePlanId: planId,
+        scheduledStart,
+        scheduledEnd,
+      },
+    });
+
+    const res = await request(app)
+      .get("/maintenance-plans")
+      .set("Authorization", `Bearer ${supervisorToken}`);
+
+    expect(res.status).toBe(200);
+    const plan = res.body.find((p: { id: string }) => p.id === planId);
+    expect(plan.openWorkOrder).toMatchObject({
+      id: workOrder.id,
+      number: workOrder.number,
+      scheduledStart: scheduledStart.toISOString(),
+      scheduledEnd: scheduledEnd.toISOString(),
+      status: WorkOrderStatus.PROGRAMADA,
+    });
+  });
+
+  it("não expõe uma OS já ENCERRADA/CANCELADA como openWorkOrder", async () => {
+    const planId = await createPlan();
+
+    await prisma.workOrder.create({
+      data: {
+        number: `OS-TEST-PLAN-CLOSED-${planId}`,
+        type: WorkOrderType.PREVENTIVA,
+        priority: Priority.MEDIA,
+        status: WorkOrderStatus.ENCERRADA,
+        title: "OS encerrada vinculada a plano",
+        description: "desc",
+        requesterId,
+        assetId,
+        maintenancePlanId: planId,
+      },
+    });
+
+    const res = await request(app)
+      .get("/maintenance-plans")
+      .set("Authorization", `Bearer ${supervisorToken}`);
+
+    expect(res.status).toBe(200);
+    const plan = res.body.find((p: { id: string }) => p.id === planId);
+    expect(plan.openWorkOrder).toBeNull();
+  });
 });
 
 describe("DELETE /maintenance-plans/:id", () => {

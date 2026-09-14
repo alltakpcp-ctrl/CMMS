@@ -125,7 +125,12 @@ export function MaintenanceCalendar() {
   const eventsByDay = useMemo(() => {
     const map = new Map<string, MaintenancePlanWithDueDate[]>();
     for (const plan of scheduledPlans) {
-      const key = isoDateKey(plan.dueDate as string);
+      // Enquanto houver uma OS já agendada para o plano, o evento é
+      // posicionado na data real de início programado dela — não na data de
+      // vencimento calculada (que passa a valer de novo só depois que a OS
+      // é encerrada e um novo ciclo ainda não foi gerado).
+      const calendarDate = plan.openWorkOrder?.scheduledStart ?? plan.dueDate;
+      const key = isoDateKey(calendarDate as string);
       const list = map.get(key);
       if (list) {
         list.push(plan);
