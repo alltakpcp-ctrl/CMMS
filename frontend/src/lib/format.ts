@@ -27,6 +27,11 @@ export function formatPercentage(value: number | null): string {
   return `${value.toFixed(1)}%`;
 }
 
+export function formatCurrency(value: number | null): string {
+  if (value === null) return "—";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export function formatDuration(minutes: number): string {
   if (minutes < 1) return "< 1min";
   if (minutes < 60) return `${minutes}min`;

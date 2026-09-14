@@ -82,6 +82,18 @@ Além do ciclo de OS, o sistema também cobre:
   ou a TÉCNICO com a flag `canManageStock` (`supervisorOrCanManageStock()`),
   com `reason` obrigatório. **Não** há perfil de almoxarife dedicado — é uma
   flag no `User`, não um role.
+- **Dashboard do estoque** (`GET /stock/dashboard`, TECNICO/SUPERVISOR — mesmo
+  gate de `/stock/low-stock` e `/stock/ledger/:partId`) agrega, a partir de
+  `Part`/`StockMovement`: contagem/saldo por `StockStatus`, saldo por armário
+  (`stock/service.ts#extractArmario` faz parsing do prefixo "Armário X" do
+  texto livre de `Part.location`, gerado por `scripts/import-parts-controle.ts`
+  — peças com outro formato de localização ou sem localização caem em "Sem
+  armário"), saldo por setor, top 20 peças mais consumidas (soma de
+  `StockMovement` tipo SAIDA, que só existe após aprovação de uma
+  `StockWithdrawalRequest` — não inclui `AJUSTE` de baixa manual) e peças
+  "sem giro" (saldo > 0 sem nenhuma SAIDA nos últimos 90 dias, constante
+  `DEAD_STOCK_DAYS`). Consumido pela aba "Dashboard" de `Estoque.tsx`
+  (`pages/estoque/EstoqueDashboard.tsx`), aba padrão ao abrir `/estoque`.
 - **Consumo de peças = declaração obrigatória + aprovação, não baixa direta.**
   Ao encerrar tecnicamente uma OS (`encerramentoTecnico`) ou concluir uma
   subtarefa (`finishSubtask`), o técnico é obrigado a declarar peças usadas
@@ -196,7 +208,7 @@ Além do ciclo de OS, o sistema também cobre:
     │   │   │   NovaSolicitacao.tsx
     │   │   ├── agenda/          # calendário de preventivas + programação (ver §6.1)
     │   │   ├── cadastros/       # Ativos.tsx, Setores.tsx, Usuarios.tsx (SUPERVISOR-only)
-    │   │   ├── estoque/         # Estoque.tsx
+    │   │   ├── estoque/         # Estoque.tsx (aba "Dashboard" = EstoqueDashboard.tsx)
     │   │   ├── indicators/      # BacklogChart, PhaseDurationChart, TechnicianEfficiencyPanel
     │   │   ├── pedidos/         # MontarPedido, RevisaoPedidos, Compras
     │   │   └── workorders/      # DetalheOS.tsx + actions/ (um form por transição) + subtasks/

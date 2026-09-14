@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { Part, StockMovement } from "../types";
+import { Part, StockDashboard, StockMovement } from "../types";
 import { StockStatus } from "../domain/enums";
 
 export interface StockEntryInput {
@@ -43,4 +43,8 @@ export function getLedger(token: string, partId: string) {
 
 export function getLowStock(token: string) {
   return apiRequest<Part[]>("/stock/low-stock", { token });
+}
+
+export function getStockDashboard(token: string) {
+  return apiRequest<StockDashboard>("/stock/dashboard", { token });
 }

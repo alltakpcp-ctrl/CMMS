@@ -6,6 +6,7 @@ import { supervisorOrCanManageStock } from "../../middlewares/canManageStock";
 import { asyncHandler } from "../../lib/asyncHandler";
 import {
   getPartLedgerController,
+  getStockDashboardController,
   listLowStockController,
   stockAdjustController,
   stockEntryController,
@@ -28,4 +29,9 @@ stockRoutes.get(
   "/ledger/:partId",
   authorize(Role.TECNICO, Role.SUPERVISOR),
   asyncHandler(getPartLedgerController)
+);
+stockRoutes.get(
+  "/dashboard",
+  authorize(Role.TECNICO, Role.SUPERVISOR),
+  asyncHandler(getStockDashboardController)
 );

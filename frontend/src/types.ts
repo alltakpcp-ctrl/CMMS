@@ -343,6 +343,43 @@ export interface StockMovement {
   createdAt: string;
 }
 
+export interface StockDashboard {
+  summary: {
+    totalParts: number;
+    totalStockQty: number;
+    totalValue: number;
+    partsWithoutCost: number;
+  };
+  byStatus: { status: StockStatus; count: number; stockQty: number }[];
+  byArmario: { armario: string; count: number; stockQty: number }[];
+  bySector: { sectorName: string; sectorId: string | null; count: number; stockQty: number }[];
+  topUsedParts: {
+    partId: string;
+    code: string;
+    description: string;
+    unit: string;
+    totalQuantity: number;
+  }[];
+  deadStock: {
+    id: string;
+    code: string;
+    description: string;
+    stockQty: number;
+    daysSinceLastOutbound: number | null;
+  }[];
+  recentMovements: {
+    id: string;
+    type: StockMovementType;
+    quantity: number;
+    balanceAfter: number;
+    reason: string | null;
+    createdAt: string;
+    partCode: string;
+    partDescription: string;
+    userName: string | null;
+  }[];
+}
+
 export interface PurchaseOrderComment {
   id: string;
   purchaseOrderId: string;

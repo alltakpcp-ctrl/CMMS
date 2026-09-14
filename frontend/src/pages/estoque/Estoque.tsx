@@ -24,6 +24,7 @@ import { Checkbox } from "../../components/Checkbox";
 import { useToast } from "../../components/ToastProvider";
 import { getErrorMessage } from "../../lib/errors";
 import { formatDateTime } from "../../lib/format";
+import { EstoqueDashboard } from "./EstoqueDashboard";
 
 type ModalType = "entry" | "adjust" | "return" | "part" | null;
 
@@ -59,7 +60,7 @@ export default function Estoque() {
   const { showError, showSuccess } = useToast();
   const podeMovimentar = user?.role === Role.SUPERVISOR || user?.canManageStock === true;
 
-  const [tab, setTab] = useState<"movimentacao" | "extrato" | "aprovacoes">("movimentacao");
+  const [tab, setTab] = useState<"dashboard" | "movimentacao" | "extrato" | "aprovacoes">("dashboard");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -310,6 +311,14 @@ export default function Estoque() {
 
       <div className="flex gap-1 border-b border-slate-200">
         <button
+          onClick={() => setTab("dashboard")}
+          className={`px-4 py-2 text-sm font-medium ${
+            tab === "dashboard" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Dashboard
+        </button>
+        <button
           onClick={() => setTab("movimentacao")}
           className={`px-4 py-2 text-sm font-medium ${
             tab === "movimentacao" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"
@@ -336,6 +345,8 @@ export default function Estoque() {
           </button>
         )}
       </div>
+
+      {tab === "dashboard" && <EstoqueDashboard />}
 
       {tab === "movimentacao" && (
         <div className="space-y-4">

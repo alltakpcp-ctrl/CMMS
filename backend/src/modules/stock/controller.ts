@@ -24,3 +24,7 @@ export async function getPartLedgerController(req: Request, res: Response) {
 export async function listLowStockController(_req: Request, res: Response) {
   res.json(await stockService.listLowStockParts());
 }
+
+export async function getStockDashboardController(_req: Request, res: Response) {
+  res.json(await stockService.getStockDashboard());
+}
