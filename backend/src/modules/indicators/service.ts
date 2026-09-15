@@ -87,11 +87,39 @@ export async function getOverview(filters: IndicatorsQuery) {
   const adherence = calculateAdherence(workOrders);
   const backlog = calculateBacklog(workOrders);
 
+  const totalWorkOrders = workOrders.length;
+  const closedWorkOrders = workOrders.filter((wo) => wo.status === WorkOrderStatus.ENCERRADA).length;
+  const cancelledWorkOrders = workOrders.filter((wo) => wo.status === WorkOrderStatus.CANCELADA).length;
+
+  const byTypeMap = new Map<WorkOrderType, number>();
+  for (const wo of workOrders) {
+    byTypeMap.set(wo.type, (byTypeMap.get(wo.type) ?? 0) + 1);
+  }
+  const byType = Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count }));
+
+  // Ignora from/to de propósito: representa o início real do sistema (1ª OS
+  // já criada), não o começo do período filtrado pela query.
+  const oldest = await prisma.workOrder.findFirst({
+    where: { ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }) },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  const firstWorkOrderAt = oldest?.createdAt ?? null;
+  const daysSinceFirst = firstWorkOrderAt
+    ? Math.max(1, Math.ceil((Date.now() - firstWorkOrderAt.getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
+
   return {
     mttrHours: mttr.overall.hours,
     mtbfHours: mtbf.overall.hours,
     adherencePercentage: adherence.percentage,
     backlogTotal: backlog.total,
+    totalWorkOrders,
+    closedWorkOrders,
+    cancelledWorkOrders,
+    byType,
+    firstWorkOrderAt,
+    daysSinceFirst,
   };
 }
 

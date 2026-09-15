@@ -12,6 +12,12 @@ export interface Overview {
   mtbfHours: number | null;
   adherencePercentage: number | null;
   backlogTotal: number;
+  totalWorkOrders: number;
+  closedWorkOrders: number;
+  cancelledWorkOrders: number;
+  byType: { type: string; count: number }[];
+  firstWorkOrderAt: string | null;
+  daysSinceFirst: number | null;
 }
 
 export interface AssetIndicator {

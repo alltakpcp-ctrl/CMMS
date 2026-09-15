@@ -3,7 +3,7 @@
 > Este arquivo é o contexto permanente do projeto. Leia-o por inteiro antes de
 > mexer em qualquer parte do sistema. Ele descreve stack, regras de negócio,
 > modelo de dados, permissões e convenções **do estado atual do código**
-> (última revisão: 2026-09-14).
+> (última revisão: 2026-09-15).
 >
 > O MVP original (specs `01` a `06` em `/specs`) já foi implementado e
 > commitado por inteiro — o projeto evoluiu bem além dele (estoque com fluxo
@@ -599,6 +599,21 @@ das OS encerradas por ativo; MTBF = tempo total observado − tempo total em
 reparo ÷ nº de falhas corretivas; aderência = OS iniciadas dentro da janela
 `scheduledStart` ÷ OS programadas) estão documentadas em
 `backend/src/lib/indicators.ts` — checar lá antes de alterar qualquer cálculo.
+
+- **`/overview`** também retorna, além de MTTR/MTBF/aderência/backlog:
+  `totalWorkOrders`/`closedWorkOrders`/`cancelledWorkOrders` (contagens sobre
+  o mesmo conjunto filtrado por `from`/`to`/`targetSectorId`), `byType`
+  (contagem por `WorkOrderType`) e `firstWorkOrderAt`/`daysSinceFirst` —
+  estes dois últimos **ignoram `from`/`to` de propósito** (sempre a 1ª OS já
+  criada no sistema, não o início do período filtrado), já que alimentam o
+  bloco "Overview do sistema" do Dashboard (`frontend/src/pages/Dashboard.tsx`),
+  que chama `getOverview` sem filtros. Esse bloco (visível só a
+  TECNICO/SUPERVISOR, mesmo gate do endpoint) mostra o total de OS desde o
+  início como "folhas de papel economizadas" (1 OS = 1 folha, decisão de
+  produto — cada OS aberta no sistema substitui uma folha que antes seria
+  impressa/preenchida à mão), convertidas em resmas quando ≥ 500, além de
+  card grid (OS encerradas, backlog, média de OS/dia) e distribuição por
+  tipo.
 
 ---
 
