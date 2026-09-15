@@ -17,9 +17,14 @@ export function toDateTimeLocalInput(value: string | null | undefined): string {
   )}`;
 }
 
-export function formatHours(value: number | null): string {
+// Aceita number ou string porque campos Decimal do Postgres (ex.:
+// Subtask.estimatedHours, WorkOrder.estimatedHours) chegam do backend como
+// string na serialização JSON, mesmo o tipo TS declarando number.
+export function formatHours(value: number | string | null): string {
   if (value === null) return "—";
-  return `${value.toFixed(1)} h`;
+  const num = typeof value === "string" ? Number(value) : value;
+  if (Number.isNaN(num)) return "—";
+  return `${num.toFixed(1)} h`;
 }
 
 export function formatPercentage(value: number | null): string {
