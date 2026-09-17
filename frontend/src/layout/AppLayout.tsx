@@ -33,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/cadastros/setores", label: "Setores", roles: [Role.SUPERVISOR] },
   { to: "/estoque", label: "Estoque", roles: [Role.SUPERVISOR, Role.TECNICO] },
   { to: "/cadastros/usuarios", label: "Usuários", roles: [Role.SUPERVISOR] },
+  { to: "/bau", label: "Baú", roles: [Role.SUPERVISOR] },
 ];
 
 export function AppLayout() {

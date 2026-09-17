@@ -640,11 +640,47 @@ Sem suíte de teste de frontend configurada no projeto — validado por
 limpos; sem chamada a banco nesta fase (é só código de UI consumindo um
 endpoint já testado na Fase 2).
 
-Fases restantes (7 a 9 — não implementadas): tela nova do Baú; ajuste do
-botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
-`deleteMaintenancePlan`, que bloqueia com `422` sempre que há qualquer OS
-vinculada — o que é o caso de todo plano rascunho, então hoje esse botão
-nunca funciona nesse cenário).
+**Fase 7 (tela do Baú, pronta):** `pages/Bau.tsx`, rota `/bau`
+(`RequireRole [SUPERVISOR]` em `App.tsx`) + item no menu lateral
+(`AppLayout.tsx`, `SUPERVISOR`-only). Consome `GET /workorders/bau` (Fase
+5) via `api/workorders.ts#getBau`. Tabela simples (`Table`/`Badge`/
+`EmptyState` já existentes): número, título, ativo, tipo, badge "Excluída"/
+"Cancelada" (`bauInfo.kind`), motivo, autor, data — clicar na linha navega
+pra `/ordens/:id` (que já mostra o aviso de exclusão, Fase 6). `BauInfo`/
+`BauItem` novos em `types.ts`.
+
+**Fase 8 (botão "Excluir" do plano corrigido, pronta):** `deleteMaintenancePlan`
+continua existindo do jeito que estava (só apaga plano sem NENHUMA OS
+vinculada — o que nunca é o caso de um rascunho). O que mudou é a reação
+do frontend ao erro: `MaintenancePlanModal.tsx#handleDelete` agora detecta
+`422 MAINTENANCE_PLAN_HAS_WORK_ORDERS` e mostra uma mensagem específica —
+se o plano era rascunho (`periodicity` null na origem, guardado em
+`wasDraft`), orienta a excluir a OS que o originou (Fase 2/6, cascateia
+pro plano automaticamente); senão, orienta a desativar (`active=false`) em
+vez de excluir. Antes disso o usuário só via a mensagem genérica do
+backend, que sugeria "desativar" mesmo quando excluir a OS (caminho novo,
+melhor pro caso de rascunho) já resolvia o problema de vez.
+
+**Fase 9 (fechamento, pronta):** jornada completa das Fases 1-6 validada
+de ponta a ponta contra produção num único smoke test (criar OS PREVENTIVA
+→ plano rascunho vinculado → indicadores contam → listagem inclui → excluir
+→ ler direto do banco (não cache) confirmando `excludedAt`/cascata no
+plano/`status` inalterado → indicadores voltam ao baseline → listagens
+excluem por padrão e reincluem com o parâmetro → Baú mostra com
+`bauInfo` correto → OS excluída rejeita `cancelar()` com
+`409 ALREADY_EXCLUDED`) — 16/16, resíduo zero.
+
+**Estado final da feature "exclusão lógica de OS / baú de cancelados e
+excluídos": as 9 fases estão prontas e em produção** (backend + frontend).
+Gap de infraestrutura que permanece, fora do escopo desta feature: (1)
+`TEST_DATABASE_URL` não configurado neste `.env` local — toda a validação
+das 9 fases foi feita por smoke test manual contra produção (dados
+prefixados, limpos ao final, resíduo verificado a cada rodada), nunca pela
+suíte automatizada real; (2) o endpoint `-pooler` do Neon em `DATABASE_URL`
+combinado com `$transaction` interativo do Prisma, que gerou timeouts
+intermitentes (`P2028`) especificamente em `createWorkOrder(PREVENTIVA)` e
+em `excluir()` durante testes de alta latência — pré-existente ao
+projeto inteiro, não introduzido por esta feature.
 
 ---
 

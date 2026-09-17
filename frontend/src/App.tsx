@@ -17,6 +17,7 @@ import Estoque from "./pages/estoque/Estoque";
 import MontarPedido from "./pages/pedidos/MontarPedido";
 import RevisaoPedidos from "./pages/pedidos/RevisaoPedidos";
 import Compras from "./pages/pedidos/Compras";
+import Bau from "./pages/Bau";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireRole } from "./auth/RequireRole";
 import { RequireFlag } from "./auth/RequireFlag";
@@ -145,6 +146,14 @@ export default function App() {
           element={
             <RequireRole roles={[Role.SUPERVISOR]}>
               <Usuarios />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/bau"
+          element={
+            <RequireRole roles={[Role.SUPERVISOR]}>
+              <Bau />
             </RequireRole>
           }
         />

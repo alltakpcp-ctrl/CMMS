@@ -15,6 +15,7 @@ import { MultiSearchableSelect } from "../components/MultiSearchableSelect";
 import { Button } from "../components/Button";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
+import { ApiError } from "../api/client";
 
 interface MaintenancePlanModalProps {
   planId?: string;
@@ -93,6 +94,11 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
   const [form, setForm] = useState<FormState>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Rascunho de verdade (periodicity null na origem) — não deriva de
+  // form.periodicity, que já vem pré-preenchido com MENSAL pro form (ver
+  // planToForm). Usado só pra dar a mensagem certa se a exclusão falhar
+  // por ter OS vinculada (§5.2/Fase 8 do CLAUDE.md).
+  const [wasDraft, setWasDraft] = useState(false);
 
   // Só usados na criação — gera a 1ª OS (já PROGRAMADA) junto com o plano.
   // Editar um plano existente não agenda uma nova OS.
@@ -114,7 +120,10 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
     setLoadingPlan(true);
     maintenancePlansApi
       .getMaintenancePlan(token, planId)
-      .then((plan) => setForm(planToForm(plan)))
+      .then((plan) => {
+        setForm(planToForm(plan));
+        setWasDraft(plan.periodicity === null);
+      })
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoadingPlan(false));
   }, [token, planId, showError]);
@@ -175,7 +184,21 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
       onSaved();
       onClose();
     } catch (err) {
-      showError(getErrorMessage(err));
+      // Fase 8 (§5.2 do CLAUDE.md): este endpoint só apaga um plano sem
+      // NENHUMA OS vinculada — o que nunca é o caso de um plano rascunho
+      // (a OS que o originou sempre está lá). Em vez do erro genérico do
+      // backend (que ainda sugere "desativar", conselho desatualizado desde
+      // que a exclusão de OS passou a cascatear pro plano — Fase 2),
+      // orienta pro caminho certo em cada caso.
+      if (err instanceof ApiError && err.code === "MAINTENANCE_PLAN_HAS_WORK_ORDERS") {
+        showError(
+          wasDraft
+            ? "Este plano é um rascunho com OS vinculada — não é excluído aqui. Abra a OS que o originou e use \"Excluir OS\" (só funciona enquanto ela estiver ABERTA); o plano é excluído junto, automaticamente."
+            : "Este plano já tem histórico de OS e não pode ser excluído. Desmarque \"Ativo\" para desativá-lo em vez de excluir."
+        );
+      } else {
+        showError(getErrorMessage(err));
+      }
     } finally {
       setDeleting(false);
     }

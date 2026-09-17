@@ -312,6 +312,19 @@ export interface Paginated<T> {
   pageSize: number;
 }
 
+// Baú (Fase 5/7, §5.2 do CLAUDE.md) — normaliza os dois mecanismos de
+// auditoria (exclusão vs. cancelamento) num único formato.
+export interface BauInfo {
+  kind: "EXCLUIDA" | "CANCELADA";
+  reason: string | null;
+  by: PublicUser | null;
+  at: string;
+}
+
+export interface BauItem extends WorkOrder {
+  bauInfo: BauInfo;
+}
+
 export interface PartRequest {
   id: string;
   itemType: PartRequestItemType;

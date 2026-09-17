@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { Paginated, WorkOrder } from "../types";
+import { BauItem, Paginated, WorkOrder } from "../types";
 import { Disciplina, MaintenancePeriodicity, Priority, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 export interface CreateWorkOrderInput {
@@ -139,6 +139,14 @@ export function cancelar(token: string, id: string, input: CancelarInput) {
 
 export function excluir(token: string, id: string, input: ExcluirInput) {
   return apiRequest<WorkOrder>(`/workorders/${id}/excluir`, { method: "POST", token, body: input });
+}
+
+export function getBau(token: string, filters: { page?: number; pageSize?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
+  const qs = params.toString();
+  return apiRequest<Paginated<BauItem>>(`/workorders/bau${qs ? `?${qs}` : ""}`, { token });
 }
 
 export function timelineOverride(token: string, id: string, input: TimelineOverrideInput) {
