@@ -262,6 +262,8 @@ específicas via middleware dedicado (não via `authorize(role)`):
 | (5) Encerramento técnico | ❌ | ✅ | ✅ |
 | (5) Validar e dar baixa na OS / reprovar validação | ❌ | ❌ | ✅ |
 | Cancelar OS (qualquer status ≠ ENCERRADA, nota obrigatória) | ❌ | ❌ | ✅ |
+| Excluir OS (só `ABERTA`, motivo obrigatório — §5.2) | ❌ | ❌ | ✅ |
+| Ver Baú (`GET /workorders/bau` — OS cancelada + excluída, §5.2) | ❌ | ❌ | ✅ |
 | Override manual de fase (`PATCH /:id/timeline`, pula a máquina de estados) | ❌ | ❌ | ✅ |
 | Subtarefas: abrir | ❌ | ✅ | ✅ |
 | Subtarefas: fechar/cancelar/reatribuir | ❌ | 🔒 só se dono (`assignedToId`) | ✅ qualquer uma |
@@ -586,8 +588,37 @@ introduzido por esta feature — não tocado aqui por estar fora do escopo
 declarado das Fases 3/4; sinalizar se voltar a acontecer com frequência em
 produção real (não só em teste de alta latência).
 
-Fases restantes (5 a 9 — não implementadas): endpoint do Baú (`status =
-CANCELADA OR excludedAt IS NOT NULL`); ação "Excluir OS" em
+**Fase 5 (endpoint do Baú, pronta):** `GET /workorders/bau`
+(`SUPERVISOR`-only, paginado) — `workorders/service.ts#listBau`, `where:
+{ OR: [{ status: CANCELADA }, { excludedAt: { not: null } }] }`, ordenado
+por `updatedAt desc`. Cadastrada **antes** de `GET /:id` em `routes.ts`
+(senão o Express casaria `bau` como `:id`). Normaliza os dois mecanismos de
+auditoria (campos diretos da exclusão vs. a `StatusHistory` mais recente
+com `toStatus: CANCELADA`) num único `bauInfo: { kind: "EXCLUIDA" |
+"CANCELADA", reason, by, at }` por item, pra Fase 7 (tela) não precisar
+conhecer a diferença por baixo.
+
+**Guard "OS excluída fica congelada" (adicionado junto, não parte do
+desenho original):** a Fase 5 expôs uma lacuna — como `excluir()` nunca
+muda `WorkOrder.status` (só preenche os 3 campos, permanece `ABERTA`), nada
+impedia um SUPERVISOR de chamar `cancelar()`/`triagem()`/`timelineOverride`/
+`reprogramacao()` numa OS já excluída depois, o que geraria um registro
+contraditório no Baú (`CANCELADA` **e** `excludedAt` preenchido ao mesmo
+tempo). Corrigido com um guard `if (workOrder.excludedAt) throw 409
+ALREADY_EXCLUDED` logo após buscar a OS em `applyTransition` (cobre
+`triagem`/`planejamento`/`programacao`/`iniciar`/`validar`/`cancelar`/
+`registrar` de uma vez, todas passam por ali) **e** repetido em
+`reprogramacao()`/`timelineOverride()`, que têm suas próprias transações
+manuais e não passam por `applyTransition`. Uma OS excluída agora é
+terminal de fato — nenhuma rota consegue mais alterá-la.
+
+Testado por `src/test/workorder-bau.test.ts` (9 casos: os dois `kind` do
+Baú, OS ativa ausente, 403 por role, e os 4 guards de "congelada").
+Validado por smoke test manual contra produção (mesma limitação de
+`TEST_DATABASE_URL` ausente) — 13/13, sem a instabilidade de pooler das
+Fases 3/4 (só operações `CORRETIVA`, mais leves).
+
+Fases restantes (6 a 9 — não implementadas): ação "Excluir OS" em
 `DetalheOS.tsx` (só visível em `ABERTA` + `SUPERVISOR`); tela nova do Baú;
 ajuste do botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
 `deleteMaintenancePlan`, que bloqueia com `422` sempre que há qualquer OS

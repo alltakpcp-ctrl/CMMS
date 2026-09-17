@@ -18,6 +18,7 @@ import {
   EncerramentoTecnicoInput,
   ExcluirInput,
   IniciarInput,
+  ListBauQuery,
   ListWorkOrdersQuery,
   PlanejamentoInput,
   ProgramacaoInput,
@@ -174,6 +175,57 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
   return { items, total, page, pageSize };
 }
 
+// Baú (Fase 5, §5.2 do CLAUDE.md): OS CANCELADA + OS excluída, cada uma com
+// motivo/quem/quando. SUPERVISOR-only (autorização na própria rota) — sem
+// filtro de setor, mesma isenção que SUPERVISOR já tem em todo o sistema.
+// Os dois mecanismos de auditoria são diferentes por baixo (excludedAt/
+// excludedById/exclusionReason direto na OS vs. a StatusHistory da
+// transição ABERTA/qualquer→CANCELADA) — normalizados aqui num único
+// `bauInfo` pra Fase 7 (tela) não precisar conhecer essa diferença.
+export async function listBau(query: ListBauQuery) {
+  const { page = 1, pageSize = 20 } = query;
+
+  const where: Prisma.WorkOrderWhereInput = {
+    OR: [{ status: WorkOrderStatus.CANCELADA }, { excludedAt: { not: null } }],
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.workOrder.findMany({
+      where,
+      include: {
+        ...workOrderInclude,
+        excludedBy: { select: publicUserSelect },
+        // Só a transição mais recente para CANCELADA — suficiente pra
+        // motivo/quem/quando; histórico completo já é visível em GET /:id.
+        statusHistory: {
+          where: { toStatus: WorkOrderStatus.CANCELADA },
+          orderBy: { changedAt: "desc" },
+          take: 1,
+          include: { changedBy: { select: publicUserSelect } },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.workOrder.count({ where }),
+  ]);
+
+  const withBauInfo = items.map((wo) => {
+    const bauInfo = wo.excludedAt
+      ? { kind: "EXCLUIDA" as const, reason: wo.exclusionReason, by: wo.excludedBy, at: wo.excludedAt }
+      : {
+          kind: "CANCELADA" as const,
+          reason: wo.statusHistory[0]?.note ?? null,
+          by: wo.statusHistory[0]?.changedBy ?? null,
+          at: wo.statusHistory[0]?.changedAt ?? wo.updatedAt,
+        };
+    return { ...wo, bauInfo };
+  });
+
+  return { items: withBauInfo, total, page, pageSize };
+}
+
 export async function getWorkOrderById(id: string, user: AuthPayload) {
   const workOrder = await prisma.workOrder.findUnique({
     where: { id },
@@ -237,6 +289,11 @@ async function applyTransition({ id, to, role, userId, note, context, mutate }: 
     });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+    // Uma OS excluída fica congelada (§5.2 do CLAUDE.md) — mesmo guard em
+    // timelineOverride()/reprogramacao(), que passam ao largo desta função.
+    if (workOrder.excludedAt) {
+      throw new AppError(409, "ALREADY_EXCLUDED", "Esta OS foi excluída e não pode mais ser alterada.");
     }
 
     const result = canTransition({
@@ -431,6 +488,9 @@ export async function reprogramacao(id: string, input: ReprogramacaoInput, user:
     const workOrder = await tx.workOrder.findUnique({ where: { id } });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+    if (workOrder.excludedAt) {
+      throw new AppError(409, "ALREADY_EXCLUDED", "Esta OS foi excluída e não pode mais ser alterada.");
     }
 
     if (workOrder.status === WorkOrderStatus.ENCERRADA || workOrder.status === WorkOrderStatus.CANCELADA) {
@@ -842,6 +902,9 @@ export function timelineOverride(id: string, dto: TimelineOverrideInput, user: A
     const workOrder = await tx.workOrder.findUnique({ where: { id } });
     if (!workOrder) {
       throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+    if (workOrder.excludedAt) {
+      throw new AppError(409, "ALREADY_EXCLUDED", "Esta OS foi excluída e não pode mais ser alterada.");
     }
 
     if (!Object.values(WorkOrderStatus).includes(dto.toStatus as WorkOrderStatus)) {

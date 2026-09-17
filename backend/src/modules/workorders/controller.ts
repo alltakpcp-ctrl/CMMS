@@ -7,6 +7,7 @@ import {
   encerramentoTecnicoSchema,
   excluirSchema,
   iniciarSchema,
+  listBauQuerySchema,
   listWorkOrdersQuerySchema,
   planejamentoSchema,
   programacaoSchema,
@@ -37,6 +38,11 @@ export async function listWorkOrdersController(req: Request, res: Response) {
 
 export async function getWorkOrderController(req: Request, res: Response) {
   res.json(await workOrdersService.getWorkOrderById(req.params.id, requireUser(req)));
+}
+
+export async function getBauController(req: Request, res: Response) {
+  const query = listBauQuerySchema.parse(req.query);
+  res.json(await workOrdersService.listBau(query));
 }
 
 export async function triagemController(req: Request, res: Response) {

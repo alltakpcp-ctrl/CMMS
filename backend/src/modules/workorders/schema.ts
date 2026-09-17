@@ -136,6 +136,13 @@ export const excluirSchema = z.object({
   reason: z.string().min(1, "Motivo é obrigatório para excluir a OS."),
 });
 
+// Baú (Fase 5, §5.2 do CLAUDE.md) — só paginação, sem filtro de status (o
+// próprio endpoint já restringe a CANCELADA/excluída).
+export const listBauQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 // Override manual da timeline pelo SUPERVISOR — não passa pela máquina de
 // estados (canTransition). Nota é obrigatória por ser uma ação excepcional.
 export const timelineOverrideSchema = z.object({
@@ -157,4 +164,5 @@ export type EncerramentoTecnicoInput = z.infer<typeof encerramentoTecnicoSchema>
 export type ValidarInput = z.infer<typeof validarSchema>;
 export type CancelarInput = z.infer<typeof cancelarSchema>;
 export type ExcluirInput = z.infer<typeof excluirSchema>;
+export type ListBauQuery = z.infer<typeof listBauQuerySchema>;
 export type TimelineOverrideInput = z.infer<typeof timelineOverrideSchema>;

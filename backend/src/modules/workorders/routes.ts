@@ -8,6 +8,7 @@ import {
   createWorkOrderController,
   encerramentoTecnicoController,
   excluirController,
+  getBauController,
   getWorkOrderController,
   iniciarController,
   listWorkOrdersController,
@@ -31,6 +32,10 @@ workOrdersRoutes.post(
   asyncHandler(createWorkOrderController)
 );
 workOrdersRoutes.get("/", asyncHandler(listWorkOrdersController));
+// Baú (Fase 5, §5.2 do CLAUDE.md): OS CANCELADA + OS excluída, com
+// motivo/quem/quando. SUPERVISOR-only. Precisa vir ANTES de "/:id" — senão
+// Express casaria "bau" como :id.
+workOrdersRoutes.get("/bau", authorize(Role.SUPERVISOR), asyncHandler(getBauController));
 workOrdersRoutes.get("/:id", asyncHandler(getWorkOrderController));
 
 // Etapa 2 — Triagem e Planejamento.
