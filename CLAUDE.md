@@ -355,10 +355,12 @@ rascunho), `priorityAdjustedByTech`/`priorityOriginal`/`priorityAdjustedById`/`p
 - `excludedAt`/`excludedById`/`excludedBy`/`exclusionReason` — colunas de
   **exclusão lógica**, adicionadas pela migração
   `20260917115159_add_work_order_exclusion` e preenchidas por `POST
-  /workorders/:id/excluir` (Fases 1 e 2 de 9 do plano — ver §5.2). **Ainda
-  não há filtro de indicador/listagem nem tela usando esses campos** (Fases
-  3+). Não confundir com `cancelar()`/`CANCELADA`, que já existe e continua
-  sendo o caminho para qualquer OS que já saiu da fase inicial.
+  /workorders/:id/excluir` (ver §5.2), diretamente pela OS ou em cascata a
+  partir de `POST /maintenance-plans/:id/excluir`. Filtradas por indicador e
+  listagem (Fases 3/4 do §5.2) e visíveis no Baú (Fase 5/7). Não confundir
+  com `cancelar()`/`CANCELADA`: as duas ações convivem em qualquer status
+  ≠ `ENCERRADA` — "cancelada" é trabalho real interrompido, "excluída" é
+  "isto não devia existir/continuar" (ajuste 2026-09-17, ver §5.2).
 
 ### WorkOrderAssignee (manutentores de apoio — N:N)
 `id`, `workOrderId`, `userId`, `createdAt`. `@@unique([workOrderId, userId])`.
@@ -391,10 +393,13 @@ PREVENTIVA sem que exista plano prévio para o ativo), `estimatedHours`?
   PLAN_HAS_OPEN_WORK_ORDER`) enquanto existir uma OS do plano em status fora
   de `ENCERRADA`/`CANCELADA`.
 - `excludedAt`/`excludedById`/`excludedBy`/`exclusionReason` — mesma exclusão
-  lógica descrita acima para `WorkOrder`, aplicada em cascata (dentro de
-  `POST /workorders/:id/excluir`) quando a OS que originou este plano
-  rascunho é excluída e nenhuma outra OS não-excluída ainda aponta pra ele
-  (ver §5.2).
+  lógica descrita acima para `WorkOrder`, preenchida de dois jeitos (ver
+  §5.2): (1) em cascata, automaticamente, quando a única OS não-excluída de
+  um plano **rascunho** (`periodicity === null`) é excluída ou cancelada
+  (`cascadeExcludeDraftMaintenancePlan`); (2) diretamente, por ação do
+  supervisor via `POST /maintenance-plans/:id/excluir` (funciona em plano
+  rascunho ou já com periodicidade, e mata junto toda OS dele que ainda não
+  esteja `ENCERRADA`).
 
 ### Execution (registro de execução — 1:N com WorkOrder)
 `id`, `workOrderId` (→ WorkOrder, sem unique — uma OS pode ter mais de um
@@ -495,10 +500,13 @@ altura sem PT aprovada. Se for pedido para reativar esse fluxo, tratar como
 feature nova a reconstruir (os modelos de dados já existem, mas a lógica de
 service/rotas precisa ser recriada), não como bug a corrigir.
 
-### 5.2 — Exclusão lógica de OS/plano ("baú de cancelados e excluídos") — EM CONSTRUÇÃO, só Fase 1 pronta
-Feature planejada em 9 fases para dar ao SUPERVISOR um caminho de descarte de
-OS abertas por engano, sem nunca apagar linha nenhuma do banco nem perder
-histórico/auditoria. **Estado real em 2026-09-17: Fases 1 e 2 prontas.**
+### 5.2 — Exclusão lógica de OS/plano ("baú de cancelados e excluídos") — PRONTA, em produção
+Feature planejada originalmente em 9 fases (histórico detalhado abaixo) pra
+dar ao SUPERVISOR um caminho de descarte de OS/plano abertos por engano ou
+descontinuados, sem nunca apagar linha nenhuma do banco nem perder
+histórico/auditoria. **As 9 fases + o ajuste de escopo de 2026-09-17 estão
+prontos e em produção** (backend + frontend) — ver "Estado final" ao fim
+desta seção antes de ler o histórico fase a fase logo abaixo.
 Fase 1 — migração `20260917115159_add_work_order_exclusion` (colunas
 `excludedAt`/`excludedById`/`exclusionReason` em `WorkOrder` e
 `MaintenancePlan`, ver §5). Fase 2 — endpoint `POST /workorders/:id/excluir`
