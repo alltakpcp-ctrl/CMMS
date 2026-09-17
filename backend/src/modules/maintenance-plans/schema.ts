@@ -58,6 +58,9 @@ export const listMaintenancePlansQuerySchema = z.object({
   discipline: z.nativeEnum(MaintenanceDiscipline).optional(),
   priority: z.nativeEnum(Priority).optional(),
   active: z.coerce.boolean().optional(),
+  // Fase 4 do "baú" (CLAUDE.md §5.2): por padrão, a Agenda não vê plano
+  // excluído em cascata. Só o Baú (Fase 5) passa true pra enxergá-lo.
+  incluirExcluidos: z.coerce.boolean().optional().default(false),
 });
 
 export type CreateMaintenancePlanInput = z.infer<typeof createMaintenancePlanSchema>;

@@ -20,8 +20,13 @@ import {
 import { WorkOrderStatus, WorkOrderType, Priority } from "../../domain/enums";
 import { IndicatorsQuery } from "./schema";
 
+// excludedAt: null em todo where deste módulo (Fase 3 do "baú" — CLAUDE.md
+// §5.2): uma OS excluída (erro de abertura, nunca chegou a andar) não deve
+// contar em NENHUM indicador — diferente de CANCELADA, que continua
+// contando normalmente como desfecho legítimo do processo.
 async function fetchWorkOrdersForIndicators(filters: IndicatorsQuery): Promise<WorkOrderForIndicators[]> {
   const where: Prisma.WorkOrderWhereInput = {
+    excludedAt: null,
     ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
     ...((filters.from || filters.to) && {
       createdAt: {
@@ -98,9 +103,11 @@ export async function getOverview(filters: IndicatorsQuery) {
   const byType = Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count }));
 
   // Ignora from/to de propósito: representa o início real do sistema (1ª OS
-  // já criada), não o começo do período filtrado pela query.
+  // já criada), não o começo do período filtrado pela query. excludedAt:
+  // null pra uma OS excluída (erro de abertura) não virar "a primeira OS do
+  // sistema" por engano.
   const oldest = await prisma.workOrder.findFirst({
-    where: { ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }) },
+    where: { excludedAt: null, ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }) },
     orderBy: { createdAt: "asc" },
     select: { createdAt: true },
   });
@@ -153,6 +160,7 @@ export async function getBacklog(filters: IndicatorsQuery) {
 
 export async function getLifecycle(filters: IndicatorsQuery) {
   const where: Prisma.WorkOrderWhereInput = {
+    excludedAt: null,
     ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
     ...((filters.from || filters.to) && {
       createdAt: {
@@ -188,6 +196,7 @@ export async function getLifecycle(filters: IndicatorsQuery) {
 
 export async function getDistribution(filters: IndicatorsQuery) {
   const where: Prisma.WorkOrderWhereInput = {
+    excludedAt: null,
     ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
     ...((filters.from || filters.to) && {
       createdAt: {
@@ -231,6 +240,7 @@ export async function getDistribution(filters: IndicatorsQuery) {
 
     const previousCount = await prisma.workOrder.count({
       where: {
+        excludedAt: null,
         ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
         createdAt: { gte: prevFrom, lt: prevTo },
       },
@@ -254,6 +264,7 @@ export async function getTechnicianEfficiency(filters: IndicatorsQuery) {
   // zeradas/null).
   const currentLoad = await prisma.workOrder.findMany({
     where: {
+      excludedAt: null,
       status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
       ...(filters.targetSectorId && { targetSectorId: filters.targetSectorId }),
     },

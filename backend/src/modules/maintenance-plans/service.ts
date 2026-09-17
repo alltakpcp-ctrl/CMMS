@@ -151,6 +151,10 @@ async function openWorkOrderByPlanId(planIds: string[]): Promise<Map<string, Ope
 
 export async function listMaintenancePlans(query: ListMaintenancePlansQuery) {
   const where: Prisma.MaintenancePlanWhereInput = {
+    // Fase 4 do "baú" (CLAUDE.md §5.2): por padrão some da Agenda qualquer
+    // plano excluído em cascata — só quem passa incluirExcluidos=true (o
+    // Baú, Fase 5) vê.
+    ...(!query.incluirExcluidos && { excludedAt: null }),
     assetId: query.assetId,
     discipline: query.discipline,
     priority: query.priority,

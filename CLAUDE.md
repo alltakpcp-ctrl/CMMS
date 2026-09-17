@@ -545,11 +545,49 @@ validado por um smoke test manual e descartável direto contra produção
 confirmado zero) — rodar a suíte de verdade na primeira vez que houver um
 branch de teste disponível.
 
-Fases restantes (3 a 9 — não implementadas): filtro `excludedAt: null` em
-todo `where` de `lib/indicators.ts` e das queries do Dashboard; filtro
-`excludedAt: null` por padrão em `listWorkOrders`/`listMaintenancePlans`
-(Fila de Triagem, Agenda, `MinhasOS`, `AgendaProgramacao`); endpoint do Baú
-(`status = CANCELADA OR excludedAt IS NOT NULL`); ação "Excluir OS" em
+**Fase 3 (indicadores, pronta):** todo `where` de
+`indicators/service.ts` (`fetchWorkOrdersForIndicators`, `getOverview`'s
+`oldest`/`firstWorkOrderAt`, `getLifecycle`, `getDistribution` + seu
+`previousCount` de tendência, `getTechnicianEfficiency`'s `currentLoad`) —
+6 pontos — ganhou `excludedAt: null`. Uma OS excluída não conta em MTTR,
+MTBF, aderência, backlog, ciclo de vida, distribuição, eficiência por
+técnico, `totalWorkOrders`/`byType`/`firstWorkOrderAt` do Dashboard. Uma OS
+`CANCELADA` continua contando normalmente em tudo isso — só `excludedAt`
+filtra, nunca `status`.
+
+**Fase 4 (listagens operacionais, pronta):** `listWorkOrders` e
+`listMaintenancePlans` ganharam `excludedAt: null` por padrão no `where`,
+condicionado a um novo parâmetro de query — `incluirExcluidas` em
+`GET /workorders`, `incluirExcluidos` em `GET /maintenance-plans` (ambos
+`boolean`, default `false`). Como nenhuma tela hoje envia esse parâmetro,
+toda listagem existente (Fila de Triagem, `ListaOS`, `MinhasOS`, Agenda,
+`AgendaProgramacao`, `PreventivasTecnico`) já filtra sozinha, sem precisar
+tocar em nenhum código de frontend — só o futuro Baú (Fase 5) vai passar
+`true`. `getWorkOrderById` (`GET /workorders/:id`, acesso direto por id)
+**não** foi alterado de propósito — continua acessível mesmo excluída.
+
+Testado por `src/test/workorder-exclusao-visibilidade.test.ts` (6 casos,
+asserções por delta antes/depois — o banco de teste é compartilhado entre
+arquivos, sem reset por arquivo). Mesma limitação de `TEST_DATABASE_URL`
+ausente das Fases 1/2 — validado por smoke test manual contra produção,
+dados prefixados, limpos ao final.
+
+**Achado de infraestrutura (fora do escopo desta feature, não corrigido):**
+durante a validação em produção, `POST /workorders` para `PREVENTIVA` e o
+próprio `POST /workorders/:id/excluir` esbarraram repetidamente no timeout
+de 5s de transação interativa do Prisma (`P2028`), com a mesma chamada às
+vezes passando e às vezes não. Causa provável: a `DATABASE_URL` usa o
+endpoint `-pooler` do Neon (pooling em modo transação, estilo PgBouncer),
+que é uma combinação conhecida por instabilidade com `prisma.$transaction`
+interativo — Prisma/Neon recomendam uma conexão direta (não pooled) para
+esse caso. Isso é pré-existente (afeta `createWorkOrder`, `applyTransition`,
+`timelineOverride`, `reprogramacao`, e agora também `excluir`) e não foi
+introduzido por esta feature — não tocado aqui por estar fora do escopo
+declarado das Fases 3/4; sinalizar se voltar a acontecer com frequência em
+produção real (não só em teste de alta latência).
+
+Fases restantes (5 a 9 — não implementadas): endpoint do Baú (`status =
+CANCELADA OR excludedAt IS NOT NULL`); ação "Excluir OS" em
 `DetalheOS.tsx` (só visível em `ABERTA` + `SUPERVISOR`); tela nova do Baú;
 ajuste do botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
 `deleteMaintenancePlan`, que bloqueia com `422` sempre que há qualquer OS

@@ -147,6 +147,9 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
   const targetSectorId = user.role === Role.OPERADOR ? undefined : rest.targetSectorId;
 
   const where: Prisma.WorkOrderWhereInput = {
+    // Fase 4 do "baú" (CLAUDE.md §5.2): por padrão some da listagem qualquer
+    // OS excluída — só quem passa incluirExcluidas=true (o Baú, Fase 5) vê.
+    ...(!rest.incluirExcluidas && { excludedAt: null }),
     ...(rest.status && { status: rest.status }),
     ...(rest.type && { type: rest.type }),
     ...(targetSectorId && { targetSectorId }),

@@ -20,6 +20,9 @@ export const listWorkOrdersQuerySchema = z.object({
   asSupport: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  // Fase 4 do "baú" (CLAUDE.md §5.2): por padrão, toda listagem esconde OS
+  // excluída. Só o Baú (Fase 5) passa true pra enxergá-las.
+  incluirExcluidas: z.coerce.boolean().optional().default(false),
 });
 
 export const triagemSchema = z.object({
