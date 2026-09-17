@@ -269,6 +269,40 @@ async function assertNoOpenSubtasks(tx: Prisma.TransactionClient, workOrderId: s
   }
 }
 
+// Cascata pro plano rascunho (ver CLAUDE.md §5.2/§2): só quando a OS que está
+// saindo de circulação (cancelada ou excluída) era a única (ou a última
+// não-excluída) vinculada a um plano ainda sem periodicidade — um plano que
+// já tem outra OS de verdade não é tocado. Compartilhada entre excluir() e
+// cancelar() para as duas ações terem exatamente o mesmo critério.
+async function cascadeExcludeDraftMaintenancePlan(
+  tx: Prisma.TransactionClient,
+  workOrder: WorkOrder,
+  userId: string,
+  reason: string
+) {
+  if (!workOrder.maintenancePlanId) {
+    return;
+  }
+  const plan = await tx.maintenancePlan.findUnique({ where: { id: workOrder.maintenancePlanId } });
+  if (!plan || plan.periodicity !== null || plan.excludedAt) {
+    return;
+  }
+  const otherActiveWorkOrders = await tx.workOrder.count({
+    where: { maintenancePlanId: plan.id, id: { not: workOrder.id }, excludedAt: null },
+  });
+  if (otherActiveWorkOrders > 0) {
+    return;
+  }
+  await tx.maintenancePlan.update({
+    where: { id: plan.id },
+    data: {
+      excludedAt: new Date(),
+      excludedById: userId,
+      exclusionReason: reason,
+    },
+  });
+}
+
 interface ApplyTransitionParams {
   id: string;
   to: WorkOrderStatus;
@@ -807,11 +841,21 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
     role: user.role,
     userId: user.userId,
     note: input.note,
-    mutate: async (tx) => {
+    mutate: async (tx, workOrder) => {
       await tx.execution.updateMany({
         where: { workOrderId: id, finishedAt: null },
         data: { finishedAt: new Date() },
       });
+
+      // Mesma cascata de excluir() (ver CLAUDE.md §5.2/§2): cancelar a única
+      // OS PREVENTIVA de um plano ainda rascunho (sem periodicidade) leva o
+      // plano junto, em vez de deixá-lo órfão e visível na Agenda para sempre.
+      await cascadeExcludeDraftMaintenancePlan(
+        tx,
+        workOrder,
+        user.userId,
+        `Plano rascunho excluído automaticamente junto com a OS ${workOrder.number} (cancelada: ${input.note}).`
+      );
     },
   });
 }
@@ -863,27 +907,12 @@ export async function excluir(id: string, input: ExcluirInput, user: AuthPayload
       },
     });
 
-    // Cascata pro plano rascunho (ver CLAUDE.md §5.2): só quando esta OS era
-    // a única (ou a última não-excluída) vinculada a um plano ainda sem
-    // periodicidade — um plano que já tem outra OS de verdade não é tocado.
-    if (workOrder.maintenancePlanId) {
-      const plan = await tx.maintenancePlan.findUnique({ where: { id: workOrder.maintenancePlanId } });
-      if (plan && plan.periodicity === null && !plan.excludedAt) {
-        const otherActiveWorkOrders = await tx.workOrder.count({
-          where: { maintenancePlanId: plan.id, id: { not: id }, excludedAt: null },
-        });
-        if (otherActiveWorkOrders === 0) {
-          await tx.maintenancePlan.update({
-            where: { id: plan.id },
-            data: {
-              excludedAt: new Date(),
-              excludedById: user.userId,
-              exclusionReason: `Plano rascunho excluído automaticamente junto com a OS ${workOrder.number} (${input.reason}).`,
-            },
-          });
-        }
-      }
-    }
+    await cascadeExcludeDraftMaintenancePlan(
+      tx,
+      workOrder,
+      user.userId,
+      `Plano rascunho excluído automaticamente junto com a OS ${workOrder.number} (${input.reason}).`
+    );
 
     return updated;
   });

@@ -211,3 +211,44 @@ describe("exclusão lógica de OS (POST /workorders/:id/excluir)", () => {
     expect(plan?.excludedAt).toBeNull();
   });
 });
+
+// Mesma cascata de excluir(), agora disparada por cancelar() (POST
+// /workorders/:id/cancelar) — ver workorders/service.ts#cascadeExcludeDraftMaintenancePlan.
+describe("cascata de plano rascunho ao cancelar OS PREVENTIVA", () => {
+  it("cancela em cascata o plano rascunho quando esta é a única OS vinculada", async () => {
+    const assetCascata = await criarAtivoIsolado("cancel-cascata");
+    const os = await criarOSAberta(WorkOrderType.PREVENTIVA, "Preventiva a cancelar", assetCascata);
+    expect(os.maintenancePlanId).toBeTruthy();
+
+    const planAntes = await prisma.maintenancePlan.findUnique({ where: { id: os.maintenancePlanId! } });
+    expect(planAntes?.periodicity).toBeNull(); // é rascunho
+
+    const res = await request(app)
+      .post(`/workorders/${os.id}/cancelar`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ note: "Preventiva aberta pro ativo errado, cancelada." });
+    expect(res.status).toBe(200);
+
+    const planDepois = await prisma.maintenancePlan.findUnique({ where: { id: os.maintenancePlanId! } });
+    expect(planDepois?.excludedAt).not.toBeNull();
+    expect(planDepois?.exclusionReason).toContain(os.number);
+  });
+
+  it("NÃO cancela o plano rascunho quando outra OS ativa ainda está vinculada a ele", async () => {
+    const assetCompartilhado = await criarAtivoIsolado("cancel-compartilhado");
+    const os1 = await criarOSAberta(WorkOrderType.PREVENTIVA, "Preventiva 1 — a cancelar", assetCompartilhado);
+    const planId = os1.maintenancePlanId!;
+
+    const os2 = await criarOSAberta(WorkOrderType.PREVENTIVA, "Preventiva 2 — mesmo ativo", assetCompartilhado);
+    expect(os2.maintenancePlanId).toBe(planId);
+
+    const res = await request(app)
+      .post(`/workorders/${os1.id}/cancelar`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ note: "Só a primeira era engano." });
+    expect(res.status).toBe(200);
+
+    const plan = await prisma.maintenancePlan.findUnique({ where: { id: planId } });
+    expect(plan?.excludedAt).toBeNull();
+  });
+});

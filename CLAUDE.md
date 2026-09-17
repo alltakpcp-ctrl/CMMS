@@ -522,10 +522,18 @@ Decisões de design já fechadas (não reabrir sem confirmar com o usuário):
   exclusão — mesma exigência que `cancelar()` **já** cumpre hoje
   (`cancelarSchema.note`, `min(1)`) sem precisar de nenhuma mudança; a
   exclusão nova deve seguir o mesmo padrão de validação.
-- **Exclusão em cascata pro plano rascunho:** ao excluir uma OS PREVENTIVA
-  cujo `maintenancePlanId` aponta pra um plano rascunho (`periodicity ===
-  null`) sem nenhuma outra OS vinculada, o plano leva o mesmo trio de campos
-  na mesma transação. Se o plano tiver outra OS vinculada, não é tocado.
+- **Exclusão em cascata pro plano rascunho:** ao excluir **ou cancelar** uma
+  OS PREVENTIVA cujo `maintenancePlanId` aponta pra um plano rascunho
+  (`periodicity === null`) sem nenhuma outra OS **não-excluída** vinculada, o
+  plano leva o mesmo trio de campos (`excludedAt`/`excludedById`/
+  `exclusionReason`) na mesma transação. Se o plano tiver outra OS vinculada,
+  não é tocado. Implementado uma única vez em
+  `workorders/service.ts#cascadeExcludeDraftMaintenancePlan`, chamado tanto
+  por `excluir()` quanto por `cancelar()` — os dois são os únicos caminhos
+  pelos quais uma OS PREVENTIVA sai de circulação sem nunca ter sido
+  encerrada, então os dois precisam da mesma cascata (senão o plano rascunho
+  fica órfão, visível na Agenda pra sempre, sem nenhuma OS "viva" apontando
+  pra ele).
 - **Auditoria reaproveitando `StatusHistory`**, sem tabela nova: gravar um
   registro com `fromStatus === toStatus` e a nota, mesmo padrão que
   `reprogramacao()` já usa para ações que não mudam o `status` da OS.
@@ -669,6 +677,16 @@ plano/`status` inalterado → indicadores voltam ao baseline → listagens
 excluem por padrão e reincluem com o parâmetro → Baú mostra com
 `bauInfo` correto → OS excluída rejeita `cancelar()` com
 `409 ALREADY_EXCLUDED`) — 16/16, resíduo zero.
+
+**Ajuste pós-Fase 9 (2026-09-17):** a cascata pro plano rascunho, que até
+então só disparava em `excluir()`, passou a disparar também em `cancelar()`
+(extraída para `cascadeExcludeDraftMaintenancePlan`, ver decisão de design
+acima) — sem isso, cancelar a única OS PREVENTIVA de um plano rascunho
+deixava o plano órfão, sem nenhuma OS vinculada e sem forma de gerar uma nova
+sem duplicar o plano. Cobertura nova em
+`src/test/workorder-exclusao.test.ts` (2 casos, mesmo padrão dos 2 já
+existentes para `excluir()`) — mesma limitação de `TEST_DATABASE_URL`
+ausente, não rodada localmente ainda.
 
 **Estado final da feature "exclusão lógica de OS / baú de cancelados e
 excluídos": as 9 fases estão prontas e em produção** (backend + frontend).
