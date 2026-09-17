@@ -29,6 +29,7 @@ import { RegistrarForm } from "./actions/RegistrarForm";
 import { EncerramentoForm } from "./actions/EncerramentoForm";
 import { ValidarForm } from "./actions/ValidarForm";
 import { CancelarForm } from "./actions/CancelarForm";
+import { ExcluirForm } from "./actions/ExcluirForm";
 import { MoverFaseForm } from "./actions/MoverFaseForm";
 import { SubtaskPanel } from "./subtasks/SubtaskPanel";
 
@@ -41,6 +42,7 @@ type ActionKey =
   | "encerramento"
   | "validar"
   | "cancelar"
+  | "excluir"
   | "moverFase";
 
 const ACTION_LABELS: Record<ActionKey, string> = {
@@ -52,10 +54,15 @@ const ACTION_LABELS: Record<ActionKey, string> = {
   encerramento: "Encerramento técnico",
   validar: "Validar",
   cancelar: "Cancelar OS",
+  excluir: "Excluir OS",
   moverFase: "Mover fase",
 };
 
 function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionKey[] {
+  // OS excluída fica congelada (§5.2 do CLAUDE.md) — nenhuma ação, nem o
+  // backend aceitaria (409 ALREADY_EXCLUDED em qualquer transição).
+  if (wo.excludedAt) return [];
+
   const actions: ActionKey[] = [];
   const isAssignedTech =
     role === Role.TECNICO &&
@@ -94,6 +101,11 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
     wo.status !== WorkOrderStatus.CANCELADA
   ) {
     actions.push("cancelar");
+  }
+  // Exclusão (§5.2 do CLAUDE.md): só OS que nunca saiu da fase inicial —
+  // qualquer OS que já andou usa cancelar(), não isto.
+  if (wo.status === WorkOrderStatus.ABERTA && role === Role.SUPERVISOR) {
+    actions.push("excluir");
   }
   // Override de timeline: SUPERVISOR pode mover a OS para qualquer fase,
   // em qualquer status, inclusive ENCERRADA/CANCELADA (fora da máquina de
@@ -148,6 +160,7 @@ export default function DetalheOS() {
           <p className="text-sm text-slate-500">{workOrder.title}</p>
         </div>
         <div className="flex gap-2">
+          {workOrder.excludedAt && <Badge color="red">Excluída</Badge>}
           <Badge color={STATUS_COLORS[workOrder.status]}>{STATUS_LABELS[workOrder.status]}</Badge>
           {workOrder.priority && (
             <Badge color={PRIORITY_COLORS[workOrder.priority]}>{PRIORITY_LABELS[workOrder.priority]}</Badge>
@@ -155,12 +168,22 @@ export default function DetalheOS() {
         </div>
       </div>
 
+      {workOrder.excludedAt && (
+        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-medium">Esta OS foi excluída — sem ação disponível.</p>
+          <p className="mt-1">
+            Motivo: "{workOrder.exclusionReason}" — {workOrder.excludedBy?.name ?? "—"} ·{" "}
+            {formatDateTime(workOrder.excludedAt)}
+          </p>
+        </div>
+      )}
+
       {actions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {actions.map((action) => (
             <Button
               key={action}
-              variant={action === "cancelar" ? "danger" : "primary"}
+              variant={action === "cancelar" || action === "excluir" ? "danger" : "primary"}
               onClick={() => setActiveAction(action)}
             >
               {ACTION_LABELS[action]}
@@ -407,6 +430,11 @@ export default function DetalheOS() {
       {activeAction === "cancelar" && (
         <Modal title={ACTION_LABELS.cancelar} onClose={() => setActiveAction(null)}>
           <CancelarForm workOrder={workOrder} onSuccess={handleActionSuccess} onClose={() => setActiveAction(null)} />
+        </Modal>
+      )}
+      {activeAction === "excluir" && (
+        <Modal title={ACTION_LABELS.excluir} onClose={() => setActiveAction(null)}>
+          <ExcluirForm workOrder={workOrder} onSuccess={handleActionSuccess} onClose={() => setActiveAction(null)} />
         </Modal>
       )}
       {activeAction === "moverFase" && (

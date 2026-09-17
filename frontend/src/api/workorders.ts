@@ -75,6 +75,10 @@ export interface CancelarInput {
   note: string;
 }
 
+export interface ExcluirInput {
+  reason: string;
+}
+
 export interface TimelineOverrideInput {
   toStatus: WorkOrderStatus;
   note: string;
@@ -131,6 +135,10 @@ export function validar(token: string, id: string, input: ValidarInput) {
 
 export function cancelar(token: string, id: string, input: CancelarInput) {
   return apiRequest<WorkOrder>(`/workorders/${id}/cancelar`, { method: "POST", token, body: input });
+}
+
+export function excluir(token: string, id: string, input: ExcluirInput) {
+  return apiRequest<WorkOrder>(`/workorders/${id}/excluir`, { method: "POST", token, body: input });
 }
 
 export function timelineOverride(token: string, id: string, input: TimelineOverrideInput) {

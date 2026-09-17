@@ -618,9 +618,30 @@ Validado por smoke test manual contra produção (mesma limitação de
 `TEST_DATABASE_URL` ausente) — 13/13, sem a instabilidade de pooler das
 Fases 3/4 (só operações `CORRETIVA`, mais leves).
 
-Fases restantes (6 a 9 — não implementadas): ação "Excluir OS" em
-`DetalheOS.tsx` (só visível em `ABERTA` + `SUPERVISOR`); tela nova do Baú;
-ajuste do botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
+**Fase 6 (ação "Excluir OS" no frontend, pronta):** `DetalheOS.tsx` ganhou
+a ação `excluir` — botão vermelho, ao lado de "Cancelar", só quando
+`status === ABERTA` **e** `role === SUPERVISOR` (`getAvailableActions`).
+`ExcluirForm.tsx` (mesmo padrão de `CancelarForm.tsx`, motivo obrigatório)
+chama `POST /workorders/:id/excluir` via `api/workorders.ts#excluir`.
+`getAvailableActions` também retorna `[]` de imediato se `wo.excludedAt`
+estiver preenchido — nenhuma ação aparece pra uma OS já excluída (ela fica
+congelada desde a Fase 5, então nem faria sentido oferecer botão nenhum).
+Se alguém navegar direto pra uma OS excluída (ex.: link antigo, ou a partir
+da Fase 7), a página mostra um aviso vermelho no topo com motivo/autor/data
+em vez de simplesmente não ter nenhum botão sem explicação. `types.ts`
+(`WorkOrder`) e `api/workorders.ts` ganharam os 4 campos de exclusão
+correspondentes aos que o backend já retorna desde a Fase 1 (`excludedAt`,
+`excludedById`, `excludedBy`, `exclusionReason` — sempre presentes na
+resposta de `GET /workorders/:id`, já que `include` do Prisma não restringe
+campos escalares do model, só adiciona relações).
+
+Sem suíte de teste de frontend configurada no projeto — validado por
+`tsc -b` (type-check) e `npm run build` (build de produção real), ambos
+limpos; sem chamada a banco nesta fase (é só código de UI consumindo um
+endpoint já testado na Fase 2).
+
+Fases restantes (7 a 9 — não implementadas): tela nova do Baú; ajuste do
+botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
 `deleteMaintenancePlan`, que bloqueia com `422` sempre que há qualquer OS
 vinculada — o que é o caso de todo plano rascunho, então hoje esse botão
 nunca funciona nesse cenário).

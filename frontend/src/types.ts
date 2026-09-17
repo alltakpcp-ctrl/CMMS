@@ -296,6 +296,13 @@ export interface WorkOrder {
   statusHistory?: StatusHistoryEntry[];
   trabalhoEmAltura: boolean;
   permissaoTrabalho: PermissaoTrabalho | null;
+  // Exclusão lógica (§5.2 do CLAUDE.md) — só preenchido quando a OS foi
+  // excluída (sempre a partir de ABERTA). Diferente de CANCELADA: a OS
+  // continua com o status original, só some das telas/indicadores.
+  excludedAt: string | null;
+  excludedById: string | null;
+  excludedBy: PublicUser | null;
+  exclusionReason: string | null;
 }
 
 export interface Paginated<T> {
