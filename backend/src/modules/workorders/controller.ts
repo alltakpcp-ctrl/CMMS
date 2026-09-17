@@ -5,6 +5,7 @@ import {
   cancelarSchema,
   createWorkOrderSchema,
   encerramentoTecnicoSchema,
+  excluirSchema,
   iniciarSchema,
   listWorkOrdersQuerySchema,
   planejamentoSchema,
@@ -81,6 +82,11 @@ export async function validarController(req: Request, res: Response) {
 export async function cancelarController(req: Request, res: Response) {
   const input = cancelarSchema.parse(req.body);
   res.json(await workOrdersService.cancelar(req.params.id, input, requireUser(req)));
+}
+
+export async function excluirController(req: Request, res: Response) {
+  const input = excluirSchema.parse(req.body);
+  res.json(await workOrdersService.excluir(req.params.id, input, requireUser(req)));
 }
 
 export async function timelineOverrideController(req: Request, res: Response) {

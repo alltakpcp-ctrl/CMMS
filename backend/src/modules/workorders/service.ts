@@ -16,6 +16,7 @@ import {
   CancelarInput,
   CreateWorkOrderInput,
   EncerramentoTecnicoInput,
+  ExcluirInput,
   IniciarInput,
   ListWorkOrdersQuery,
   PlanejamentoInput,
@@ -749,6 +750,79 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
         data: { finishedAt: new Date() },
       });
     },
+  });
+}
+
+// Exclusão lógica (§5.2 do CLAUDE.md, "baú de cancelados e excluídos") —
+// exclusiva do SUPERVISOR (§ rota). Propositalmente NÃO usa
+// applyTransition/canTransition: não é uma transição de status (a OS
+// continua ABERTA, só ganha os 3 campos de exclusão), mesmo espírito de
+// reprogramacao(). Só elegível em ABERTA — qualquer OS que já andou (a
+// partir de TRIAGEM) usa cancelar() (CANCELADA), nunca isto; a exclusão não
+// apaga a linha, só a tira das telas operacionais e de todo indicador,
+// mantendo-a visível (com motivo/autor/data) só no Baú.
+export async function excluir(id: string, input: ExcluirInput, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id } });
+    if (!workOrder) {
+      throw new AppError(404, "WORK_ORDER_NOT_FOUND", "Ordem de serviço não encontrada.");
+    }
+
+    if (workOrder.excludedAt) {
+      throw new AppError(409, "ALREADY_EXCLUDED", "Esta OS já foi excluída.");
+    }
+
+    if (workOrder.status !== WorkOrderStatus.ABERTA) {
+      throw new AppError(
+        422,
+        "WORK_ORDER_NOT_IN_INITIAL_PHASE",
+        "Só é possível excluir uma OS que ainda não saiu da fase inicial (ABERTA). Para uma OS em andamento, use o cancelamento."
+      );
+    }
+
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: {
+        excludedAt: new Date(),
+        excludedById: user.userId,
+        exclusionReason: input.reason,
+      },
+      include: workOrderInclude,
+    });
+
+    await tx.statusHistory.create({
+      data: {
+        workOrderId: id,
+        fromStatus: workOrder.status,
+        toStatus: workOrder.status,
+        changedById: user.userId,
+        note: `[EXCLUSÃO] ${input.reason}`,
+      },
+    });
+
+    // Cascata pro plano rascunho (ver CLAUDE.md §5.2): só quando esta OS era
+    // a única (ou a última não-excluída) vinculada a um plano ainda sem
+    // periodicidade — um plano que já tem outra OS de verdade não é tocado.
+    if (workOrder.maintenancePlanId) {
+      const plan = await tx.maintenancePlan.findUnique({ where: { id: workOrder.maintenancePlanId } });
+      if (plan && plan.periodicity === null && !plan.excludedAt) {
+        const otherActiveWorkOrders = await tx.workOrder.count({
+          where: { maintenancePlanId: plan.id, id: { not: id }, excludedAt: null },
+        });
+        if (otherActiveWorkOrders === 0) {
+          await tx.maintenancePlan.update({
+            where: { id: plan.id },
+            data: {
+              excludedAt: new Date(),
+              excludedById: user.userId,
+              exclusionReason: `Plano rascunho excluído automaticamente junto com a OS ${workOrder.number} (${input.reason}).`,
+            },
+          });
+        }
+      }
+    }
+
+    return updated;
   });
 }
 

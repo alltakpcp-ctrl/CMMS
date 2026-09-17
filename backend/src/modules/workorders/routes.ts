@@ -7,6 +7,7 @@ import {
   cancelarController,
   createWorkOrderController,
   encerramentoTecnicoController,
+  excluirController,
   getWorkOrderController,
   iniciarController,
   listWorkOrdersController,
@@ -78,6 +79,9 @@ workOrdersRoutes.post(
 );
 workOrdersRoutes.post("/:id/validar", authorize(Role.SUPERVISOR), asyncHandler(validarController));
 workOrdersRoutes.post("/:id/cancelar", authorize(Role.SUPERVISOR), asyncHandler(cancelarController));
+// Exclusão lógica (§5.2 do CLAUDE.md) — só OS em ABERTA, ver
+// workorders/service.ts#excluir. Nunca apaga a linha do banco.
+workOrdersRoutes.post("/:id/excluir", authorize(Role.SUPERVISOR), asyncHandler(excluirController));
 
 // Override manual da linha do tempo — SUPERVISOR pode mover a OS para
 // qualquer status, fora da máquina de estados normal (canTransition).

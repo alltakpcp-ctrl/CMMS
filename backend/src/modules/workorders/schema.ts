@@ -126,6 +126,13 @@ export const cancelarSchema = z.object({
   note: z.string().min(1, "Nota é obrigatória para cancelar a OS."),
 });
 
+// Exclusão lógica (§5.2 do CLAUDE.md) — só aplicável a OS em ABERTA, checado
+// em workorders/service.ts#excluir (o schema não conhece o status da OS).
+// Nunca apaga a linha; motivo obrigatório, mesmo padrão de cancelarSchema.
+export const excluirSchema = z.object({
+  reason: z.string().min(1, "Motivo é obrigatório para excluir a OS."),
+});
+
 // Override manual da timeline pelo SUPERVISOR — não passa pela máquina de
 // estados (canTransition). Nota é obrigatória por ser uma ação excepcional.
 export const timelineOverrideSchema = z.object({
@@ -146,4 +153,5 @@ export type RegistrarInput = z.infer<typeof registrarSchema>;
 export type EncerramentoTecnicoInput = z.infer<typeof encerramentoTecnicoSchema>;
 export type ValidarInput = z.infer<typeof validarSchema>;
 export type CancelarInput = z.infer<typeof cancelarSchema>;
+export type ExcluirInput = z.infer<typeof excluirSchema>;
 export type TimelineOverrideInput = z.infer<typeof timelineOverrideSchema>;

@@ -14,53 +14,55 @@ datasource db {
 // idêntico entre dev e produção e a lógica de validação centralizada.
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String
-  sectorId     String?
-  sector       Sector?  @relation(fields: [sectorId], references: [id])
-  canReceivePartRequests Boolean @default(false)
-  canManageStock Boolean @default(false)
-  canPurchase  Boolean @default(false)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  shiftId      String?
-  shift        Shift?   @relation(fields: [shiftId], references: [id])
+  id                     String   @id @default(cuid())
+  name                   String
+  email                  String   @unique
+  passwordHash           String
+  role                   String
+  sectorId               String?
+  sector                 Sector?  @relation(fields: [sectorId], references: [id])
+  canReceivePartRequests Boolean  @default(false)
+  canManageStock         Boolean  @default(false)
+  canPurchase            Boolean  @default(false)
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  shiftId                String?
+  shift                  Shift?   @relation(fields: [shiftId], references: [id])
 
-  workOrdersRequested WorkOrder[]     @relation("WorkOrderRequester")
-  workOrdersAssigned  WorkOrder[]     @relation("WorkOrderAssignee")
-  workOrdersPriorityAdjusted WorkOrder[] @relation("WorkOrderPriorityAdjustedBy")
-  statusChanges       StatusHistory[]
-  partRequestsCreated   PartRequest[]   @relation("partRequestsCreated")
-  purchaseOrdersCreated PurchaseOrder[] @relation("purchaseOrdersCreated")
-  purchaseOrdersReviewed PurchaseOrder[] @relation("purchaseOrdersReviewed")
-  assigneeOf          WorkOrderAssignee[]
-  executionLogs       ExecutionLog[]
-  stockMovements      StockMovement[]
-  subtasksCreated     Subtask[]       @relation("SubtaskCreatedBy")
-  subtasksAssigned    Subtask[]       @relation("SubtaskAssignedTo")
-  subtasksClosedBy    Subtask[]       @relation("SubtaskClosedBy")
-  purchaseOrderComments PurchaseOrderComment[] @relation("purchaseOrderComments")
-  stockWithdrawalRequestsCreated  StockWithdrawalRequest[] @relation("stockWithdrawalRequestsCreated")
-  stockWithdrawalRequestsReviewed StockWithdrawalRequest[] @relation("stockWithdrawalRequestsReviewed")
-  permissoesTrabalhoAprovadas PermissaoTrabalho[] @relation("PermissaoTrabalhoApprovedBy")
-  assinaturasPT          PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaUser")
-  assinaturasPTSolicitadas PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaRequestedBy")
-  executionsStarted Execution[] @relation("ExecutionStartedBy")
-  executionsEnded   Execution[] @relation("ExecutionEndedBy")
+  workOrdersRequested             WorkOrder[]                   @relation("WorkOrderRequester")
+  workOrdersAssigned              WorkOrder[]                   @relation("WorkOrderAssignee")
+  workOrdersPriorityAdjusted      WorkOrder[]                   @relation("WorkOrderPriorityAdjustedBy")
+  statusChanges                   StatusHistory[]
+  partRequestsCreated             PartRequest[]                 @relation("partRequestsCreated")
+  purchaseOrdersCreated           PurchaseOrder[]               @relation("purchaseOrdersCreated")
+  purchaseOrdersReviewed          PurchaseOrder[]               @relation("purchaseOrdersReviewed")
+  assigneeOf                      WorkOrderAssignee[]
+  executionLogs                   ExecutionLog[]
+  stockMovements                  StockMovement[]
+  subtasksCreated                 Subtask[]                     @relation("SubtaskCreatedBy")
+  subtasksAssigned                Subtask[]                     @relation("SubtaskAssignedTo")
+  subtasksClosedBy                Subtask[]                     @relation("SubtaskClosedBy")
+  purchaseOrderComments           PurchaseOrderComment[]        @relation("purchaseOrderComments")
+  stockWithdrawalRequestsCreated  StockWithdrawalRequest[]      @relation("stockWithdrawalRequestsCreated")
+  stockWithdrawalRequestsReviewed StockWithdrawalRequest[]      @relation("stockWithdrawalRequestsReviewed")
+  permissoesTrabalhoAprovadas     PermissaoTrabalho[]           @relation("PermissaoTrabalhoApprovedBy")
+  assinaturasPT                   PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaUser")
+  assinaturasPTSolicitadas        PermissaoTrabalhoAssinatura[] @relation("PermissaoTrabalhoAssinaturaRequestedBy")
+  executionsStarted               Execution[]                   @relation("ExecutionStartedBy")
+  executionsEnded                 Execution[]                   @relation("ExecutionEndedBy")
+  workOrdersExcluded              WorkOrder[]                   @relation("WorkOrderExcludedBy")
+  maintenancePlansExcluded        MaintenancePlan[]             @relation("MaintenancePlanExcludedBy")
 }
 
 model Shift {
   id        String   @id @default(cuid())
   name      String   @unique
-  startTime String   // "HH:mm"
-  endTime   String   // "HH:mm"
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  users     User[]
+  users User[]
 }
 
 model Sector {
@@ -78,27 +80,27 @@ model Sector {
 }
 
 model Asset {
-  id                         String   @id @default(cuid())
-  code                       String   @unique
-  name                       String
+  id                        String   @id @default(cuid())
+  code                      String   @unique
+  name                      String
   // @deprecated setor primário; visibilidade real via AssetSector (N:N)
-  sectorId                   String
+  sectorId                  String
   // @deprecated setor primário; visibilidade real via AssetSector (N:N)
-  sector                     Sector   @relation(fields: [sectorId], references: [id], onDelete: Restrict)
-  location                   String
-  criticality                Int
+  sector                    Sector   @relation(fields: [sectorId], references: [id], onDelete: Restrict)
+  location                  String
+  criticality               Int
   // GANCHO FUTURO (§5.6): campo já existe para uma futura geração automática
   // de OS PREVENTIVA — um job agendado (cron) verificaria, por ativo, se
   // `hoje - data da última preventiva encerrada >= preventivePeriodicityDays`
   // e chamaria a mesma lógica de `workorders/service.ts#createWorkOrder`.
   // NÃO implementado no MVP (abertura de preventiva é sempre manual).
-  preventivePeriodicityDays  Int?
-  active                     Boolean  @default(true)
-  createdAt                  DateTime @default(now())
+  preventivePeriodicityDays Int?
+  active                    Boolean  @default(true)
+  createdAt                 DateTime @default(now())
 
-  workOrders WorkOrder[]
-  sectors    AssetSector[]
-  partRequests PartRequest[]
+  workOrders       WorkOrder[]
+  sectors          AssetSector[]
+  partRequests     PartRequest[]
   maintenancePlans MaintenancePlan[]
 }
 
@@ -120,73 +122,82 @@ model Part {
   stockQty    Int      @default(0)
   createdAt   DateTime @default(now())
 
-  minStock    Int?
-  maxStock    Int?
-  unitCost    Decimal? @db.Decimal(12, 2)
-  location    String?
-  sectorId    String?
-  sector      Sector?  @relation(fields: [sectorId], references: [id])
-  active      Boolean  @default(true)
+  minStock            Int?
+  maxStock            Int?
+  unitCost            Decimal? @db.Decimal(12, 2)
+  location            String?
+  sectorId            String?
+  sector              Sector?  @relation(fields: [sectorId], references: [id])
+  active              Boolean  @default(true)
   stockStatusOverride String?
-  updatedAt   DateTime @updatedAt @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
 
-  workOrderParts   WorkOrderPart[]
-  partRequests     PartRequest[]
-  plannedPartItems WorkOrderPlannedPart[]
-  stockMovements   StockMovement[]
+  workOrderParts              WorkOrderPart[]
+  partRequests                PartRequest[]
+  plannedPartItems            WorkOrderPlannedPart[]
+  stockMovements              StockMovement[]
   stockWithdrawalRequestItems StockWithdrawalRequestItem[]
 }
 
 model WorkOrder {
-  id             String    @id @default(cuid())
-  number         String    @unique
-  type           String
-  disciplina     String    @default("ELETRICA")
-  trabalhoEmAltura Boolean @default(false)
-  status         String    @default("ABERTA")
-  priority       String
-  title          String
-  description    String
-  requesterId    String
-  requester      User      @relation("WorkOrderRequester", fields: [requesterId], references: [id])
-  assetId        String
-  asset          Asset     @relation(fields: [assetId], references: [id])
-  targetSectorId String?
-  targetSector   Sector?   @relation(fields: [targetSectorId], references: [id], onDelete: Restrict)
-  plan           String?
+  id                     String           @id @default(cuid())
+  number                 String           @unique
+  type                   String
+  disciplina             String           @default("ELETRICA")
+  trabalhoEmAltura       Boolean          @default(false)
+  status                 String           @default("ABERTA")
+  priority               String
+  title                  String
+  description            String
+  requesterId            String
+  requester              User             @relation("WorkOrderRequester", fields: [requesterId], references: [id])
+  assetId                String
+  asset                  Asset            @relation(fields: [assetId], references: [id])
+  targetSectorId         String?
+  targetSector           Sector?          @relation(fields: [targetSectorId], references: [id], onDelete: Restrict)
+  plan                   String?
   // @deprecated como input — agora derivado de assignees.count + 1 (responsável
   // principal + manutentores de apoio). Mantido como coluna para não quebrar
   // dados existentes; não deve mais ser aceito diretamente pela API.
-  numMaintainers   Int?
-  estimatedHours   Decimal?  @db.Decimal(5, 2)
-  safetyEquipment  String?   // @deprecated usar ppe
-  plannedParts     Json?     // @deprecated usar plannedPartItems
-  tools            Json?
-  ppe              Json?
-  scheduledStart DateTime?
-  scheduledEnd   DateTime?
-  assignedToId   String?
-  assignedTo     User?     @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
-  maintenancePlanId String?
-  maintenancePlan   MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id])
-  priorityAdjustedByTech Boolean   @default(false)
+  numMaintainers         Int?
+  estimatedHours         Decimal?         @db.Decimal(5, 2)
+  safetyEquipment        String? // @deprecated usar ppe
+  plannedParts           Json? // @deprecated usar plannedPartItems
+  tools                  Json?
+  ppe                    Json?
+  scheduledStart         DateTime?
+  scheduledEnd           DateTime?
+  assignedToId           String?
+  assignedTo             User?            @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  maintenancePlanId      String?
+  maintenancePlan        MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id])
+  priorityAdjustedByTech Boolean          @default(false)
   priorityOriginal       String?
   priorityAdjustedAt     DateTime?
   priorityAdjustedById   String?
-  priorityAdjustedBy     User?     @relation("WorkOrderPriorityAdjustedBy", fields: [priorityAdjustedById], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  priorityAdjustedBy     User?            @relation("WorkOrderPriorityAdjustedBy", fields: [priorityAdjustedById], references: [id])
+  // Exclusão lógica (Fase 1 do "baú de cancelados/excluídos", ver CLAUDE.md §5.2):
+  // só aplicável a OS em ABERTA (nunca saiu da fase inicial); OS que já andou
+  // e precisa ser interrompida usa cancelar() (CANCELADA), não isto. Uma OS
+  // excluída não é removida fisicamente — some das telas operacionais e dos
+  // indicadores, mas continua íntegra no banco e visível no Baú (SUPERVISOR).
+  excludedAt             DateTime?
+  excludedById           String?
+  excludedBy             User?            @relation("WorkOrderExcludedBy", fields: [excludedById], references: [id])
+  exclusionReason        String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
-  executions     Execution[]
-  parts          WorkOrderPart[]
-  statusHistory  StatusHistory[]
-  partRequests   PartRequest[]
-  plannedPartItems WorkOrderPlannedPart[]
-  assignees        WorkOrderAssignee[]
-  stockMovements   StockMovement[]
+  executions              Execution[]
+  parts                   WorkOrderPart[]
+  statusHistory           StatusHistory[]
+  partRequests            PartRequest[]
+  plannedPartItems        WorkOrderPlannedPart[]
+  assignees               WorkOrderAssignee[]
+  stockMovements          StockMovement[]
   stockWithdrawalRequests StockWithdrawalRequest[]
-  subtasks         Subtask[]
-  permissaoTrabalho PermissaoTrabalho?
+  subtasks                Subtask[]
+  permissaoTrabalho       PermissaoTrabalho?
 }
 
 // Manutentores de apoio (N:N), distintos do responsável principal
@@ -215,27 +226,34 @@ model WorkOrderAssignee {
 // OPERADOR abre uma OS PREVENTIVA sem que exista plano prévio para o ativo —
 // nesse caso não há periodicidade conhecida ainda (supervisor completa depois).
 model MaintenancePlan {
-  id               String    @id @default(cuid())
-  assetId          String
-  asset            Asset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  discipline       String    // MaintenanceDiscipline
-  title            String
-  description      String?
-  priority         String    // Priority
-  periodicity      String?   // MaintenancePeriodicity — null = plano rascunho, sem periodicidade definida
-  estimatedHours   Decimal?  @db.Decimal(5, 2)
-  responsible      String?
-  action01         String?
-  action02         String?
-  action03         String?
-  action04         String?
-  action05         String?
-  action06         String?
-  active           Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  assetId         String
+  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  discipline      String // MaintenanceDiscipline
+  title           String
+  description     String?
+  priority        String // Priority
+  periodicity     String? // MaintenancePeriodicity — null = plano rascunho, sem periodicidade definida
+  estimatedHours  Decimal?  @db.Decimal(5, 2)
+  responsible     String?
+  action01        String?
+  action02        String?
+  action03        String?
+  action04        String?
+  action05        String?
+  action06        String?
+  active          Boolean   @default(true)
+  // Exclusão lógica em cascata: quando a OS que originou este plano rascunho
+  // (periodicity null) é excluída e nenhuma outra OS está vinculada a ele, o
+  // plano é marcado excluído junto — mesma semântica de WorkOrder.excludedAt.
+  excludedAt      DateTime?
+  excludedById    String?
+  excludedBy      User?     @relation("MaintenancePlanExcludedBy", fields: [excludedById], references: [id])
+  exclusionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  workOrders       WorkOrder[]
+  workOrders WorkOrder[]
 
   @@index([assetId])
 }
@@ -245,28 +263,28 @@ model MaintenancePlan {
 // a Execution: subtarefas registram partes concluídas do trabalho dentro de
 // uma OS, sem relação com o ciclo de execução/registro de reparo.
 model Subtask {
-  id               String    @id @default(cuid())
-  workOrderId      String
-  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  title            String
-  description      String?
-  status           String    @default("ABERTA")
-  estimatedHours   Decimal   @db.Decimal(5, 2)
-  createdById      String
-  createdBy        User      @relation("SubtaskCreatedBy", fields: [createdById], references: [id])
-  assignedToId     String
-  assignedTo       User      @relation("SubtaskAssignedTo", fields: [assignedToId], references: [id])
+  id             String    @id @default(cuid())
+  workOrderId    String
+  workOrder      WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  status         String    @default("ABERTA")
+  estimatedHours Decimal   @db.Decimal(5, 2)
+  createdById    String
+  createdBy      User      @relation("SubtaskCreatedBy", fields: [createdById], references: [id])
+  assignedToId   String
+  assignedTo     User      @relation("SubtaskAssignedTo", fields: [assignedToId], references: [id])
   // @deprecated ver openedAt/closedAt abaixo — mantido para não quebrar dados
   // existentes; só é preenchido no caminho CONCLUIDA (não em CANCELADA).
-  finishedAt       DateTime?
+  finishedAt     DateTime?
   // Timestamp imutável de abertura (sempre now() do servidor, nunca editável).
-  openedAt         DateTime  @default(now())
+  openedAt       DateTime  @default(now())
   // Preenchido tanto em CONCLUIDA quanto em CANCELADA (now() do servidor).
-  closedAt         DateTime?
-  closedById       String?
-  closedBy         User?     @relation("SubtaskClosedBy", fields: [closedById], references: [id])
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  closedAt       DateTime?
+  closedById     String?
+  closedBy       User?     @relation("SubtaskClosedBy", fields: [closedById], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   stockWithdrawalRequests StockWithdrawalRequest[]
 
@@ -296,7 +314,7 @@ model Execution {
   endNote           String?
   outcome           String?
 
-  logs              ExecutionLog[]
+  logs ExecutionLog[]
 
   @@index([workOrderId])
 }
@@ -326,23 +344,23 @@ model WorkOrderPart {
 }
 
 model StockMovement {
-  id           String   @id @default(cuid())
-  partId       String
-  part         Part     @relation(fields: [partId], references: [id])
-  type         String
-  quantity     Int
-  balanceAfter Int
-  unitCost     Decimal? @db.Decimal(12, 2)
-  workOrderId  String?
-  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
-  partRequestId String?
-  partRequest  PartRequest? @relation(fields: [partRequestId], references: [id])
-  userId       String?
-  user         User?    @relation(fields: [userId], references: [id])
-  reason       String?
+  id             String       @id @default(cuid())
+  partId         String
+  part           Part         @relation(fields: [partId], references: [id])
+  type           String
+  quantity       Int
+  balanceAfter   Int
+  unitCost       Decimal?     @db.Decimal(12, 2)
+  workOrderId    String?
+  workOrder      WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  partRequestId  String?
+  partRequest    PartRequest? @relation(fields: [partRequestId], references: [id])
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  reason         String?
   statusSnapshot String?
   orderRef       String?
-  createdAt    DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([partId, createdAt])
 }
@@ -373,7 +391,7 @@ model StatusHistory {
 // decisão de §2 do CLAUDE.md aplicada aos demais campos do schema.
 model PartRequest {
   id              String         @id @default(cuid())
-  itemType        String         // "PECA" | "FERRAMENTA"
+  itemType        String // "PECA" | "FERRAMENTA"
   partId          String?
   part            Part?          @relation(fields: [partId], references: [id])
   description     String
@@ -394,26 +412,26 @@ model PartRequest {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  stockMovements  StockMovement[]
+  stockMovements StockMovement[]
 }
 
 model PurchaseOrder {
-  id           String    @id @default(cuid())
-  number       String    @unique
-  status       String    @default("EM_ANALISE") // EM_ANALISE | APROVADO | APROVADO_PARCIAL | DEVOLVIDO | REJEITADO | ENVIADO_COMPRAS
-  createdById  String
-  createdBy    User      @relation("purchaseOrdersCreated", fields: [createdById], references: [id])
-  reviewedById String?
-  reviewedBy   User?     @relation("purchaseOrdersReviewed", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
-  reviewNotes  String?
-  items        PartRequest[]
+  id                    String                 @id @default(cuid())
+  number                String                 @unique
+  status                String                 @default("EM_ANALISE") // EM_ANALISE | APROVADO | APROVADO_PARCIAL | DEVOLVIDO | REJEITADO | ENVIADO_COMPRAS
+  createdById           String
+  createdBy             User                   @relation("purchaseOrdersCreated", fields: [createdById], references: [id])
+  reviewedById          String?
+  reviewedBy            User?                  @relation("purchaseOrdersReviewed", fields: [reviewedById], references: [id])
+  reviewedAt            DateTime?
+  reviewNotes           String?
+  items                 PartRequest[]
   parentPurchaseOrderId String?
-  parent       PurchaseOrder?  @relation("PurchaseOrderChildren", fields: [parentPurchaseOrderId], references: [id])
-  children     PurchaseOrder[] @relation("PurchaseOrderChildren")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  comments     PurchaseOrderComment[]
+  parent                PurchaseOrder?         @relation("PurchaseOrderChildren", fields: [parentPurchaseOrderId], references: [id])
+  children              PurchaseOrder[]        @relation("PurchaseOrderChildren")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  comments              PurchaseOrderComment[]
 }
 
 model PurchaseOrderComment {
@@ -436,22 +454,22 @@ model PurchaseOrderComment {
 // só acontece quando um usuário com a flag canManageStock aprova uma request
 // PENDENTE — ver stock-withdrawals/service.ts.
 model StockWithdrawalRequest {
-  id            String    @id @default(cuid())
+  id            String                       @id @default(cuid())
   workOrderId   String
-  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id])
+  workOrder     WorkOrder                    @relation(fields: [workOrderId], references: [id])
   subtaskId     String?
-  subtask       Subtask?  @relation(fields: [subtaskId], references: [id])
-  status        String    @default("PENDENTE") // PENDENTE | APROVADA | REJEITADA
-  notApplicable Boolean   @default(false)
+  subtask       Subtask?                     @relation(fields: [subtaskId], references: [id])
+  status        String                       @default("PENDENTE") // PENDENTE | APROVADA | REJEITADA
+  notApplicable Boolean                      @default(false)
   requestedById String
-  requestedBy   User      @relation("stockWithdrawalRequestsCreated", fields: [requestedById], references: [id])
+  requestedBy   User                         @relation("stockWithdrawalRequestsCreated", fields: [requestedById], references: [id])
   reviewedById  String?
-  reviewedBy    User?     @relation("stockWithdrawalRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedBy    User?                        @relation("stockWithdrawalRequestsReviewed", fields: [reviewedById], references: [id])
   reviewedAt    DateTime?
   reviewNotes   String?
   items         StockWithdrawalRequestItem[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
 
   @@index([workOrderId])
   @@index([subtaskId])
@@ -470,28 +488,28 @@ model StockWithdrawalRequestItem {
 // status é String validada via zod, nunca enum nativo — mesma decisão de §2
 // do CLAUDE.md aplicada aos demais campos do schema.
 model PermissaoTrabalho {
-  id           String    @id @default(cuid())
-  workOrderId  String    @unique
-  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  status       String    @default("RASCUNHO")
+  id          String    @id @default(cuid())
+  workOrderId String    @unique
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  status      String    @default("RASCUNHO")
 
-  emittedAt    DateTime?
-  closedAt     DateTime?
+  emittedAt DateTime?
+  closedAt  DateTime?
 
-  approvedById String?
-  approvedBy   User?     @relation("PermissaoTrabalhoApprovedBy", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
+  approvedById    String?
+  approvedBy      User?     @relation("PermissaoTrabalhoApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
   rejectionReason String?
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  respostas    PermissaoTrabalhoResposta[]
-  assinaturas  PermissaoTrabalhoAssinatura[]
+  respostas   PermissaoTrabalhoResposta[]
+  assinaturas PermissaoTrabalhoAssinatura[]
 }
 
 model PermissaoTrabalhoResposta {
-  id                  String @id @default(cuid())
+  id                  String            @id @default(cuid())
   permissaoTrabalhoId String
   permissaoTrabalho   PermissaoTrabalho @relation(fields: [permissaoTrabalhoId], references: [id], onDelete: Cascade)
   ordem               Int

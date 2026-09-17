@@ -3,7 +3,7 @@
 > Este arquivo é o contexto permanente do projeto. Leia-o por inteiro antes de
 > mexer em qualquer parte do sistema. Ele descreve stack, regras de negócio,
 > modelo de dados, permissões e convenções **do estado atual do código**
-> (última revisão: 2026-09-15).
+> (última revisão: 2026-09-17).
 >
 > O MVP original (specs `01` a `06` em `/specs`) já foi implementado e
 > commitado por inteiro — o projeto evoluiu bem além dele (estoque com fluxo
@@ -349,6 +349,13 @@ rascunho), `priorityAdjustedByTech`/`priorityOriginal`/`priorityAdjustedById`/`p
   dados antigos; a API não os aceita mais diretamente. Manutentores de apoio
   vêm de `WorkOrderAssignee`, EPI de `ppe`, peças planejadas de
   `WorkOrderPlannedPart`.
+- `excludedAt`/`excludedById`/`excludedBy`/`exclusionReason` — colunas de
+  **exclusão lógica**, adicionadas pela migração
+  `20260917115159_add_work_order_exclusion` e preenchidas por `POST
+  /workorders/:id/excluir` (Fases 1 e 2 de 9 do plano — ver §5.2). **Ainda
+  não há filtro de indicador/listagem nem tela usando esses campos** (Fases
+  3+). Não confundir com `cancelar()`/`CANCELADA`, que já existe e continua
+  sendo o caminho para qualquer OS que já saiu da fase inicial.
 
 ### WorkOrderAssignee (manutentores de apoio — N:N)
 `id`, `workOrderId`, `userId`, `createdAt`. `@@unique([workOrderId, userId])`.
@@ -380,6 +387,11 @@ PREVENTIVA sem que exista plano prévio para o ativo), `estimatedHours`?
   `POST /maintenance-plans/:id/gerar-os`, bloqueado (`409
   PLAN_HAS_OPEN_WORK_ORDER`) enquanto existir uma OS do plano em status fora
   de `ENCERRADA`/`CANCELADA`.
+- `excludedAt`/`excludedById`/`excludedBy`/`exclusionReason` — mesma exclusão
+  lógica descrita acima para `WorkOrder`, aplicada em cascata (dentro de
+  `POST /workorders/:id/excluir`) quando a OS que originou este plano
+  rascunho é excluída e nenhuma outra OS não-excluída ainda aponta pra ele
+  (ver §5.2).
 
 ### Execution (registro de execução — 1:N com WorkOrder)
 `id`, `workOrderId` (→ WorkOrder, sem unique — uma OS pode ter mais de um
@@ -479,6 +491,70 @@ nenhuma rota para esse módulo. Não há mais gate bloqueando início de OS de
 altura sem PT aprovada. Se for pedido para reativar esse fluxo, tratar como
 feature nova a reconstruir (os modelos de dados já existem, mas a lógica de
 service/rotas precisa ser recriada), não como bug a corrigir.
+
+### 5.2 — Exclusão lógica de OS/plano ("baú de cancelados e excluídos") — EM CONSTRUÇÃO, só Fase 1 pronta
+Feature planejada em 9 fases para dar ao SUPERVISOR um caminho de descarte de
+OS abertas por engano, sem nunca apagar linha nenhuma do banco nem perder
+histórico/auditoria. **Estado real em 2026-09-17: Fases 1 e 2 prontas.**
+Fase 1 — migração `20260917115159_add_work_order_exclusion` (colunas
+`excludedAt`/`excludedById`/`exclusionReason` em `WorkOrder` e
+`MaintenancePlan`, ver §5). Fase 2 — endpoint `POST /workorders/:id/excluir`
+(`workorders/service.ts#excluir`, `SUPERVISOR`-only), com `excluirSchema`
+(`reason` obrigatório). **Ainda não existe filtro de indicador, filtro de
+listagem "viva" nem tela nenhuma usando esses campos** — a OS excluída
+continua aparecendo em `ListaOS`/Dashboard/indicadores normalmente até a
+Fase 3/4 serem feitas; não assumir que a feature já esconde nada da UI.
+
+Decisões de design já fechadas (não reabrir sem confirmar com o usuário):
+- **Exclusão só é válida para OS em `ABERTA`** (nunca saiu da fase inicial —
+  nem chegou a `TRIAGEM`). Qualquer OS que já andou e precisa ser descartada
+  no meio do caminho usa `cancelar()` (→ `CANCELADA`), nunca exclusão. As
+  duas coisas são semânticas diferentes por decisão explícita: "cancelada" =
+  trabalho real interrompido; "excluída" = erro de abertura.
+- **Exclusão lógica, não física.** A OS/plano não é apagado — os 3 campos
+  são preenchidos, a OS some das telas operacionais/pendências e de
+  **todo** indicador (diferente de `CANCELADA`, que hoje conta normalmente
+  em indicadores/Dashboard), mas continua íntegra no banco e visível só no
+  "Baú" (tela nova, `SUPERVISOR`-only, ainda não construída).
+- **`SUPERVISOR`-only e `reason`/`exclusionReason` obrigatório** para
+  exclusão — mesma exigência que `cancelar()` **já** cumpre hoje
+  (`cancelarSchema.note`, `min(1)`) sem precisar de nenhuma mudança; a
+  exclusão nova deve seguir o mesmo padrão de validação.
+- **Exclusão em cascata pro plano rascunho:** ao excluir uma OS PREVENTIVA
+  cujo `maintenancePlanId` aponta pra um plano rascunho (`periodicity ===
+  null`) sem nenhuma outra OS vinculada, o plano leva o mesmo trio de campos
+  na mesma transação. Se o plano tiver outra OS vinculada, não é tocado.
+- **Auditoria reaproveitando `StatusHistory`**, sem tabela nova: gravar um
+  registro com `fromStatus === toStatus` e a nota, mesmo padrão que
+  `reprogramacao()` já usa para ações que não mudam o `status` da OS.
+
+**`POST /workorders/:id/excluir` (Fase 2, pronto):** `SUPERVISOR`-only. Body
+`{ reason: string }` (`400` se vazio). `404 WORK_ORDER_NOT_FOUND` se a OS não
+existir; `409 ALREADY_EXCLUDED` se já excluída; `422
+WORK_ORDER_NOT_IN_INITIAL_PHASE` se `status !== ABERTA`. Sucesso: preenche os
+3 campos, grava `StatusHistory` (`fromStatus === toStatus`, nota prefixada
+`[EXCLUSÃO]`) e, se a OS for PREVENTIVA vinculada a um plano rascunho
+(`periodicity === null`) sem **nenhuma outra OS não-excluída** apontando pra
+ele, marca o mesmo trio de campos no plano também — mesma transação. Não usa
+`applyTransition`/`canTransition` (não é transição de status), mesmo
+espírito de `reprogramacao()`/`timelineOverride()`. Testado por
+`src/test/workorder-exclusao.test.ts` (8 casos) — **suíte ainda não roda
+localmente** porque `TEST_DATABASE_URL` não está configurado neste `.env`;
+validado por um smoke test manual e descartável direto contra produção
+(SUP.CMMS), com dados de teste prefixados e limpos ao final (resíduo
+confirmado zero) — rodar a suíte de verdade na primeira vez que houver um
+branch de teste disponível.
+
+Fases restantes (3 a 9 — não implementadas): filtro `excludedAt: null` em
+todo `where` de `lib/indicators.ts` e das queries do Dashboard; filtro
+`excludedAt: null` por padrão em `listWorkOrders`/`listMaintenancePlans`
+(Fila de Triagem, Agenda, `MinhasOS`, `AgendaProgramacao`); endpoint do Baú
+(`status = CANCELADA OR excludedAt IS NOT NULL`); ação "Excluir OS" em
+`DetalheOS.tsx` (só visível em `ABERTA` + `SUPERVISOR`); tela nova do Baú;
+ajuste do botão "Excluir" hoje morto em `MaintenancePlanModal.tsx` (chama
+`deleteMaintenancePlan`, que bloqueia com `422` sempre que há qualquer OS
+vinculada — o que é o caso de todo plano rascunho, então hoje esse botão
+nunca funciona nesse cenário).
 
 ---
 
