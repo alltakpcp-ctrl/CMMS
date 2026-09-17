@@ -63,7 +63,15 @@ export const listMaintenancePlansQuerySchema = z.object({
   incluirExcluidos: z.coerce.boolean().optional().default(false),
 });
 
+// Exclusão lógica do plano (§5.2 do CLAUDE.md, extensão pro plano em si, não
+// só cascata a partir da OS) — mesmo padrão de excluirSchema em
+// workorders/schema.ts: nunca apaga a linha, motivo obrigatório.
+export const excluirMaintenancePlanSchema = z.object({
+  reason: z.string().min(1, "Motivo é obrigatório para excluir o plano."),
+});
+
 export type CreateMaintenancePlanInput = z.infer<typeof createMaintenancePlanSchema>;
 export type UpdateMaintenancePlanInput = z.infer<typeof updateMaintenancePlanSchema>;
 export type GenerateWorkOrderFromPlanInput = z.infer<typeof generateWorkOrderFromPlanSchema>;
 export type ListMaintenancePlansQuery = z.infer<typeof listMaintenancePlansQuerySchema>;
+export type ExcluirMaintenancePlanInput = z.infer<typeof excluirMaintenancePlanSchema>;

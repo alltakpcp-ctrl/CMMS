@@ -68,6 +68,12 @@ export interface MaintenancePlan {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  // Exclusão lógica (§5.2 do CLAUDE.md) — via cascata automática (OS
+  // rascunho excluída/cancelada) ou via POST /maintenance-plans/:id/excluir
+  // (ação direta do supervisor). Nunca apaga a linha.
+  excludedAt: string | null;
+  excludedById: string | null;
+  exclusionReason: string | null;
 }
 
 // Retorno de GET /maintenance-plans (lista) — mesmo shape + campos calculados

@@ -7,6 +7,7 @@ import { AuthPayload } from "../../middlewares/authenticate";
 import { MaintenancePeriodicity, WorkOrderStatus } from "../../domain/enums";
 import {
   CreateMaintenancePlanInput,
+  ExcluirMaintenancePlanInput,
   GenerateWorkOrderFromPlanInput,
   ListMaintenancePlansQuery,
   UpdateMaintenancePlanInput,
@@ -87,6 +88,69 @@ export async function deleteMaintenancePlan(id: string) {
   }
 
   await prisma.maintenancePlan.delete({ where: { id } });
+}
+
+// Exclusão lógica do plano — SUPERVISOR-only (§ rota), extensão de §5.2 do
+// CLAUDE.md pro plano em si, não só a cascata que já existia a partir de
+// excluir()/cancelar() de uma OS (workorders/service.ts). Ao contrário de
+// deleteMaintenancePlan() (hard delete, só funciona com zero OS vinculada —
+// na prática quase nunca, já que todo plano nasce com uma OS), esta função
+// nunca apaga linha nenhuma: marca o trio de exclusão no plano e "mata
+// junto" qualquer OS dele que ainda não tenha terminado (ENCERRADA fica
+// intacta como histórico — só o que ainda está em aberto/pendente é
+// excluído). Funciona tanto em plano rascunho quanto num já com
+// periodicidade definida — é uma ação deliberada do supervisor, diferente
+// da cascata automática (que só mexe em plano rascunho).
+export async function excluirMaintenancePlan(id: string, input: ExcluirMaintenancePlanInput, user: AuthPayload) {
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.maintenancePlan.findUnique({ where: { id } });
+    if (!plan) {
+      throw new AppError(404, "MAINTENANCE_PLAN_NOT_FOUND", "Plano de manutenção não encontrado.");
+    }
+    if (plan.excludedAt) {
+      throw new AppError(409, "ALREADY_EXCLUDED", "Este plano já foi excluído.");
+    }
+
+    const updated = await tx.maintenancePlan.update({
+      where: { id },
+      data: {
+        excludedAt: new Date(),
+        excludedById: user.userId,
+        exclusionReason: input.reason,
+      },
+      include: { asset: true },
+    });
+
+    const openWorkOrders = await tx.workOrder.findMany({
+      where: { maintenancePlanId: id, status: { not: WorkOrderStatus.ENCERRADA }, excludedAt: null },
+    });
+
+    for (const workOrder of openWorkOrders) {
+      await tx.execution.updateMany({
+        where: { workOrderId: workOrder.id, finishedAt: null },
+        data: { finishedAt: new Date() },
+      });
+      await tx.workOrder.update({
+        where: { id: workOrder.id },
+        data: {
+          excludedAt: new Date(),
+          excludedById: user.userId,
+          exclusionReason: `Excluída automaticamente junto com o plano de preventiva (${input.reason}).`,
+        },
+      });
+      await tx.statusHistory.create({
+        data: {
+          workOrderId: workOrder.id,
+          fromStatus: workOrder.status,
+          toStatus: workOrder.status,
+          changedById: user.userId,
+          note: `[EXCLUSÃO EM CASCATA — PLANO] ${input.reason}`,
+        },
+      });
+    }
+
+    return updated;
+  });
 }
 
 // Última Execution encerrada por plano, numa única query (evita N+1 no

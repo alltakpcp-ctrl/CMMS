@@ -166,3 +166,76 @@ describe("DELETE /maintenance-plans/:id", () => {
     expect(deleted).toBeNull();
   });
 });
+
+// Exclusão lógica do plano (§5.2 do CLAUDE.md, ajuste 2026-09-17) — ao
+// contrário do DELETE acima, funciona mesmo com OS vinculada e mata junto
+// qualquer OS não-ENCERRADA do plano, sem nunca apagar linha nenhuma.
+describe("POST /maintenance-plans/:id/excluir", () => {
+  it("exclui o plano e cascateia pra OS não-ENCERRADA vinculada, sem tocar em OS já ENCERRADA", async () => {
+    const planId = await createPlan();
+    await createLinkedWorkOrder(planId, "ABERTA");
+    const encerrada = await prisma.workOrder.create({
+      data: {
+        number: `OS-TEST-PLAN-ENC-${planId}`,
+        type: WorkOrderType.PREVENTIVA,
+        priority: Priority.MEDIA,
+        status: WorkOrderStatus.ENCERRADA,
+        title: "OS já encerrada",
+        description: "desc",
+        requesterId,
+        assetId,
+        maintenancePlanId: planId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/maintenance-plans/${planId}/excluir`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ reason: "Preventiva descontinuada." });
+
+    expect(res.status).toBe(200);
+    expect(res.body.excludedAt).not.toBeNull();
+
+    const linked = await prisma.workOrder.findMany({ where: { maintenancePlanId: planId } });
+    const aberta = linked.find((wo) => wo.id !== encerrada.id)!;
+    expect(aberta.excludedAt).not.toBeNull();
+    expect(aberta.exclusionReason).toContain("Preventiva descontinuada");
+
+    const encerradaDepois = await prisma.workOrder.findUnique({ where: { id: encerrada.id } });
+    expect(encerradaDepois?.excludedAt).toBeNull();
+    expect(encerradaDepois?.status).toBe(WorkOrderStatus.ENCERRADA);
+  });
+
+  it("rejeita excluir o mesmo plano duas vezes (409 ALREADY_EXCLUDED)", async () => {
+    const planId = await createPlan();
+
+    await request(app)
+      .post(`/maintenance-plans/${planId}/excluir`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ reason: "Primeira exclusão." });
+
+    const res = await request(app)
+      .post(`/maintenance-plans/${planId}/excluir`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ reason: "Segunda tentativa." });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("ALREADY_EXCLUDED");
+  });
+
+  it("rejeita sem motivo (400) e 404 para plano inexistente", async () => {
+    const planId = await createPlan();
+
+    const semMotivo = await request(app)
+      .post(`/maintenance-plans/${planId}/excluir`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({});
+    expect(semMotivo.status).toBe(400);
+
+    const inexistente = await request(app)
+      .post("/maintenance-plans/id-inexistente/excluir")
+      .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ reason: "Motivo qualquer." });
+    expect(inexistente.status).toBe(404);
+  });
+});

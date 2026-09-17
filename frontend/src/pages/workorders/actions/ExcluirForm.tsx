@@ -6,10 +6,11 @@ import { Button } from "../../../components/Button";
 import { getErrorMessage } from "../../../lib/errors";
 import { ActionFormProps } from "./types";
 
-// Só chamado quando a OS está ABERTA (getAvailableActions em DetalheOS.tsx
-// já garante isso) — o backend também valida (§5.2 do CLAUDE.md). Diferente
-// de cancelar: não é uma transição de status, a OS some das telas e
-// indicadores mas continua íntegra no banco, visível só no Baú.
+// Chamado em qualquer status exceto ENCERRADA (getAvailableActions em
+// DetalheOS.tsx já garante isso, o backend também valida — §5.2 do
+// CLAUDE.md, ajuste 2026-09-17). Diferente de cancelar: não é uma transição
+// de status, a OS some das telas e indicadores mas continua íntegra no
+// banco, visível só no Baú.
 export function ExcluirForm({ workOrder, onSuccess, onClose }: ActionFormProps) {
   const { token } = useAuth();
   const [reason, setReason] = useState("");
@@ -34,9 +35,8 @@ export function ExcluirForm({ workOrder, onSuccess, onClose }: ActionFormProps) 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-sm text-slate-600">
-        Use isto só para uma OS aberta por engano. A OS não é apagada — some das telas e indicadores, mas
-        continua visível no Baú com este motivo. Se a OS já andou (triagem, planejamento, execução), cancele-a
-        em vez de excluir.
+        A OS não é apagada — some das telas e indicadores, mas continua visível no Baú com este motivo. Se a OS
+        estiver em andamento, qualquer execução em aberto é fechada automaticamente.
       </p>
       <Textarea label="Motivo (obrigatório)" value={reason} onChange={(e) => setReason(e.target.value)} required />
 

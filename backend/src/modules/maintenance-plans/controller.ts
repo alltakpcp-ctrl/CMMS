@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AppError } from "../../lib/AppError";
 import {
   createMaintenancePlanSchema,
+  excluirMaintenancePlanSchema,
   generateWorkOrderFromPlanSchema,
   listMaintenancePlansQuerySchema,
   updateMaintenancePlanSchema,
@@ -38,6 +39,11 @@ export async function updateMaintenancePlanController(req: Request, res: Respons
 export async function deleteMaintenancePlanController(req: Request, res: Response) {
   await maintenancePlansService.deleteMaintenancePlan(req.params.id);
   res.status(204).send();
+}
+
+export async function excluirMaintenancePlanController(req: Request, res: Response) {
+  const input = excluirMaintenancePlanSchema.parse(req.body);
+  res.json(await maintenancePlansService.excluirMaintenancePlan(req.params.id, input, requireUser(req)));
 }
 
 export async function generateWorkOrderFromPlanController(req: Request, res: Response) {

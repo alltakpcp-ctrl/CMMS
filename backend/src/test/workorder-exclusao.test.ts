@@ -131,7 +131,7 @@ describe("exclusão lógica de OS (POST /workorders/:id/excluir)", () => {
     expect(resOperador.status).toBe(403);
   });
 
-  it("rejeita exclusão de OS que já saiu de ABERTA (422 WORK_ORDER_NOT_IN_INITIAL_PHASE)", async () => {
+  it("permite excluir uma OS que já saiu de ABERTA (ajuste 2026-09-17 — antes era 422)", async () => {
     const os = await criarOSAberta(WorkOrderType.CORRETIVA, "OS em triagem");
     await request(app)
       .post(`/workorders/${os.id}/triagem`)
@@ -141,10 +141,23 @@ describe("exclusão lógica de OS (POST /workorders/:id/excluir)", () => {
     const res = await request(app)
       .post(`/workorders/${os.id}/excluir`)
       .set("Authorization", `Bearer ${supervisorToken}`)
+      .send({ reason: "Aberta pro ativo errado, só percebido na triagem." });
+
+    expect(res.status).toBe(200);
+    expect(res.body.excludedAt).not.toBeNull();
+  });
+
+  it("rejeita excluir uma OS já ENCERRADA (422 WORK_ORDER_ENCERRADA)", async () => {
+    const os = await criarOSAberta(WorkOrderType.CORRETIVA, "OS encerrada");
+    await prisma.workOrder.update({ where: { id: os.id }, data: { status: "ENCERRADA" } });
+
+    const res = await request(app)
+      .post(`/workorders/${os.id}/excluir`)
+      .set("Authorization", `Bearer ${supervisorToken}`)
       .send({ reason: "Não deveria funcionar." });
 
     expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe("WORK_ORDER_NOT_IN_INITIAL_PHASE");
+    expect(res.body.error.code).toBe("WORK_ORDER_ENCERRADA");
   });
 
   it("rejeita excluir a mesma OS duas vezes (409 ALREADY_EXCLUDED)", async () => {

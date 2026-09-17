@@ -862,12 +862,15 @@ export function cancelar(id: string, input: CancelarInput, user: AuthPayload) {
 
 // Exclusão lógica (§5.2 do CLAUDE.md, "baú de cancelados e excluídos") —
 // exclusiva do SUPERVISOR (§ rota). Propositalmente NÃO usa
-// applyTransition/canTransition: não é uma transição de status (a OS
-// continua ABERTA, só ganha os 3 campos de exclusão), mesmo espírito de
-// reprogramacao(). Só elegível em ABERTA — qualquer OS que já andou (a
-// partir de TRIAGEM) usa cancelar() (CANCELADA), nunca isto; a exclusão não
-// apaga a linha, só a tira das telas operacionais e de todo indicador,
-// mantendo-a visível (com motivo/autor/data) só no Baú.
+// applyTransition/canTransition: não é uma transição de status (o `status`
+// da OS não muda, só ganha os 3 campos de exclusão), mesmo espírito de
+// reprogramacao(). Elegível em qualquer status **exceto ENCERRADA** (ajuste
+// 2026-09-17: antes só valia para ABERTA — passou a valer também pra OS já
+// em andamento, a pedido do supervisor poder "matar" uma OS/preventiva
+// inteira sem precisar cancelar primeiro); uma OS já ENCERRADA é histórico
+// definitivo e não pode ser excluída. A exclusão não apaga a linha, só a
+// tira das telas operacionais e de todo indicador, mantendo-a visível (com
+// motivo/autor/data) só no Baú.
 export async function excluir(id: string, input: ExcluirInput, user: AuthPayload) {
   return prisma.$transaction(async (tx) => {
     const workOrder = await tx.workOrder.findUnique({ where: { id } });
@@ -879,13 +882,20 @@ export async function excluir(id: string, input: ExcluirInput, user: AuthPayload
       throw new AppError(409, "ALREADY_EXCLUDED", "Esta OS já foi excluída.");
     }
 
-    if (workOrder.status !== WorkOrderStatus.ABERTA) {
+    if (workOrder.status === WorkOrderStatus.ENCERRADA) {
       throw new AppError(
         422,
-        "WORK_ORDER_NOT_IN_INITIAL_PHASE",
-        "Só é possível excluir uma OS que ainda não saiu da fase inicial (ABERTA). Para uma OS em andamento, use o cancelamento."
+        "WORK_ORDER_ENCERRADA",
+        "Não é possível excluir uma OS já encerrada — ela é histórico definitivo. Use apenas o cancelamento em OS ainda em andamento."
       );
     }
+
+    // Uma OS excluída em andamento (ex.: EM_EXECUCAO) não pode deixar uma
+    // Execution aberta pra trás — mesmo tratamento de cancelar().
+    await tx.execution.updateMany({
+      where: { workOrderId: id, finishedAt: null },
+      data: { finishedAt: new Date() },
+    });
 
     const updated = await tx.workOrder.update({
       where: { id },

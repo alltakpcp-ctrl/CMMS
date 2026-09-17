@@ -74,6 +74,13 @@ export function deleteMaintenancePlan(token: string, id: string) {
   return apiRequest<null>(`/maintenance-plans/${id}`, { method: "DELETE", token });
 }
 
+// Exclusão lógica (§5.2 do CLAUDE.md) — ao contrário do DELETE acima (hard
+// delete, só funciona com zero OS vinculada), funciona com o plano em
+// qualquer estado e mata junto toda OS não-ENCERRADA vinculada a ele.
+export function excluirMaintenancePlan(token: string, id: string, input: { reason: string }) {
+  return apiRequest<MaintenancePlan>(`/maintenance-plans/${id}/excluir`, { method: "POST", token, body: input });
+}
+
 export function generateWorkOrderFromPlan(token: string, id: string, input: GenerateWorkOrderFromPlanInput) {
   return apiRequest<WorkOrder>(`/maintenance-plans/${id}/gerar-os`, { method: "POST", token, body: input });
 }

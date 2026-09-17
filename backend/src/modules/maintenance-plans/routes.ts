@@ -6,6 +6,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import {
   createMaintenancePlanController,
   deleteMaintenancePlanController,
+  excluirMaintenancePlanController,
   generateWorkOrderFromPlanController,
   getMaintenancePlanController,
   listMaintenancePlansController,
@@ -36,6 +37,14 @@ maintenancePlansRoutes.post(
 );
 maintenancePlansRoutes.patch("/:id", authorize(Role.SUPERVISOR), asyncHandler(updateMaintenancePlanController));
 maintenancePlansRoutes.delete("/:id", authorize(Role.SUPERVISOR), asyncHandler(deleteMaintenancePlanController));
+// Exclusão lógica (§5.2 do CLAUDE.md) — ao contrário do DELETE acima (hard
+// delete, só funciona com zero OS vinculada), funciona com o plano em
+// qualquer estado e mata junto toda OS não-ENCERRADA vinculada a ele.
+maintenancePlansRoutes.post(
+  "/:id/excluir",
+  authorize(Role.SUPERVISOR),
+  asyncHandler(excluirMaintenancePlanController)
+);
 // Gera um novo ciclo de OS a partir de um plano já existente (ex.: venceu de
 // novo após a OS anterior ser ENCERRADA). Mesma permissão de criar plano.
 maintenancePlansRoutes.post(

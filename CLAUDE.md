@@ -257,12 +257,13 @@ específicas via middleware dedicado (não via `authorize(role)`):
 | (3) Programação de OS corretiva/preditiva (rota real só aceita SUPERVISOR — ver nota) | ❌ | ❌ | ✅ |
 | (3) Reprogramar (trocar técnico/reagendar sem mudar status) | ❌ | ❌ | ✅ (endpoint existe, **sem UI no frontend hoje** — ver §6.1) |
 | Agenda de preventivas: criar plano (gera 1ª OS) / gerar novo ciclo | ❌ | ✅ | ✅ |
-| Editar/desativar/excluir plano de preventiva existente | ❌ | ❌ | ✅ |
+| Editar/desativar plano de preventiva existente | ❌ | ❌ | ✅ |
+| Excluir plano de preventiva (`DELETE` físico se zero OS vinculada — raro; senão exclusão lógica via `POST /:id/excluir`, mata junto toda OS não-ENCERRADA do plano — §5.2) | ❌ | ❌ | ✅ |
 | (4) Executar e registrar reparo | ❌ | ✅ (o assignedTo/apoio) | ✅ (isento da checagem de assignedTo) |
 | (5) Encerramento técnico | ❌ | ✅ | ✅ |
 | (5) Validar e dar baixa na OS / reprovar validação | ❌ | ❌ | ✅ |
 | Cancelar OS (qualquer status ≠ ENCERRADA, nota obrigatória) | ❌ | ❌ | ✅ |
-| Excluir OS (só `ABERTA`, motivo obrigatório — §5.2) | ❌ | ❌ | ✅ |
+| Excluir OS (qualquer status ≠ `ENCERRADA`, motivo obrigatório — §5.2, ajuste 2026-09-17) | ❌ | ❌ | ✅ |
 | Ver Baú (`GET /workorders/bau` — OS cancelada + excluída, §5.2) | ❌ | ❌ | ✅ |
 | Override manual de fase (`PATCH /:id/timeline`, pula a máquina de estados) | ❌ | ❌ | ✅ |
 | Subtarefas: abrir | ❌ | ✅ | ✅ |
@@ -508,11 +509,23 @@ continua aparecendo em `ListaOS`/Dashboard/indicadores normalmente até a
 Fase 3/4 serem feitas; não assumir que a feature já esconde nada da UI.
 
 Decisões de design já fechadas (não reabrir sem confirmar com o usuário):
-- **Exclusão só é válida para OS em `ABERTA`** (nunca saiu da fase inicial —
-  nem chegou a `TRIAGEM`). Qualquer OS que já andou e precisa ser descartada
-  no meio do caminho usa `cancelar()` (→ `CANCELADA`), nunca exclusão. As
-  duas coisas são semânticas diferentes por decisão explícita: "cancelada" =
-  trabalho real interrompido; "excluída" = erro de abertura.
+- **Exclusão vale em qualquer status ≠ `ENCERRADA`** (ajuste 2026-09-17 —
+  decisão original abaixo, reaberta a pedido explícito do usuário: "o
+  supervisor precisa poder matar de vez planos, OS, rascunhos e todo o
+  escopo de preventivas"). Só `ENCERRADA` fica de fora, por ser histórico
+  definitivo. Ao excluir uma OS que estava em andamento (ex.: `EM_EXECUCAO`),
+  qualquer `Execution` aberta (`finishedAt: null`) é fechada automaticamente
+  na mesma transação — mesmo tratamento que `cancelar()` já dava. Diferente
+  de `cancelar()`, que continua sendo o caminho natural pra "trabalho real
+  interrompido" (aparece no Baú com `bauInfo.kind: "CANCELADA"`), excluir()
+  é pra "isto não devia existir/continuar" (some de vez das telas, some do
+  Baú-listagem operacional, mas nunca é apagado do banco). Os dois convivem
+  no mesmo status — o supervisor escolhe qual ação faz sentido.
+  - Decisão original (2026-09-17, Fase 2, já superada pelo parágrafo acima):
+    exclusão só valia para OS em `ABERTA` (nunca saiu da fase inicial);
+    qualquer OS que já tinha andado precisava usar `cancelar()` primeiro.
+    Ficou documentado aqui só pra explicar o código legado/testes antigos —
+    não é mais a regra vigente.
 - **Exclusão lógica, não física.** A OS/plano não é apagado — os 3 campos
   são preenchidos, a OS some das telas operacionais/pendências e de
   **todo** indicador (diferente de `CANCELADA`, que hoje conta normalmente
@@ -538,22 +551,46 @@ Decisões de design já fechadas (não reabrir sem confirmar com o usuário):
   registro com `fromStatus === toStatus` e a nota, mesmo padrão que
   `reprogramacao()` já usa para ações que não mudam o `status` da OS.
 
-**`POST /workorders/:id/excluir` (Fase 2, pronto):** `SUPERVISOR`-only. Body
-`{ reason: string }` (`400` se vazio). `404 WORK_ORDER_NOT_FOUND` se a OS não
-existir; `409 ALREADY_EXCLUDED` se já excluída; `422
-WORK_ORDER_NOT_IN_INITIAL_PHASE` se `status !== ABERTA`. Sucesso: preenche os
-3 campos, grava `StatusHistory` (`fromStatus === toStatus`, nota prefixada
+**`POST /workorders/:id/excluir` (Fase 2, pronto — escopo ampliado
+2026-09-17):** `SUPERVISOR`-only. Body `{ reason: string }` (`400` se
+vazio). `404 WORK_ORDER_NOT_FOUND` se a OS não existir; `409
+ALREADY_EXCLUDED` se já excluída; `422 WORK_ORDER_ENCERRADA` se `status ===
+ENCERRADA` (único status que não pode ser excluído). Sucesso: fecha qualquer
+`Execution` aberta (`finishedAt: null`), preenche os 3 campos, grava
+`StatusHistory` (`fromStatus === toStatus`, nota prefixada
 `[EXCLUSÃO]`) e, se a OS for PREVENTIVA vinculada a um plano rascunho
 (`periodicity === null`) sem **nenhuma outra OS não-excluída** apontando pra
 ele, marca o mesmo trio de campos no plano também — mesma transação. Não usa
 `applyTransition`/`canTransition` (não é transição de status), mesmo
 espírito de `reprogramacao()`/`timelineOverride()`. Testado por
-`src/test/workorder-exclusao.test.ts` (8 casos) — **suíte ainda não roda
-localmente** porque `TEST_DATABASE_URL` não está configurado neste `.env`;
-validado por um smoke test manual e descartável direto contra produção
-(SUP.CMMS), com dados de teste prefixados e limpos ao final (resíduo
-confirmado zero) — rodar a suíte de verdade na primeira vez que houver um
-branch de teste disponível.
+`src/test/workorder-exclusao.test.ts` (10 casos, incluindo os 2 do ajuste de
+escopo) — **suíte ainda não roda localmente** porque `TEST_DATABASE_URL` não
+está configurado neste `.env`; validado por um smoke test manual e
+descartável direto contra produção (SUP.CMMS), com dados de teste
+prefixados e limpos ao final (resíduo confirmado zero) — rodar a suíte de
+verdade na primeira vez que houver um branch de teste disponível.
+
+**`POST /maintenance-plans/:id/excluir` (novo, 2026-09-17):**
+`SUPERVISOR`-only, `maintenance-plans/service.ts#excluirMaintenancePlan`.
+Body `{ reason: string }` (`400` se vazio). `404
+MAINTENANCE_PLAN_NOT_FOUND`/`409 ALREADY_EXCLUDED` nos mesmos moldes do
+endpoint de OS. Diferente de `DELETE /maintenance-plans/:id` (hard delete,
+só funciona com **zero** OS vinculada — na prática quase nunca, já que todo
+plano nasce com uma OS junto, ver Fase 8 abaixo), este é o caminho real pra
+"matar" um plano de preventiva de vez: marca o trio de exclusão no plano
+**e** em toda OS dele que ainda não esteja `ENCERRADA` (fechando qualquer
+`Execution` aberta de cada uma, mesmo tratamento do endpoint de OS) — OS já
+`ENCERRADA` fica intacta como histórico, nunca tocada. Funciona tanto num
+plano rascunho quanto num já com periodicidade definida; diferente da
+cascata automática (`cascadeExcludeDraftMaintenancePlan`, só dispara pra
+plano rascunho quando a última OS dele é excluída/cancelada), esta é uma
+ação deliberada e direta do supervisor sobre o plano em si, disponível pelo
+botão "Excluir" de `MaintenancePlanModal.tsx` (que tenta o `DELETE` físico
+primeiro — só sucede se realmente não houver OS nenhuma — e cai pra este
+endpoint, pedindo o motivo por `window.prompt`, quando o backend responde
+`422 MAINTENANCE_PLAN_HAS_WORK_ORDERS`). Testado por
+`src/test/maintenance-plans.test.ts` (mesma limitação de `TEST_DATABASE_URL`
+ausente, não rodado localmente).
 
 **Fase 3 (indicadores, pronta):** todo `where` de
 `indicators/service.ts` (`fetchWorkOrdersForIndicators`, `getOverview`'s
@@ -626,9 +663,11 @@ Validado por smoke test manual contra produção (mesma limitação de
 `TEST_DATABASE_URL` ausente) — 13/13, sem a instabilidade de pooler das
 Fases 3/4 (só operações `CORRETIVA`, mais leves).
 
-**Fase 6 (ação "Excluir OS" no frontend, pronta):** `DetalheOS.tsx` ganhou
-a ação `excluir` — botão vermelho, ao lado de "Cancelar", só quando
-`status === ABERTA` **e** `role === SUPERVISOR` (`getAvailableActions`).
+**Fase 6 (ação "Excluir OS" no frontend, pronta — escopo ampliado
+2026-09-17):** `DetalheOS.tsx` ganhou a ação `excluir` — botão vermelho, ao
+lado de "Cancelar", quando `status !== ENCERRADA` **e** `role ===
+SUPERVISOR` (`getAvailableActions`; antes só aparecia com `status ===
+ABERTA`). Convive com "Cancelar" no mesmo status, como ações independentes.
 `ExcluirForm.tsx` (mesmo padrão de `CancelarForm.tsx`, motivo obrigatório)
 chama `POST /workorders/:id/excluir` via `api/workorders.ts#excluir`.
 `getAvailableActions` também retorna `[]` de imediato se `wo.excludedAt`
@@ -657,17 +696,18 @@ endpoint já testado na Fase 2).
 pra `/ordens/:id` (que já mostra o aviso de exclusão, Fase 6). `BauInfo`/
 `BauItem` novos em `types.ts`.
 
-**Fase 8 (botão "Excluir" do plano corrigido, pronta):** `deleteMaintenancePlan`
-continua existindo do jeito que estava (só apaga plano sem NENHUMA OS
-vinculada — o que nunca é o caso de um rascunho). O que mudou é a reação
-do frontend ao erro: `MaintenancePlanModal.tsx#handleDelete` agora detecta
-`422 MAINTENANCE_PLAN_HAS_WORK_ORDERS` e mostra uma mensagem específica —
-se o plano era rascunho (`periodicity` null na origem, guardado em
-`wasDraft`), orienta a excluir a OS que o originou (Fase 2/6, cascateia
-pro plano automaticamente); senão, orienta a desativar (`active=false`) em
-vez de excluir. Antes disso o usuário só via a mensagem genérica do
-backend, que sugeria "desativar" mesmo quando excluir a OS (caminho novo,
-melhor pro caso de rascunho) já resolvia o problema de vez.
+**Fase 8 (botão "Excluir" do plano corrigido, pronta — superada pelo endpoint
+novo de 2026-09-17):** `deleteMaintenancePlan` continua existindo do jeito
+que estava (só apaga plano sem NENHUMA OS vinculada — o que nunca é o caso
+de um rascunho). Quando essa feature foi fechada, a reação do frontend ao
+erro `422 MAINTENANCE_PLAN_HAS_WORK_ORDERS` era só orientar o usuário
+(desativar, ou excluir a OS que originou o rascunho manualmente) — não
+existia ainda um jeito de excluir o plano em si com OS vinculada. Com
+`POST /maintenance-plans/:id/excluir` (ver acima), `MaintenancePlanModal.tsx#handleDelete`
+agora, ao receber esse mesmo erro, chama esse endpoint novo (pedindo o
+motivo por `window.prompt`) em vez de só orientar — o campo `wasDraft` que
+guardava a distinção "era rascunho?" foi removido do componente, já que não
+faz mais diferença (o endpoint novo funciona igual pros dois casos).
 
 **Fase 9 (fechamento, pronta):** jornada completa das Fases 1-6 validada
 de ponta a ponta contra produção num único smoke test (criar OS PREVENTIVA

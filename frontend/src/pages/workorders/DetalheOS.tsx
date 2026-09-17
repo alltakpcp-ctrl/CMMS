@@ -102,9 +102,11 @@ function getAvailableActions(wo: WorkOrder, role: Role, userId: string): ActionK
   ) {
     actions.push("cancelar");
   }
-  // Exclusão (§5.2 do CLAUDE.md): só OS que nunca saiu da fase inicial —
-  // qualquer OS que já andou usa cancelar(), não isto.
-  if (wo.status === WorkOrderStatus.ABERTA && role === Role.SUPERVISOR) {
+  // Exclusão (§5.2 do CLAUDE.md): ajuste 2026-09-17 — antes só valia pra OS
+  // que nunca saiu de ABERTA; agora vale em qualquer status, exceto
+  // ENCERRADA (histórico definitivo, nunca excluída). Convive com "cancelar"
+  // no mesmo status — são ações independentes, o supervisor escolhe.
+  if (wo.status !== WorkOrderStatus.ENCERRADA && role === Role.SUPERVISOR) {
     actions.push("excluir");
   }
   // Override de timeline: SUPERVISOR pode mover a OS para qualquer fase,

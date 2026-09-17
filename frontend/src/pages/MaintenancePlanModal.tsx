@@ -94,11 +94,6 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
   const [form, setForm] = useState<FormState>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // Rascunho de verdade (periodicity null na origem) — não deriva de
-  // form.periodicity, que já vem pré-preenchido com MENSAL pro form (ver
-  // planToForm). Usado só pra dar a mensagem certa se a exclusão falhar
-  // por ter OS vinculada (§5.2/Fase 8 do CLAUDE.md).
-  const [wasDraft, setWasDraft] = useState(false);
 
   // Só usados na criação — gera a 1ª OS (já PROGRAMADA) junto com o plano.
   // Editar um plano existente não agenda uma nova OS.
@@ -120,10 +115,7 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
     setLoadingPlan(true);
     maintenancePlansApi
       .getMaintenancePlan(token, planId)
-      .then((plan) => {
-        setForm(planToForm(plan));
-        setWasDraft(plan.periodicity === null);
-      })
+      .then((plan) => setForm(planToForm(plan)))
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoadingPlan(false));
   }, [token, planId, showError]);
@@ -179,23 +171,35 @@ export function MaintenancePlanModal({ planId, onClose, onSaved }: MaintenancePl
     if (!window.confirm("Excluir este plano de manutenção?")) return;
     setDeleting(true);
     try {
+      // Tenta primeiro o DELETE de verdade — só funciona se o plano nunca
+      // teve nenhuma OS vinculada (raro, praticamente nunca acontece, já que
+      // todo plano nasce com uma OS junto).
       await maintenancePlansApi.deleteMaintenancePlan(token, planId);
       showSuccess("Plano de manutenção excluído.");
       onSaved();
       onClose();
     } catch (err) {
-      // Fase 8 (§5.2 do CLAUDE.md): este endpoint só apaga um plano sem
-      // NENHUMA OS vinculada — o que nunca é o caso de um plano rascunho
-      // (a OS que o originou sempre está lá). Em vez do erro genérico do
-      // backend (que ainda sugere "desativar", conselho desatualizado desde
-      // que a exclusão de OS passou a cascatear pro plano — Fase 2),
-      // orienta pro caminho certo em cada caso.
       if (err instanceof ApiError && err.code === "MAINTENANCE_PLAN_HAS_WORK_ORDERS") {
-        showError(
-          wasDraft
-            ? "Este plano é um rascunho com OS vinculada — não é excluído aqui. Abra a OS que o originou e use \"Excluir OS\" (só funciona enquanto ela estiver ABERTA); o plano é excluído junto, automaticamente."
-            : "Este plano já tem histórico de OS e não pode ser excluído. Desmarque \"Ativo\" para desativá-lo em vez de excluir."
+        // Ajuste 2026-09-17 (§5.2 do CLAUDE.md): em vez de só orientar o
+        // supervisor a excluir a OS manualmente, oferece direto a exclusão
+        // lógica do plano — mata junto qualquer OS dele que ainda não tenha
+        // sido encerrada (ENCERRADA fica intacta como histórico). Nada é
+        // apagado do banco; some das telas, mas fica auditável.
+        const reason = window.prompt(
+          "Este plano tem OS vinculada e não pode ser apagado fisicamente. Informe o motivo para excluí-lo: o plano e qualquer OS dele ainda em aberto somem das telas (OS já encerradas continuam como histórico)."
         );
+        if (!reason) {
+          setDeleting(false);
+          return;
+        }
+        try {
+          await maintenancePlansApi.excluirMaintenancePlan(token, planId, { reason });
+          showSuccess("Plano de manutenção excluído.");
+          onSaved();
+          onClose();
+        } catch (excluirErr) {
+          showError(getErrorMessage(excluirErr));
+        }
       } else {
         showError(getErrorMessage(err));
       }
