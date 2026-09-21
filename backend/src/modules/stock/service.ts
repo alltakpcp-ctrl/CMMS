@@ -224,12 +224,7 @@ export async function getStockDashboard() {
       include: {
         part: { select: { code: true, description: true } },
         user: { select: { name: true } },
-        withdrawalRequest: {
-          select: {
-            requestedBy: { select: { name: true } },
-            subtask: { select: { assignedTo: { select: { name: true } } } },
-          },
-        },
+        workOrder: { select: { assignedTo: { select: { name: true } } } },
       },
     }),
     // Peça SAIDA sempre carrega workOrderId (StockWithdrawalRequest.workOrderId
@@ -418,16 +413,12 @@ export async function getStockDashboard() {
       partCode: m.part.code,
       partDescription: m.part.description,
       workOrderId: m.workOrderId,
-      // Técnico responsável: dono da subtask quando a baixa veio do fechamento
-      // de uma subtask (pode ter sido um supervisor quem registrou por ele);
-      // senão, quem declarou o consumo no encerramento técnico da OS; senão
-      // (movimentação manual ou registro anterior à migration), quem executou
-      // a ação (userId) — mantém o comportamento antigo nesses casos.
-      technicianName:
-        m.withdrawalRequest?.subtask?.assignedTo?.name ??
-        m.withdrawalRequest?.requestedBy?.name ??
-        m.user?.name ??
-        null,
+      // Técnico responsável = responsável principal da OS (WorkOrder.assignedTo),
+      // independente de a baixa ter vindo do encerramento técnico da OS toda
+      // ou da conclusão de uma subtask específica. Fallback para userId
+      // (quem executou a ação) só em movimentações sem OS (entrada/ajuste/
+      // devolução manual) ou sem responsável principal atribuído.
+      technicianName: m.workOrder?.assignedTo?.name ?? m.user?.name ?? null,
       // Quem validou o encerramento da OS (AGUARDANDO_VALIDACAO -> ENCERRADA).
       // null quando a movimentação não tem OS associada (m.workOrderId null,
       // tratado no frontend como "—"), OU quando a OS ainda não foi validada
