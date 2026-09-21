@@ -137,8 +137,8 @@ Além do ciclo de OS, o sistema também cobre:
   `workOrderId` do movimento.
 - **Preventiva = sem cron/agendador automático.** O vencimento de um
   `MaintenancePlan` é sempre calculado sob demanda (`lib/maintenancePlans.ts`),
-  nunca por job em background. Criar um `MaintenancePlan` (TECNICO ou
-  SUPERVISOR, via Agenda) **gera a 1ª OS na hora**, já `PROGRAMADA` (pula
+  nunca por job em background. Criar um `MaintenancePlan` (SUPERVISOR, via
+  Agenda) **gera a 1ª OS na hora**, já `PROGRAMADA` (pula
   triagem/planejamento — quem agenda já informa data/hora e técnico); ciclos
   seguintes usam `POST /maintenance-plans/:id/gerar-os` (manual) **ou** são
   gerados sozinhos ao encerrar o ciclo anterior, se o plano vinculado estiver
@@ -276,7 +276,7 @@ específicas via middleware dedicado (não via `authorize(role)`):
 | (2) Planejamento (peças, ferramentas, procedimentos) | ❌ | ✅ | ✅ |
 | (3) Programação de OS corretiva/preditiva (rota real só aceita SUPERVISOR — ver nota) | ❌ | ❌ | ✅ |
 | (3) Reprogramar (trocar técnico/reagendar sem mudar status) | ❌ | ❌ | ✅ (endpoint existe, **sem UI no frontend hoje** — ver §6.1) |
-| Agenda de preventivas: criar plano (gera 1ª OS) / gerar novo ciclo | ❌ | ✅ | ✅ |
+| Agenda de preventivas: criar plano (gera 1ª OS) / gerar novo ciclo | ❌ | ❌ | ✅ |
 | Editar/desativar plano de preventiva existente | ❌ | ❌ | ✅ |
 | Excluir plano de preventiva (`DELETE` físico se zero OS vinculada — raro; senão exclusão lógica via `POST /:id/excluir`, mata junto toda OS não-ENCERRADA do plano — §5.2) | ❌ | ❌ | ✅ |
 | (4) Executar e registrar reparo | ❌ | ✅ (o assignedTo/apoio) | ✅ (isento da checagem de assignedTo) |
@@ -313,9 +313,9 @@ Notas importantes:
 - Em qualquer prioridade, a OS pode ir direto de `TRIAGEM` ou `PLANEJADA` para
   `EM_EXECUCAO` pelo próprio técnico (auto-atribuído), sem passar pela
   programação do SUPERVISOR (ver §6 e `workOrderStateMachine.ts`).
-- Criar um `MaintenancePlan` (Agenda) é liberado a TECNICO **e** SUPERVISOR —
-  única exceção onde TECNICO participa da etapa (3), porque a ação já embute
-  agendamento completo (data/hora + técnico) e gera a OS na hora, `PROGRAMADA`.
+- TECNICO é somente-leitura na Agenda (`/preventivas`): vê o calendário
+  completo da empresa, mas criar/editar/excluir plano e gerar novo ciclo de
+  OS são SUPERVISOR-only.
 
 ---
 
@@ -856,9 +856,10 @@ por `RequireRole` em `App.tsx`:
   `DetalheOS.tsx`) só aparece lá quando a OS está `PLANEJADA` e o usuário é
   SUPERVISOR.
 - **`/preventivas`** (TECNICO) → `agenda/PreventivasTecnico.tsx`: reaproveita
-  o mesmo `MaintenanceCalendar` (TECNICO também cria plano/gera OS, ver §4)
-  mais uma lista "minhas OS preventivas programadas" (`PROGRAMADA`/`EM_EXECUCAO`,
-  como principal ou apoio).
+  o mesmo `MaintenanceCalendar` em modo somente-leitura (TECNICO só visualiza —
+  sem criar/editar/excluir plano nem gerar OS, ver §4) mais uma lista "minhas
+  OS preventivas programadas" (`PROGRAMADA`/`EM_EXECUCAO`, como principal ou
+  apoio).
 
 ---
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import * as maintenancePlansApi from "../../api/maintenancePlans";
 import { MaintenancePlanWithDueDate } from "../../types";
-import { MaintenancePeriodicity, PERIODICITY_DAYS, Priority } from "../../domain/enums";
+import { MaintenancePeriodicity, PERIODICITY_DAYS, Priority, Role } from "../../domain/enums";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { getErrorMessage } from "../../lib/errors";
@@ -47,8 +47,12 @@ function formatPeriodLabel(view: CalendarView, reference: Date): string {
 }
 
 export function MaintenanceCalendar() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
+  // TECNICO é somente-leitura neste calendário (compartilhado entre /agenda,
+  // SUPERVISOR, e /preventivas, TECNICO) — só SUPERVISOR cria/edita/exclui
+  // plano ou gera OS.
+  const canManage = user?.role === Role.SUPERVISOR;
 
   const [view, setView] = useState<CalendarView>("month");
   const [reference, setReference] = useState<Date>(startOfToday());
@@ -228,7 +232,7 @@ export function MaintenanceCalendar() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>
+          {canManage && <Button onClick={() => setModal({ mode: "create" })}>Adicionar preventiva</Button>}
 
           <div className="flex overflow-hidden rounded border border-slate-300">
             {(Object.keys(VIEW_LABELS) as CalendarView[]).map((v) => (
@@ -293,7 +297,7 @@ export function MaintenanceCalendar() {
         </div>
       </div>
 
-      {draftPlans.length > 0 && (
+      {canManage && draftPlans.length > 0 && (
         <div className="rounded border border-amber-200 bg-amber-50 p-3">
           <p className="mb-2 text-sm font-medium text-amber-900">
             Rascunhos pendentes de periodicidade ({draftPlans.length})
@@ -321,14 +325,22 @@ export function MaintenanceCalendar() {
           plan={popover.plan}
           anchorRect={popover.anchorRect}
           onClose={() => setPopover(null)}
-          onEdit={() => {
-            setModal({ mode: "edit", planId: popover.plan.id });
-            setPopover(null);
-          }}
-          onGenerateWorkOrder={() => {
-            setGenerateModal({ planId: popover.plan.id });
-            setPopover(null);
-          }}
+          onEdit={
+            canManage
+              ? () => {
+                  setModal({ mode: "edit", planId: popover.plan.id });
+                  setPopover(null);
+                }
+              : undefined
+          }
+          onGenerateWorkOrder={
+            canManage
+              ? () => {
+                  setGenerateModal({ planId: popover.plan.id });
+                  setPopover(null);
+                }
+              : undefined
+          }
         />
       )}
 
