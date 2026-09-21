@@ -99,6 +99,10 @@ Além do ciclo de OS, o sistema também cobre:
   "sem giro" (saldo > 0 sem nenhuma SAIDA nos últimos 90 dias, constante
   `DEAD_STOCK_DAYS`). Consumido pela aba "Dashboard" de `Estoque.tsx`
   (`pages/estoque/EstoqueDashboard.tsx`), aba padrão ao abrir `/estoque`.
+  `summary.totalValue`/`partsWithoutCost` continuam calculados pela API mas
+  **não têm mais card na UI** (removido por pedido de negócio — não exibir
+  valor monetário do estoque no dashboard); não remover o cálculo do backend
+  sem confirmar que nenhum outro consumidor depende dele.
 - **Consumo de peças = declaração obrigatória + aprovação, não baixa direta.**
   Ao encerrar tecnicamente uma OS (`encerramentoTecnico`) ou concluir uma
   subtarefa (`finishSubtask`), o técnico é obrigado a declarar peças usadas

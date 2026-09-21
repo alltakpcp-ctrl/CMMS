@@ -11,7 +11,7 @@ import { Badge } from "../../components/Badge";
 import { EmptyState } from "../../components/EmptyState";
 import { useToast } from "../../components/ToastProvider";
 import { getErrorMessage } from "../../lib/errors";
-import { formatCurrency, formatDateTime } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
 import { PhaseDurationChart, BarItem } from "../indicators/PhaseDurationChart";
 
 // Mesma paleta categórica validada usada no donut de status de OS em
@@ -81,7 +81,7 @@ export function EstoqueDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
           <p className="text-sm text-slate-500">Peças ativas</p>
           <p className="mt-1 text-3xl font-semibold text-slate-900">{data.summary.totalParts}</p>
@@ -89,15 +89,6 @@ export function EstoqueDashboard() {
         <Card>
           <p className="text-sm text-slate-500">Saldo total (unidades)</p>
           <p className="mt-1 text-3xl font-semibold text-slate-900">{data.summary.totalStockQty}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-slate-500">Valor total em estoque</p>
-          <p className="mt-1 text-3xl font-semibold text-slate-900">{formatCurrency(data.summary.totalValue)}</p>
-          {data.summary.partsWithoutCost > 0 && (
-            <p className="mt-1 text-xs text-slate-500">
-              {data.summary.partsWithoutCost} peça(s) sem custo cadastrado — valor parcial
-            </p>
-          )}
         </Card>
         <Card>
           <p className="text-sm text-slate-500">Peças em urgência</p>
