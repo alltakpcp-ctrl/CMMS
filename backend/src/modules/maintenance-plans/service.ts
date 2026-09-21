@@ -200,6 +200,10 @@ async function openWorkOrderByPlanId(planIds: string[]): Promise<Map<string, Ope
     where: {
       maintenancePlanId: { in: planIds },
       status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
+      // excludedAt: null — exclusão lógica (CLAUDE.md §5.2) não muda o status,
+      // então sem este filtro uma OS excluída continua "aberta" para efeito
+      // do calendário da Agenda.
+      excludedAt: null,
     },
     select: { id: true, number: true, scheduledStart: true, scheduledEnd: true, status: true, maintenancePlanId: true },
   });

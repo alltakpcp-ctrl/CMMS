@@ -30,13 +30,16 @@ const publicWorkOrderSelect = {
 export async function listPublicOpenWorkOrdersController(_req: Request, res: Response) {
   const [abertas, programadas] = await Promise.all([
     prisma.workOrder.findMany({
-      where: { status: WorkOrderStatus.ABERTA },
+      // excludedAt: null — mesma regra do "baú" (CLAUDE.md §5.2): OS excluída
+      // logicamente não muda de status, então sem este filtro ela nunca sai
+      // do quadro público.
+      where: { status: WorkOrderStatus.ABERTA, excludedAt: null },
       select: publicWorkOrderSelect,
       orderBy: { createdAt: "desc" },
       take: 50,
     }),
     prisma.workOrder.findMany({
-      where: { status: WorkOrderStatus.PROGRAMADA },
+      where: { status: WorkOrderStatus.PROGRAMADA, excludedAt: null },
       select: publicWorkOrderSelect,
       take: 50,
     }),

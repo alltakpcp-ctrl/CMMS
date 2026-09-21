@@ -48,6 +48,10 @@ export async function generateWorkOrderFromPlan(
     where: {
       maintenancePlanId: plan.id,
       status: { notIn: [WorkOrderStatus.ENCERRADA, WorkOrderStatus.CANCELADA] },
+      // excludedAt: null — sem isso, uma OS excluída logicamente (CLAUDE.md
+      // §5.2, status inalterado) bloqueia para sempre a geração do próximo
+      // ciclo com 409 PLAN_HAS_OPEN_WORK_ORDER.
+      excludedAt: null,
     },
     select: { id: true, number: true },
   });
