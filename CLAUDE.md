@@ -115,6 +115,26 @@ Além do ciclo de OS, o sistema também cobre:
   insuficiente (`422 INSUFFICIENT_STOCK`) acontece nesse momento de
   aprovação, não na declaração. A OS/subtarefa segue seu fluxo normal
   (encerra/valida) independente do status da aprovação — são assíncronos.
+- **"Técnico" e "Validador" na tabela "Últimas movimentações" (dashboard de
+  estoque) são resolvidos em tempo de leitura, não gravados fixos.** O
+  `StockMovement` de uma SAIDA por aprovação de baixa carrega
+  `withdrawalRequestId` (→ `StockWithdrawalRequest`, preenchido em
+  `stock-withdrawals/service.ts#reviewStockWithdrawalRequest` no momento da
+  aprovação — não existe FK para `StockWithdrawalRequestItem` individual,
+  só para a request como um todo). `getStockDashboard` usa esse link para
+  resolver: **técnico** = `Subtask.assignedTo` quando a baixa veio do
+  fechamento de uma subtarefa (cobre o caso de um SUPERVISOR concluir a
+  subtarefa em nome do técnico, onde `requestedById` seria o supervisor, não
+  quem executou) → senão `StockWithdrawalRequest.requestedBy` → senão
+  `StockMovement.user` (fallback só usado por movimentações manuais e por
+  registros anteriores a esta feature, sem `withdrawalRequestId`); **validador**
+  = quem fez a transição `AGUARDANDO_VALIDACAO → ENCERRADA` daquela OS, obtido
+  via `StatusHistory` (não existe campo dedicado em `WorkOrder` para isso — ver
+  §5). Como a aprovação da baixa e a validação do encerramento são
+  assíncronas (nenhuma ordem garantida entre os dois endpoints), o validador
+  costuma ser `null` no momento da baixa; a UI trata isso como "Aguardando
+  validação" (não como erro), distinguindo de "—" (sem OS associada) pelo
+  `workOrderId` do movimento.
 - **Preventiva = sem cron/agendador automático.** O vencimento de um
   `MaintenancePlan` é sempre calculado sob demanda (`lib/maintenancePlans.ts`),
   nunca por job em background. Criar um `MaintenancePlan` (TECNICO ou
@@ -458,8 +478,13 @@ em estoque.
 ### StockMovement (kardex / livro-razão de estoque)
 `id`, `partId` (→ Part), `type` (ENTRADA | SAIDA | AJUSTE | DEVOLUCAO),
 `quantity` (sempre positivo), `balanceAfter`, `unitCost`?, `workOrderId`?,
-`partRequestId`? (→ PartRequest), `userId` (→ User), `reason`?,
-`statusSnapshot`?, `orderRef`?, `createdAt`. Índice em `(partId, createdAt)`.
+`partRequestId`? (→ PartRequest), `withdrawalRequestId`? (→
+StockWithdrawalRequest — preenchido só na SAIDA por aprovação de baixa, ver §2
+"Técnico e Validador"), `userId` (→ User, quem executou a ação: quem aprovou a
+baixa no caso de SAIDA, ou quem fez a movimentação manual nos outros tipos —
+**não** usar este campo para exibir "técnico responsável", ver §2), `reason`?,
+`statusSnapshot`?, `orderRef`?, `createdAt`. Índices em `(partId, createdAt)`
+e `withdrawalRequestId`.
 
 ### PartRequest (indicação de peça/ferramenta — início do fluxo de compras)
 `id`, `itemType` (PECA | FERRAMENTA), `partId`? (→ Part, se já cadastrada),

@@ -409,7 +409,9 @@ export interface StockDashboard {
     createdAt: string;
     partCode: string;
     partDescription: string;
-    userName: string | null;
+    workOrderId: string | null;
+    technicianName: string | null;
+    validatorName: string | null;
   }[];
 }
 

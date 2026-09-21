@@ -80,6 +80,7 @@ export async function reviewStockWithdrawalRequest(
           type: "SAIDA",
           quantity: item.quantity,
           workOrderId: request.workOrderId,
+          withdrawalRequestId: request.id,
           userId: user.userId,
           reason: `Baixa aprovada — solicitação ${request.id}`,
         });

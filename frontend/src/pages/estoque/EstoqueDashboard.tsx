@@ -228,7 +228,15 @@ export function EstoqueDashboard() {
                   ),
                 },
                 { header: "Qtd.", cell: (m) => m.quantity },
-                { header: "Por", cell: (m) => m.userName ?? "—" },
+                { header: "Técnico", cell: (m) => m.technicianName ?? "—" },
+                {
+                  header: "Validador",
+                  cell: (m) => {
+                    if (m.validatorName) return m.validatorName;
+                    if (m.workOrderId) return "Aguardando validação";
+                    return "—";
+                  },
+                },
               ]}
             />
           ) : (

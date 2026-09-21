@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../lib/AppError";
+import { WorkOrderStatus } from "../../domain/enums";
 import {
   effectiveStockStatus,
   INBOUND_TYPES,
@@ -32,6 +33,7 @@ export interface RecordStockMovementInput {
   quantity: number;
   workOrderId?: string;
   partRequestId?: string;
+  withdrawalRequestId?: string;
   userId?: string;
   reason?: string;
   unitCost?: number;
@@ -40,7 +42,19 @@ export interface RecordStockMovementInput {
 }
 
 export async function recordStockMovement(tx: Prisma.TransactionClient, input: RecordStockMovementInput) {
-  const { partId, type, quantity, workOrderId, partRequestId, userId, reason, unitCost, statusSnapshot, orderRef } = input;
+  const {
+    partId,
+    type,
+    quantity,
+    workOrderId,
+    partRequestId,
+    withdrawalRequestId,
+    userId,
+    reason,
+    unitCost,
+    statusSnapshot,
+    orderRef,
+  } = input;
 
   if (quantity <= 0) {
     throw new AppError(422, "INVALID_MOVEMENT_QTY", "Quantidade da movimentação deve ser maior que zero.");
@@ -68,6 +82,7 @@ export async function recordStockMovement(tx: Prisma.TransactionClient, input: R
       balanceAfter,
       workOrderId,
       partRequestId,
+      withdrawalRequestId,
       userId,
       reason,
       unitCost: unitCost ?? part.unitCost ?? undefined,
@@ -209,6 +224,12 @@ export async function getStockDashboard() {
       include: {
         part: { select: { code: true, description: true } },
         user: { select: { name: true } },
+        withdrawalRequest: {
+          select: {
+            requestedBy: { select: { name: true } },
+            subtask: { select: { assignedTo: { select: { name: true } } } },
+          },
+        },
       },
     }),
     // Peça SAIDA sempre carrega workOrderId (StockWithdrawalRequest.workOrderId
@@ -327,6 +348,27 @@ export async function getStockDashboard() {
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  // Quem validou o encerramento de cada OS presente nas movimentações recentes
+  // não é gravado em nenhum campo do WorkOrder — só existe como transição
+  // AGUARDANDO_VALIDACAO -> ENCERRADA no StatusHistory (pode não existir ainda,
+  // ou existir mais de uma vez se a OS foi reprovada e reencerrada depois).
+  const recentWorkOrderIds = [
+    ...new Set(recentMovements.map((m) => m.workOrderId).filter((id): id is string => id !== null)),
+  ];
+  const closureHistories = recentWorkOrderIds.length
+    ? await prisma.statusHistory.findMany({
+        where: { workOrderId: { in: recentWorkOrderIds }, toStatus: WorkOrderStatus.ENCERRADA },
+        orderBy: { changedAt: "desc" },
+        include: { changedBy: { select: { name: true } } },
+      })
+    : [];
+  const validatorNameByWorkOrderId = new Map<string, string>();
+  for (const h of closureHistories) {
+    if (!validatorNameByWorkOrderId.has(h.workOrderId)) {
+      validatorNameByWorkOrderId.set(h.workOrderId, h.changedBy.name);
+    }
+  }
+
   const lastOutboundByPartId = new Map(
     lastOutboundByPart.map((g) => [g.partId, g._max.createdAt as Date | null])
   );
@@ -375,7 +417,23 @@ export async function getStockDashboard() {
       createdAt: m.createdAt,
       partCode: m.part.code,
       partDescription: m.part.description,
-      userName: m.user?.name ?? null,
+      workOrderId: m.workOrderId,
+      // Técnico responsável: dono da subtask quando a baixa veio do fechamento
+      // de uma subtask (pode ter sido um supervisor quem registrou por ele);
+      // senão, quem declarou o consumo no encerramento técnico da OS; senão
+      // (movimentação manual ou registro anterior à migration), quem executou
+      // a ação (userId) — mantém o comportamento antigo nesses casos.
+      technicianName:
+        m.withdrawalRequest?.subtask?.assignedTo?.name ??
+        m.withdrawalRequest?.requestedBy?.name ??
+        m.user?.name ??
+        null,
+      // Quem validou o encerramento da OS (AGUARDANDO_VALIDACAO -> ENCERRADA).
+      // null quando a movimentação não tem OS associada (m.workOrderId null,
+      // tratado no frontend como "—"), OU quando a OS ainda não foi validada
+      // (m.workOrderId presente mas sem entrada no map, tratado como "Aguardando
+      // validação" — o frontend distingue os dois casos por workOrderId).
+      validatorName: m.workOrderId ? validatorNameByWorkOrderId.get(m.workOrderId) ?? null : null,
     })),
   };
 }

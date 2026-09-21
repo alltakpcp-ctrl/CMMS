@@ -344,25 +344,32 @@ model WorkOrderPart {
 }
 
 model StockMovement {
-  id             String       @id @default(cuid())
-  partId         String
-  part           Part         @relation(fields: [partId], references: [id])
-  type           String
-  quantity       Int
-  balanceAfter   Int
-  unitCost       Decimal?     @db.Decimal(12, 2)
-  workOrderId    String?
-  workOrder      WorkOrder?   @relation(fields: [workOrderId], references: [id])
-  partRequestId  String?
-  partRequest    PartRequest? @relation(fields: [partRequestId], references: [id])
-  userId         String?
-  user           User?        @relation(fields: [userId], references: [id])
-  reason         String?
-  statusSnapshot String?
-  orderRef       String?
-  createdAt      DateTime     @default(now())
+  id                  String                  @id @default(cuid())
+  partId              String
+  part                Part                    @relation(fields: [partId], references: [id])
+  type                String
+  quantity            Int
+  balanceAfter        Int
+  unitCost            Decimal?                @db.Decimal(12, 2)
+  workOrderId         String?
+  workOrder           WorkOrder?              @relation(fields: [workOrderId], references: [id])
+  partRequestId       String?
+  partRequest         PartRequest?            @relation(fields: [partRequestId], references: [id])
+  // Preenchido só na SAIDA gerada por aprovação de baixa (stock-withdrawals/service.ts) —
+  // permite resolver, em tempo de leitura, o técnico responsável real (StockWithdrawalRequest.requestedById
+  // ou Subtask.assignedToId quando a request veio de uma subtask) e o validador do encerramento da OS
+  // (via StatusHistory), em vez de depender de userId para isso.
+  withdrawalRequestId String?
+  withdrawalRequest   StockWithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+  userId              String?
+  user                User?                   @relation(fields: [userId], references: [id])
+  reason              String?
+  statusSnapshot      String?
+  orderRef            String?
+  createdAt           DateTime                @default(now())
 
   @@index([partId, createdAt])
+  @@index([withdrawalRequestId])
 }
 
 model WorkOrderPlannedPart {
@@ -454,22 +461,23 @@ model PurchaseOrderComment {
 // só acontece quando um usuário com a flag canManageStock aprova uma request
 // PENDENTE — ver stock-withdrawals/service.ts.
 model StockWithdrawalRequest {
-  id            String                       @id @default(cuid())
-  workOrderId   String
-  workOrder     WorkOrder                    @relation(fields: [workOrderId], references: [id])
-  subtaskId     String?
-  subtask       Subtask?                     @relation(fields: [subtaskId], references: [id])
-  status        String                       @default("PENDENTE") // PENDENTE | APROVADA | REJEITADA
-  notApplicable Boolean                      @default(false)
-  requestedById String
-  requestedBy   User                         @relation("stockWithdrawalRequestsCreated", fields: [requestedById], references: [id])
-  reviewedById  String?
-  reviewedBy    User?                        @relation("stockWithdrawalRequestsReviewed", fields: [reviewedById], references: [id])
-  reviewedAt    DateTime?
-  reviewNotes   String?
-  items         StockWithdrawalRequestItem[]
-  createdAt     DateTime                     @default(now())
-  updatedAt     DateTime                     @updatedAt
+  id             String                       @id @default(cuid())
+  workOrderId    String
+  workOrder      WorkOrder                    @relation(fields: [workOrderId], references: [id])
+  subtaskId      String?
+  subtask        Subtask?                     @relation(fields: [subtaskId], references: [id])
+  status         String                       @default("PENDENTE") // PENDENTE | APROVADA | REJEITADA
+  notApplicable  Boolean                      @default(false)
+  requestedById  String
+  requestedBy    User                         @relation("stockWithdrawalRequestsCreated", fields: [requestedById], references: [id])
+  reviewedById   String?
+  reviewedBy     User?                        @relation("stockWithdrawalRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  reviewNotes    String?
+  items          StockWithdrawalRequestItem[]
+  stockMovements StockMovement[]
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
 
   @@index([workOrderId])
   @@index([subtaskId])
