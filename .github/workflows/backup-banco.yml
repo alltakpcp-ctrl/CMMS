@@ -1,0 +1,80 @@
+# Backup diário do banco de produção (Neon SUP.CMMS) — plano gratuito.
+#
+# Motivo: incidente de 2026-09-17 (todo o StatusHistory apagado; ver §2 do
+# CLAUDE.md). Só existia um dump manual de agosto, e o intervalo entre ele e
+# o incidente teve de ser reconstruído por aproximação.
+#
+# Cada execução gera um pg_dump em formato custom (mesmo formato lido por
+# backend/scripts/restore-status-history.ts) e guarda como artifact do
+# próprio repositório (privado) por 90 dias.
+#
+# Segredo necessário (Settings → Secrets and variables → Actions):
+#   PROD_DATABASE_URL — connection string DIRETA da branch production no Neon
+#   (Connect → desligar "Connection pooling"; o pg_dump não deve passar pelo
+#   pooler).
+#
+# Restaurar: baixar o artifact do dia (aba Actions → execução → Artifacts) e
+#   pg_restore --no-owner --no-acl -d "<url de um branch NOVO>" cmms-*.dump
+# — nunca restaurar por cima da production sem decidir antes.
+#
+# O agendamento do GitHub pode atrasar ou pular execuções em horários de
+# pico; para backup diário isso é tolerável. Há também o botão "Run
+# workflow" (workflow_dispatch) para rodar sob demanda.
+name: Backup diário do banco
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # ~03:17 em Brasília, fora do expediente
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Gerar dump (pg_dump 18, mesma major do servidor)
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PROD_DATABASE_URL}" ]; then
+            echo "::error::Segredo PROD_DATABASE_URL não configurado."
+            exit 1
+          fi
+          case "${PROD_DATABASE_URL}" in
+            *-pooler.*) echo "::warning::A URL usa o pooler; prefira a conexão direta para o pg_dump." ;;
+          esac
+          FILE="cmms-$(date -u +%Y-%m-%dT%H%MZ).dump"
+          echo "FILE=${FILE}" >> "$GITHUB_ENV"
+          mkdir -p out
+          docker run --rm -e PGURL="${PROD_DATABASE_URL}" -v "$PWD/out:/out" postgres:18 \
+            sh -c 'pg_dump "$PGURL" --format=custom --no-owner --no-acl --file="/out/'"${FILE}"'"'
+
+      - name: Validar dump
+        run: |
+          set -euo pipefail
+          SIZE=$(stat -c %s "out/${FILE}")
+          docker run --rm -v "$PWD/out:/out" postgres:18 pg_restore --list "/out/${FILE}" > out/toc.txt
+          TABLES=$(grep -c "TABLE DATA public" out/toc.txt || true)
+          echo "Tamanho: ${SIZE} bytes | tabelas com dados: ${TABLES}"
+          # O banco tem ~20 tabelas e o dump de agosto já tinha ~200 KB.
+          if [ "${SIZE}" -lt 100000 ] || [ "${TABLES}" -lt 15 ]; then
+            echo "::error::Dump suspeito (pequeno demais ou faltando tabelas)."
+            exit 1
+          fi
+          for t in WorkOrder StatusHistory Execution; do
+            grep -Eq "TABLE DATA public \"?${t}\"?( |$)" out/toc.txt || { echo "::error::Tabela ${t} ausente no dump."; exit 1; }
+          done
+          echo "### Backup ${FILE}: ${SIZE} bytes, ${TABLES} tabelas" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar como artifact (90 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: out/${{ env.FILE }}
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0 # o formato custom já é comprimido
