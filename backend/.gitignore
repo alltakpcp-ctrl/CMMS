@@ -16,3 +16,8 @@ CREDENCIAL-ADMIN.local.txt
 scripts/delete-cancelada.ts
 scripts/diag-cancelada.ts
 scripts/fix-orphan-execution.ts
+
+# Saídas dos scripts de recuperação do histórico (ids p/ rollback, prévias CSV)
+restore-status-history.*.json
+reconstruct-status-history.*.json
+reconstruct-status-history.previa.*.csv
