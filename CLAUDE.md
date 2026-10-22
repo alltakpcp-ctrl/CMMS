@@ -72,6 +72,21 @@ Além do ciclo de OS, o sistema também cobre:
   sessões anteriores). `npm test` usa `TEST_DATABASE_URL`, um branch dedicado
   que sofre `prisma migrate reset` (apaga tudo) — nunca aponte esse env para
   o banco de produção ou de dev.
+- **PROIBIDO validar contra produção qualquer coisa que escreva no banco**
+  (smoke test, E2E, script de fixtures com "limpeza ao final"). Incidente de
+  2026-09-17: a limpeza de um smoke test (`SMOKEISO-*`) rodado contra o
+  SUP.CMMS durante a feature de exclusão lógica apagou **todo** o
+  `StatusHistory` (2.477 linhas) — recuperado em 2026-10-22 do dump do
+  cutover + reconstrução aproximada (`scripts/restore-status-history.ts`,
+  `scripts/reconstruct-status-history.ts`, linhas `[RECONSTRUÍDO]`). O
+  "resíduo zero" conferido ao final só olhava os dados com prefixo — nunca o
+  estrago colateral. Validação de escrita = `npm test` contra Postgres
+  descartável: um branch de teste do Neon em `TEST_DATABASE_URL`, ou um
+  Postgres local (ex.: pacote `embedded-postgres` fora do repo). O
+  `globalSetup` dos testes recusa rodar se `TEST_DATABASE_URL` apontar para o
+  mesmo host do `DATABASE_URL`. Em `deleteMany` de limpeza, nunca deixar o
+  filtro poder ser `undefined` — o Prisma ignora a chave e apaga a tabela
+  inteira.
 - **Almoxarifado = controle de estoque com kardex.** Peças têm saldo
   (`stockQty`, cache) e campos de controle (`minStock`, `maxStock`,
   `unitCost`, `location`, `sectorId` opcional, `active`). Toda alteração de
@@ -600,11 +615,10 @@ ele, marca o mesmo trio de campos no plano também — mesma transação. Não u
 `applyTransition`/`canTransition` (não é transição de status), mesmo
 espírito de `reprogramacao()`/`timelineOverride()`. Testado por
 `src/test/workorder-exclusao.test.ts` (10 casos, incluindo os 2 do ajuste de
-escopo) — **suíte ainda não roda localmente** porque `TEST_DATABASE_URL` não
-está configurado neste `.env`; validado por um smoke test manual e
-descartável direto contra produção (SUP.CMMS), com dados de teste
-prefixados e limpos ao final (resíduo confirmado zero) — rodar a suíte de
-verdade na primeira vez que houver um branch de teste disponível.
+escopo). Na época foi validado por smoke test contra produção — **foi esse
+método que causou o incidente de 2026-09-17** (ver "PROIBIDO validar contra
+produção" no §2). Desde 2026-10-22 a suíte inteira roda contra Postgres
+descartável e passa.
 
 **`POST /maintenance-plans/:id/excluir` (novo, 2026-09-17):**
 `SUPERVISOR`-only, `maintenance-plans/service.ts#excluirMaintenancePlan`.
@@ -651,9 +665,8 @@ tocar em nenhum código de frontend — só o futuro Baú (Fase 5) vai passar
 
 Testado por `src/test/workorder-exclusao-visibilidade.test.ts` (6 casos,
 asserções por delta antes/depois — o banco de teste é compartilhado entre
-arquivos, sem reset por arquivo). Mesma limitação de `TEST_DATABASE_URL`
-ausente das Fases 1/2 — validado por smoke test manual contra produção,
-dados prefixados, limpos ao final.
+arquivos, sem reset por arquivo). Na época, validado por smoke test contra
+produção (método proibido desde o incidente de 2026-09-17, ver §2).
 
 **Achado de infraestrutura (fora do escopo desta feature, não corrigido):**
 durante a validação em produção, `POST /workorders` para `PREVENTIVA` e o
@@ -766,15 +779,16 @@ ausente, não rodada localmente ainda.
 
 **Estado final da feature "exclusão lógica de OS / baú de cancelados e
 excluídos": as 9 fases estão prontas e em produção** (backend + frontend).
-Gap de infraestrutura que permanece, fora do escopo desta feature: (1)
-`TEST_DATABASE_URL` não configurado neste `.env` local — toda a validação
-das 9 fases foi feita por smoke test manual contra produção (dados
-prefixados, limpos ao final, resíduo verificado a cada rodada), nunca pela
-suíte automatizada real; (2) o endpoint `-pooler` do Neon em `DATABASE_URL`
+Gaps de infraestrutura da época: (1) toda a validação das 9 fases foi feita
+por smoke test contra produção — **a limpeza de um desses testes apagou todo
+o `StatusHistory` em 2026-09-17** (ver §2; resolvido em 2026-10-22, suíte
+agora roda em Postgres descartável); (2) o endpoint `-pooler` do Neon em `DATABASE_URL`
 combinado com `$transaction` interativo do Prisma, que gerou timeouts
 intermitentes (`P2028`) especificamente em `createWorkOrder(PREVENTIVA)` e
 em `excluir()` durante testes de alta latência — pré-existente ao
-projeto inteiro, não introduzido por esta feature.
+projeto inteiro, não introduzido por esta feature. **Mitigado em
+2026-10-22:** `config/prisma.ts` passou a usar `transactionOptions`
+(`maxWait` 15s / `timeout` 30s) para todas as transações interativas.
 
 ---
 

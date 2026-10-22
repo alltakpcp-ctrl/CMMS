@@ -15,6 +15,23 @@ export default async function globalSetup() {
     );
   }
 
+  // Trava contra o incidente de 2026-09-17 (CLAUDE.md §2): o reset abaixo
+  // apaga tudo, então nunca pode cair no mesmo host do DATABASE_URL do .env
+  // (que já apontou para produção).
+  const hostOf = (url: string | undefined) => {
+    try {
+      return url ? new URL(url).host : null;
+    } catch {
+      return null;
+    }
+  };
+  const appDbHost = hostOf(process.env.DATABASE_URL);
+  if (appDbHost && hostOf(databaseUrl) === appDbHost) {
+    throw new Error(
+      `TEST_DATABASE_URL aponta para o mesmo host do DATABASE_URL (${appDbHost}). Use um banco de teste separado.`
+    );
+  }
+
   execSync("npx prisma migrate reset --force --skip-seed", {
     cwd: backendRoot,
     env: { ...process.env, DATABASE_URL: databaseUrl },
