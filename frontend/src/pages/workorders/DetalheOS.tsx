@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { Role, WorkOrderStatus } from "../../domain/enums";
 import {
+  EXECUTION_OUTCOME_LABELS,
   PRIORITY_COLORS,
   PRIORITY_LABELS,
   STATUS_COLORS,
@@ -244,7 +245,14 @@ export default function DetalheOS() {
             )}
           </Card>
 
-          {workOrder.status === WorkOrderStatus.EM_EXECUCAO && <SubtaskPanel workOrder={workOrder} />}
+          {workOrder.status === WorkOrderStatus.EM_EXECUCAO ? (
+            <SubtaskPanel workOrder={workOrder} />
+          ) : (
+            // Histórico das subtarefas depois que a OS sai da execução (a
+            // listagem no backend é só TECNICO/SUPERVISOR).
+            (user?.role === Role.TECNICO || user?.role === Role.SUPERVISOR) &&
+            workOrder.executions.length > 0 && <SubtaskPanel workOrder={workOrder} readOnly />
+          )}
 
           {workOrder.executions.length > 0 &&
             workOrder.executions.map((execution, index) => (
@@ -255,9 +263,24 @@ export default function DetalheOS() {
                 </h2>
                 <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
                   <dt className="text-slate-500">Início</dt>
-                  <dd className="text-slate-900">{formatDateTime(execution.startedAt)}</dd>
+                  <dd className="text-slate-900">
+                    {formatDateTime(execution.startedAt)}
+                    {execution.startedBy && <span className="text-slate-500"> · {execution.startedBy.name}</span>}
+                  </dd>
                   <dt className="text-slate-500">Fim</dt>
-                  <dd className="text-slate-900">{formatDateTime(execution.finishedAt)}</dd>
+                  <dd className="text-slate-900">
+                    {formatDateTime(execution.finishedAt)}
+                    {execution.endedBy && <span className="text-slate-500"> · {execution.endedBy.name}</span>}
+                    {execution.finishedAt && !execution.endedBy && (
+                      <span className="text-slate-500"> · encerrada automaticamente</span>
+                    )}
+                  </dd>
+                  {execution.outcome && (
+                    <>
+                      <dt className="text-slate-500">Resultado</dt>
+                      <dd className="text-slate-900">{EXECUTION_OUTCOME_LABELS[execution.outcome] ?? execution.outcome}</dd>
+                    </>
+                  )}
                   <dt className="text-slate-500">5S / Limpeza</dt>
                   <dd className="text-slate-900">{execution.cleanupDone ? "Sim" : "Não"}</dd>
                 </dl>
@@ -296,10 +319,22 @@ export default function DetalheOS() {
                     </ul>
                   </div>
                 )}
+                {execution.startNote && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Nota de início</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.startNote}</p>
+                  </div>
+                )}
                 {execution.testNotes && (
                   <div className="mt-3">
                     <p className="text-sm font-medium text-slate-700">Notas de teste</p>
                     <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.testNotes}</p>
+                  </div>
+                )}
+                {execution.endNote && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-slate-700">Nota de encerramento</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{execution.endNote}</p>
                   </div>
                 )}
               </Card>

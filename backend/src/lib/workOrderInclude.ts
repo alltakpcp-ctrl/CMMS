@@ -15,6 +15,8 @@ export const workOrderInclude = {
   executions: {
     orderBy: { startedAt: "asc" },
     include: {
+      startedBy: { select: { id: true, name: true } },
+      endedBy: { select: { id: true, name: true } },
       logs: {
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },

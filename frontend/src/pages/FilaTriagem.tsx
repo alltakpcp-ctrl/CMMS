@@ -26,9 +26,9 @@ export default function FilaTriagem() {
     if (!token) return;
     setLoading(true);
 
-    Promise.all(QUEUE_STATUSES.map((status) => workOrdersApi.listWorkOrders(token, { status, pageSize: 100 })))
+    Promise.all(QUEUE_STATUSES.map((status) => workOrdersApi.listAllWorkOrders(token, { status })))
       .then((results) => {
-        const all = results.flatMap((r) => r.items);
+        const all = results.flat();
         all.sort((a, b) => b.asset.criticality - a.asset.criticality);
         setItems(all);
       })

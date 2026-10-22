@@ -28,13 +28,13 @@ export default function AgendaProgramacao() {
     setLoading(true);
 
     Promise.all([
-      workOrdersApi.listWorkOrders(token, { status: WorkOrderStatus.PLANEJADA, pageSize: 100 }),
-      workOrdersApi.listWorkOrders(token, { status: WorkOrderStatus.PROGRAMADA, pageSize: 100 }),
+      workOrdersApi.listAllWorkOrders(token, { status: WorkOrderStatus.PLANEJADA }),
+      workOrdersApi.listAllWorkOrders(token, { status: WorkOrderStatus.PROGRAMADA }),
     ])
       .then(([planejadas, programadas]) => {
-        setToSchedule(planejadas.items);
+        setToSchedule(planejadas);
         setScheduled(
-          programadas.items.sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""))
+          programadas.sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""))
         );
       })
       .catch((err) => showError(getErrorMessage(err)))

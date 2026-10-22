@@ -151,6 +151,14 @@ export const STOCK_STATUS_COLORS: Record<StockStatus, "slate" | "blue" | "amber"
   EXCESSO: "blue",
 };
 
+// ExecutionOutcome do backend (domain/enums.ts) — String livre no frontend,
+// por isso Record<string, string> com fallback no uso.
+export const EXECUTION_OUTCOME_LABELS: Record<string, string> = {
+  CONCLUIDA: "Concluída",
+  INTERROMPIDA: "Interrompida",
+  PAUSA_TURNO: "Pausa de turno",
+};
+
 export const SUBTASK_STATUS_LABELS: Record<SubtaskStatus, string> = {
   ABERTA: "Aberta",
   CONCLUIDA: "Concluída",

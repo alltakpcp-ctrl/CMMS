@@ -169,6 +169,25 @@ describe("re-planejamento e re-triagem", () => {
   });
 });
 
+describe("detalhe da OS expõe a autoria da execução", () => {
+  it("traz quem iniciou e quem encerrou cada ciclo", async () => {
+    const id = await abrirOS("Autoria da execução");
+    await levarAteProgramada(id);
+    await as("tec").post(`/workorders/${id}/iniciar`, { riskAnalysis: "risco" });
+    await as("tec").post(`/workorders/${id}/encerramento-tecnico`, {
+      testNotes: "ok",
+      cleanupDone: true,
+      partsNotApplicable: true,
+    });
+
+    const res = await as("sup").get(`/workorders/${id}`);
+    expect(res.status).toBe(200);
+    const [execution] = res.body.executions;
+    expect(execution.startedBy).toMatchObject({ id: ids.tec });
+    expect(execution.endedBy).toMatchObject({ id: ids.tec });
+  });
+});
+
 describe("contagem por status (Dashboard)", () => {
   it("conta além de 100 OS, bate com a listagem e ignora OS excluídas", async () => {
     // Base com mais de 100 OS do mesmo solicitante (criação direta no banco

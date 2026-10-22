@@ -139,6 +139,13 @@ export interface Execution {
   finishedAt: string | null;
   testNotes: string | null;
   cleanupDone: boolean;
+  // Autoria do ciclo — null em execuções antigas (anteriores a 2026-08-12)
+  // ou fechadas automaticamente por cancelamento/exclusão/override.
+  startedBy: { id: string; name: string } | null;
+  endedBy: { id: string; name: string } | null;
+  startNote: string | null;
+  endNote: string | null;
+  outcome: string | null;
   logs: ExecutionLog[];
 }
 

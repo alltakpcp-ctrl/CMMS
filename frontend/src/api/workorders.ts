@@ -97,6 +97,19 @@ export function listWorkOrders(token: string, filters: ListWorkOrdersFilters = {
   return apiRequest<Paginated<WorkOrder>>(`/workorders${query(filters)}`, { token });
 }
 
+// Para filas de trabalho ativo (triagem, agenda, preventivas do técnico):
+// percorre todas as páginas em vez de parar na primeira — o backend limita
+// pageSize a 100 e, sem isso, OS além da centésima sumiam da tela.
+export async function listAllWorkOrders(token: string, filters: ListWorkOrdersFilters = {}) {
+  const pageSize = 100;
+  const items: WorkOrder[] = [];
+  for (let page = 1; ; page++) {
+    const result = await listWorkOrders(token, { ...filters, page, pageSize });
+    items.push(...result.items);
+    if (result.items.length === 0 || items.length >= result.total) return items;
+  }
+}
+
 export function countWorkOrdersByStatus(token: string, filters: ListWorkOrdersFilters = {}) {
   return apiRequest<Record<WorkOrderStatus, number>>(`/workorders/contagem-status${query(filters)}`, { token });
 }

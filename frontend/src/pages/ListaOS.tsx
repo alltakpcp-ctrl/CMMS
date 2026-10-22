@@ -12,9 +12,12 @@ import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Table } from "../components/Table";
 import { EmptyState } from "../components/EmptyState";
+import { Pagination } from "../components/Pagination";
 import { formatDate } from "../lib/format";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
+
+const PAGE_SIZE = 50;
 
 export default function ListaOS() {
   const { token, user } = useAuth();
@@ -34,6 +37,13 @@ export default function ListaOS() {
   const [type, setType] = useState<WorkOrderType | "">("");
   const [assetId, setAssetId] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Filtro novo sempre volta para a 1ª página.
+  useEffect(() => {
+    setPage(1);
+  }, [status, type, assetId, onlyMine]);
 
   useEffect(() => {
     if (!token) return;
@@ -48,7 +58,8 @@ export default function ListaOS() {
     setLoading(true);
 
     const filters: workOrdersApi.ListWorkOrdersFilters = {
-      pageSize: 100,
+      page,
+      pageSize: PAGE_SIZE,
       ...(status && { status }),
       ...(type && { type }),
       ...(assetId && { assetId }),
@@ -59,12 +70,22 @@ export default function ListaOS() {
       else filters.requesterId = user.id;
     }
 
+    // Trocar filtro dispara 2 buscas seguidas (filtro + volta à página 1);
+    // a resposta da busca obsoleta é descartada para não sobrescrever a atual.
+    let stale = false;
     workOrdersApi
       .listWorkOrders(token, filters)
-      .then((result) => setItems(result.items))
-      .catch((err) => showError(getErrorMessage(err)))
-      .finally(() => setLoading(false));
-  }, [token, user, status, type, assetId, onlyMine, showError]);
+      .then((result) => {
+        if (stale) return;
+        setItems(result.items);
+        setTotal(result.total);
+      })
+      .catch((err) => !stale && showError(getErrorMessage(err)))
+      .finally(() => !stale && setLoading(false));
+    return () => {
+      stale = true;
+    };
+  }, [token, user, status, type, assetId, onlyMine, page, showError]);
 
   useEffect(() => {
     if (status) {
@@ -156,6 +177,8 @@ export default function ListaOS() {
           ]}
         />
       )}
+
+      {!loading && <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />}
     </div>
   );
 }

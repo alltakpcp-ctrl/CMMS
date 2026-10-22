@@ -14,7 +14,7 @@ import { getErrorMessage } from "../../lib/errors";
 import { useToast } from "../../components/ToastProvider";
 import { MaintenanceCalendar } from "./MaintenanceCalendar";
 
-const SCHEDULED_STATUSES = new Set<WorkOrderStatus>([WorkOrderStatus.PROGRAMADA, WorkOrderStatus.EM_EXECUCAO]);
+const SCHEDULED_STATUSES: WorkOrderStatus[] = [WorkOrderStatus.PROGRAMADA, WorkOrderStatus.EM_EXECUCAO];
 
 export default function PreventivasTecnico() {
   const { token, user } = useAuth();
@@ -28,16 +28,23 @@ export default function PreventivasTecnico() {
     if (!token || !user) return;
     setLoading(true);
 
-    Promise.all([
-      workOrdersApi.listWorkOrders(token, { type: WorkOrderType.PREVENTIVA, assignedToId: user.id, pageSize: 100 }),
-      workOrdersApi.listWorkOrders(token, { type: WorkOrderType.PREVENTIVA, asSupport: true, pageSize: 100 }),
-    ])
-      .then(([principal, apoio]) => {
+    // Filtra por status já no backend: antes buscava as 100 primeiras
+    // preventivas de qualquer status (inclusive ENCERRADA) e filtrava aqui —
+    // com mais de 100 preventivas, as programadas novas sumiam da lista.
+    const who = [{ assignedToId: user.id }, { asSupport: true }];
+    Promise.all(
+      who.flatMap((filter) =>
+        SCHEDULED_STATUSES.map((status) =>
+          workOrdersApi.listAllWorkOrders(token, { type: WorkOrderType.PREVENTIVA, status, ...filter })
+        )
+      )
+    )
+      .then((results) => {
         const byId = new Map<string, WorkOrder>();
-        for (const wo of [...principal.items, ...apoio.items]) byId.set(wo.id, wo);
-        const scheduled = Array.from(byId.values())
-          .filter((wo) => SCHEDULED_STATUSES.has(wo.status))
-          .sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""));
+        for (const wo of results.flat()) byId.set(wo.id, wo);
+        const scheduled = Array.from(byId.values()).sort((a, b) =>
+          (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? "")
+        );
         setItems(scheduled);
       })
       .catch((err) => showError(getErrorMessage(err)))

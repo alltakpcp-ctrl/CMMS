@@ -45,7 +45,9 @@ function getDurationLabel(subtask: Subtask): string | null {
   return null;
 }
 
-export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
+// readOnly: OS fora de EM_EXECUCAO — as subtarefas continuam visíveis como
+// histórico (antes o painel sumia junto com a fase), mas sem nenhuma ação.
+export function SubtaskPanel({ workOrder, readOnly = false }: { workOrder: WorkOrder; readOnly?: boolean }) {
   const { token, user } = useAuth();
   const { showError, showSuccess } = useToast();
   const { users: assignableUsers } = useAssignableUsers();
@@ -102,18 +104,22 @@ export function SubtaskPanel({ workOrder }: { workOrder: WorkOrder }) {
   }
 
   if (!user) return null;
+  // Em modo histórico, OS sem nenhuma subtarefa não precisa de um card vazio.
+  if (readOnly && !loading && subtasks.length === 0) return null;
 
   function canAct(subtask: Subtask) {
-    return user!.role === Role.SUPERVISOR || subtask.assignedToId === user!.id;
+    return !readOnly && (user!.role === Role.SUPERVISOR || subtask.assignedToId === user!.id);
   }
 
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Subtarefas</h2>
-        <Button variant="secondary" onClick={() => setModal({ type: "abrir" })}>
-          + Abrir subtarefa
-        </Button>
+        {!readOnly && (
+          <Button variant="secondary" onClick={() => setModal({ type: "abrir" })}>
+            + Abrir subtarefa
+          </Button>
+        )}
       </div>
 
       {loading && <p className="text-sm text-slate-500">Carregando…</p>}

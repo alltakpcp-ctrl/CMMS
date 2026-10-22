@@ -7,9 +7,12 @@ import { TYPE_LABELS } from "../domain/labels";
 import { Badge } from "../components/Badge";
 import { Table } from "../components/Table";
 import { EmptyState } from "../components/EmptyState";
+import { Pagination } from "../components/Pagination";
 import { formatDateTime } from "../lib/format";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
+
+const PAGE_SIZE = 50;
 
 // Baú (Fase 7, §5.2 do CLAUDE.md): OS CANCELADA + excluída, com
 // motivo/quem/quando de cada uma — SUPERVISOR-only (guardado também em
@@ -21,16 +24,26 @@ export default function Bau() {
 
   const [items, setItems] = useState<BauItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     if (!token) return;
     setLoading(true);
+    let stale = false;
     workOrdersApi
-      .getBau(token, { pageSize: 100 })
-      .then((result) => setItems(result.items))
-      .catch((err) => showError(getErrorMessage(err)))
-      .finally(() => setLoading(false));
-  }, [token, showError]);
+      .getBau(token, { page, pageSize: PAGE_SIZE })
+      .then((result) => {
+        if (stale) return;
+        setItems(result.items);
+        setTotal(result.total);
+      })
+      .catch((err) => !stale && showError(getErrorMessage(err)))
+      .finally(() => !stale && setLoading(false));
+    return () => {
+      stale = true;
+    };
+  }, [token, page, showError]);
 
   return (
     <div className="space-y-4">
@@ -69,6 +82,8 @@ export default function Bau() {
           ]}
         />
       )}
+
+      {!loading && <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />}
     </div>
   );
 }
