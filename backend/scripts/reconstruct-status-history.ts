@@ -26,7 +26,17 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     const fallback = await prisma.user.findUnique({ where: { email: authorEmail }, select: { id: true, name: true } });
-    if (!fallback) throw new Error(`Usuário de fallback ${authorEmail} não encontrado.`);
+    if (!fallback) {
+      const supervisors = await prisma.user.findMany({
+        where: { role: "SUPERVISOR", active: true },
+        select: { name: true, email: true },
+        orderBy: { name: "asc" },
+      });
+      console.error(`Usuário de fallback ${authorEmail} não encontrado. Informe um com --autor=<email>. Supervisores ativos:`);
+      supervisors.forEach((s) => console.error(`  ${s.email}  (${s.name})`));
+      process.exitCode = 1;
+      return;
+    }
 
     const workOrders = await prisma.workOrder.findMany({
       orderBy: { number: "asc" },
