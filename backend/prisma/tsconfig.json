@@ -1,0 +1,10 @@
+{
+  // Só para o editor/checagem de tipos dos seeds — mesmo motivo de
+  // scripts/tsconfig.json (prisma/ fica fora do "include" do build).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".."
+  },
+  "include": ["./*.ts"]
+}

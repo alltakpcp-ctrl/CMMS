@@ -1,0 +1,11 @@
+{
+  // Só para o editor/checagem de tipos: scripts/ fica fora do "include" do
+  // tsconfig principal (rootDir "src", build do deploy). Sem este arquivo o
+  // VS Code analisava os scripts sem os tipos do Node (process, node:fs).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".."
+  },
+  "include": ["./**/*.ts"]
+}
