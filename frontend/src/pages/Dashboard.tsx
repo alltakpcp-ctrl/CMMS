@@ -39,19 +39,16 @@ export default function Dashboard() {
 
     const filters =
       user.role === Role.OPERADOR
-        ? { requesterId: user.id, pageSize: 100 }
+        ? { requesterId: user.id }
         : user.role === Role.TECNICO
-        ? { assignedToId: user.id, pageSize: 100 }
-        : { pageSize: 100 };
+        ? { assignedToId: user.id }
+        : {};
 
+    // Contagem agregada no backend — antes contava só a 1ª página de 100 OS
+    // e os cards travavam em ~100 conforme a base crescia.
     workOrdersApi
-      .listWorkOrders(token, filters)
-      .then((result) => {
-        const tally: Record<string, number> = {};
-        for (const status of STATUS_ORDER) tally[status] = 0;
-        for (const wo of result.items) tally[wo.status] = (tally[wo.status] ?? 0) + 1;
-        setCounts(tally);
-      })
+      .countWorkOrdersByStatus(token, filters)
+      .then(setCounts)
       .catch((err) => showError(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [token, user, showError]);

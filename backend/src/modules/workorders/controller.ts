@@ -36,6 +36,11 @@ export async function listWorkOrdersController(req: Request, res: Response) {
   res.json(await workOrdersService.listWorkOrders(query, requireUser(req)));
 }
 
+export async function countByStatusController(req: Request, res: Response) {
+  const query = listWorkOrdersQuerySchema.parse(req.query);
+  res.json(await workOrdersService.countWorkOrdersByStatus(query, requireUser(req)));
+}
+
 export async function getWorkOrderController(req: Request, res: Response) {
   res.json(await workOrdersService.getWorkOrderById(req.params.id, requireUser(req)));
 }

@@ -5,6 +5,7 @@ import { authorize } from "../../middlewares/authorize";
 import { asyncHandler } from "../../lib/asyncHandler";
 import {
   cancelarController,
+  countByStatusController,
   createWorkOrderController,
   encerramentoTecnicoController,
   excluirController,
@@ -36,6 +37,9 @@ workOrdersRoutes.get("/", asyncHandler(listWorkOrdersController));
 // motivo/quem/quando. SUPERVISOR-only. Precisa vir ANTES de "/:id" — senão
 // Express casaria "bau" como :id.
 workOrdersRoutes.get("/bau", authorize(Role.SUPERVISOR), asyncHandler(getBauController));
+// Contagem por status (cards do Dashboard) — mesmos filtros e mesma
+// visibilidade de GET /. Também antes de "/:id".
+workOrdersRoutes.get("/contagem-status", asyncHandler(countByStatusController));
 workOrdersRoutes.get("/:id", asyncHandler(getWorkOrderController));
 
 // Etapa 2 — Triagem e Planejamento.

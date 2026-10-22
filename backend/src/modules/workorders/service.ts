@@ -135,19 +135,23 @@ async function operadorSectorFilter(user: AuthPayload): Promise<{ blocked: true 
   return { blocked: false, sectorId: operador.sectorId };
 }
 
-export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPayload) {
-  const { page = 1, pageSize = 20, ...rest } = filters;
-
+// Filtro único de listagem — compartilhado por listWorkOrders() e
+// countWorkOrdersByStatus() para que os cards do Dashboard e a lista de OS
+// nunca divirjam. null = operador sem setor (fail-closed: não vê nada).
+async function buildListWhere(
+  rest: Omit<ListWorkOrdersQuery, "page" | "pageSize">,
+  user: AuthPayload
+): Promise<Prisma.WorkOrderWhereInput | null> {
   const sectorFilter = await operadorSectorFilter(user);
   if (sectorFilter.blocked) {
-    return { items: [], total: 0, page, pageSize };
+    return null;
   }
 
   // Operador não pode filtrar por targetSectorId via query manual — o setor
   // dele já é aplicado abaixo via asset.sectorId (sectorFilter.sectorId).
   const targetSectorId = user.role === Role.OPERADOR ? undefined : rest.targetSectorId;
 
-  const where: Prisma.WorkOrderWhereInput = {
+  return {
     // Fase 4 do "baú" (CLAUDE.md §5.2): por padrão some da listagem qualquer
     // OS excluída — só quem passa incluirExcluidas=true (o Baú, Fase 5) vê.
     ...(!rest.incluirExcluidas && { excludedAt: null }),
@@ -160,6 +164,15 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
     ...(rest.asSupport && { assignees: { some: { userId: user.userId } } }),
     ...(sectorFilter.sectorId && { asset: { sectorId: sectorFilter.sectorId } }),
   };
+}
+
+export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPayload) {
+  const { page = 1, pageSize = 20, ...rest } = filters;
+
+  const where = await buildListWhere(rest, user);
+  if (!where) {
+    return { items: [], total: 0, page, pageSize };
+  }
 
   const [items, total] = await Promise.all([
     prisma.workOrder.findMany({
@@ -173,6 +186,27 @@ export async function listWorkOrders(filters: ListWorkOrdersQuery, user: AuthPay
   ]);
 
   return { items, total, page, pageSize };
+}
+
+// Contagem por status para os cards do Dashboard — agregada no banco (antes
+// o frontend contava só a primeira página de 100 OS, então os totais
+// travavam em ~100 assim que a base cresceu). Mesmos filtros da listagem;
+// o filtro de status em si é ignorado, já que o resultado é por status.
+export async function countWorkOrdersByStatus(filters: ListWorkOrdersQuery, user: AuthPayload) {
+  const { page: _page, pageSize: _pageSize, status: _status, ...rest } = filters;
+
+  const counts = Object.fromEntries(Object.values(WorkOrderStatus).map((s) => [s, 0])) as Record<WorkOrderStatus, number>;
+
+  const where = await buildListWhere(rest, user);
+  if (!where) {
+    return counts;
+  }
+
+  const groups = await prisma.workOrder.groupBy({ by: ["status"], where, _count: { _all: true } });
+  for (const group of groups) {
+    counts[group.status as WorkOrderStatus] = group._count._all;
+  }
+  return counts;
 }
 
 // Baú (Fase 5, §5.2 do CLAUDE.md): OS CANCELADA + OS excluída, cada uma com

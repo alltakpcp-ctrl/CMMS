@@ -97,6 +97,10 @@ export function listWorkOrders(token: string, filters: ListWorkOrdersFilters = {
   return apiRequest<Paginated<WorkOrder>>(`/workorders${query(filters)}`, { token });
 }
 
+export function countWorkOrdersByStatus(token: string, filters: ListWorkOrdersFilters = {}) {
+  return apiRequest<Record<WorkOrderStatus, number>>(`/workorders/contagem-status${query(filters)}`, { token });
+}
+
 export function getWorkOrder(token: string, id: string) {
   return apiRequest<WorkOrder>(`/workorders/${id}`, { token });
 }

@@ -26,6 +26,7 @@ function as(who: string) {
     patch: (url: string, body: object = {}) =>
       request(app).patch(url).set("Authorization", `Bearer ${tokens[who]}`).send(body),
     delete: (url: string) => request(app).delete(url).set("Authorization", `Bearer ${tokens[who]}`),
+    get: (url: string) => request(app).get(url).set("Authorization", `Bearer ${tokens[who]}`),
   };
 }
 
@@ -165,6 +166,46 @@ describe("re-planejamento e re-triagem", () => {
     const wo = await prisma.workOrder.findUniqueOrThrow({ where: { id } });
     expect(wo.priority).toBe(Priority.URGENTE);
     expect(wo.priorityOriginal).toBe(Priority.MEDIA);
+  });
+});
+
+describe("contagem por status (Dashboard)", () => {
+  it("conta além de 100 OS, bate com a listagem e ignora OS excluídas", async () => {
+    // Base com mais de 100 OS do mesmo solicitante (criação direta no banco
+    // para não depender de 100+ requisições).
+    const requester = await prisma.user.findUniqueOrThrow({ where: { id: ids.op } });
+    const last = await prisma.workOrder.findFirst({ orderBy: { number: "desc" }, select: { number: true } });
+    let seq = last ? Number(last.number.slice(-6)) : 0;
+    await prisma.workOrder.createMany({
+      data: Array.from({ length: 105 }, () => ({
+        number: `OS-${new Date().getFullYear()}-${String(++seq).padStart(6, "0")}`,
+        type: WorkOrderType.CORRETIVA,
+        status: "ENCERRADA",
+        priority: Priority.MEDIA,
+        title: "Massa para contagem",
+        description: "desc",
+        assetId,
+        requesterId: requester.id,
+      })),
+    });
+    const excluida = await abrirOS("Excluída não conta");
+    await as("sup").post(`/workorders/${excluida}/excluir`, { reason: "teste de contagem" });
+
+    const filtro = `requesterId=${ids.op}`;
+    const res = await as("sup").get(`/workorders/contagem-status?${filtro}`);
+    expect(res.status).toBe(200);
+
+    const encerradas = await as("sup").get(`/workorders?${filtro}&status=ENCERRADA&pageSize=1`);
+    const todas = await as("sup").get(`/workorders?${filtro}&pageSize=1`);
+    expect(res.body.ENCERRADA).toBeGreaterThan(100);
+    expect(res.body.ENCERRADA).toBe(encerradas.body.total);
+    const soma = Object.values(res.body as Record<string, number>).reduce((a, b) => a + b, 0);
+    expect(soma).toBe(todas.body.total);
+
+    // O próprio operador também consegue (mesma visibilidade da listagem).
+    const doOperador = await as("op").get(`/workorders/contagem-status?${filtro}`);
+    expect(doOperador.status).toBe(200);
+    expect(doOperador.body.ENCERRADA).toBe(res.body.ENCERRADA);
   });
 });
 
