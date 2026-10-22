@@ -138,6 +138,14 @@ export async function deleteUser(id: string, actingUserId: string) {
     partRequestsCreated,
     purchaseOrdersCreated,
     purchaseOrdersReviewed,
+    // Vínculos que antes não eram checados: WorkOrderAssignee tem onDelete
+    // Cascade no usuário, então excluir um técnico que só atuou como apoio
+    // apagava silenciosamente a participação dele em todas as OS.
+    supportAssignments,
+    subtasks,
+    executions,
+    executionLogs,
+    stockRecords,
   ] = await Promise.all([
     prisma.workOrder.count({ where: { requesterId: id } }),
     prisma.workOrder.count({ where: { assignedToId: id } }),
@@ -146,6 +154,11 @@ export async function deleteUser(id: string, actingUserId: string) {
     prisma.partRequest.count({ where: { requestedById: id } }),
     prisma.purchaseOrder.count({ where: { createdById: id } }),
     prisma.purchaseOrder.count({ where: { reviewedById: id } }),
+    prisma.workOrderAssignee.count({ where: { userId: id } }),
+    prisma.subtask.count({ where: { OR: [{ createdById: id }, { assignedToId: id }, { closedById: id }] } }),
+    prisma.execution.count({ where: { OR: [{ startedById: id }, { endedById: id }] } }),
+    prisma.executionLog.count({ where: { authorId: id } }),
+    prisma.stockWithdrawalRequest.count({ where: { OR: [{ requestedById: id }, { reviewedById: id }] } }),
   ]);
 
   const hasHistory =
@@ -155,7 +168,12 @@ export async function deleteUser(id: string, actingUserId: string) {
     statusChanges > 0 ||
     partRequestsCreated > 0 ||
     purchaseOrdersCreated > 0 ||
-    purchaseOrdersReviewed > 0;
+    purchaseOrdersReviewed > 0 ||
+    supportAssignments > 0 ||
+    subtasks > 0 ||
+    executions > 0 ||
+    executionLogs > 0 ||
+    stockRecords > 0;
 
   if (hasHistory) {
     throw new AppError(

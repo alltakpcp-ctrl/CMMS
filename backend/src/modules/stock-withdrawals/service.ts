@@ -69,7 +69,20 @@ export async function reviewStockWithdrawalRequest(
     if (!request) {
       throw new AppError(404, "STOCK_WITHDRAWAL_NOT_FOUND", "Solicitação de baixa não encontrada.");
     }
-    if (request.status !== StockWithdrawalStatus.PENDENTE) {
+    // "Reserva" a revisão com um update condicional antes de mexer no estoque:
+    // duas aprovações simultâneas liam ambas PENDENTE e as duas davam baixa.
+    // Com o WHERE status=PENDENTE, a segunda espera o lock da linha e, após o
+    // commit da primeira, não encontra mais nada para atualizar (count 0).
+    const claimed = await tx.stockWithdrawalRequest.updateMany({
+      where: { id, status: StockWithdrawalStatus.PENDENTE },
+      data: {
+        status: input.action === "APROVAR" ? StockWithdrawalStatus.APROVADA : StockWithdrawalStatus.REJEITADA,
+        reviewedById: user.userId,
+        reviewedAt: new Date(),
+        reviewNotes: input.reviewNotes,
+      },
+    });
+    if (claimed.count === 0) {
       throw new AppError(409, "INVALID_TRANSITION", "Só é possível revisar solicitações pendentes.");
     }
 
@@ -90,14 +103,8 @@ export async function reviewStockWithdrawalRequest(
       }
     }
 
-    return tx.stockWithdrawalRequest.update({
+    return tx.stockWithdrawalRequest.findUniqueOrThrow({
       where: { id },
-      data: {
-        status: input.action === "APROVAR" ? StockWithdrawalStatus.APROVADA : StockWithdrawalStatus.REJEITADA,
-        reviewedById: user.userId,
-        reviewedAt: new Date(),
-        reviewNotes: input.reviewNotes,
-      },
       include: stockWithdrawalInclude,
     });
   });

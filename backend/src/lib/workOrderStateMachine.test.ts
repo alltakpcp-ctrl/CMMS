@@ -52,7 +52,7 @@ describe("workOrderStateMachine", () => {
       from: WorkOrderStatus.PROGRAMADA,
       to: WorkOrderStatus.EM_EXECUCAO,
       role: Role.TECNICO,
-      context: { userId: "user-1", assignedToId: "user-2" },
+      context: { userId: "user-1", role: Role.TECNICO, assignedToId: "user-2" },
     });
     expect(result.ok).toBe(false);
     expect(result.code).toBe("NOT_ASSIGNED");

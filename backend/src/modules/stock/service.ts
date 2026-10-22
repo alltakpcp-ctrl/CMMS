@@ -66,13 +66,20 @@ export async function recordStockMovement(tx: Prisma.TransactionClient, input: R
   }
 
   const delta = INBOUND_TYPES.includes(type) ? quantity : -quantity;
-  const balanceAfter = part.stockQty + delta;
+
+  // Incremento atômico no banco (não "lê saldo → grava saldo"): duas
+  // movimentações simultâneas da mesma peça liam o mesmo stockQty e a segunda
+  // sobrescrevia a primeira — o kardex ganhava 2 linhas e o saldo só caía 1.
+  // Saldo negativo é detectado depois do update e desfaz a transação inteira.
+  const { stockQty: balanceAfter } = await tx.part.update({
+    where: { id: partId },
+    data: { stockQty: { increment: delta } },
+    select: { stockQty: true },
+  });
 
   if (balanceAfter < 0) {
     throw new AppError(422, "INSUFFICIENT_STOCK", `Saldo insuficiente para a peça ${part.description}.`);
   }
-
-  await tx.part.update({ where: { id: partId }, data: { stockQty: balanceAfter } });
 
   return tx.stockMovement.create({
     data: {

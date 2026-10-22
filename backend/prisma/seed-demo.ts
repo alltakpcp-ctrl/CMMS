@@ -16,6 +16,16 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { Priority, Role, WorkOrderStatus, WorkOrderType } from "../src/domain/enums";
 
+// Trava contra produção: este script apaga WorkOrder/Execution/StatusHistory
+// sem filtro, e o .env local do backend aponta para o Neon de produção. Só
+// roda contra banco local, ou com SEED_DEMO_I_KNOW_WHAT_IM_DOING=1 explícito.
+const databaseUrl = process.env.DATABASE_URL ?? "";
+const isLocalDb = /@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl) || databaseUrl.startsWith("file:");
+if (!isLocalDb && process.env.SEED_DEMO_I_KNOW_WHAT_IM_DOING !== "1") {
+  console.error("seed-demo recusado: DATABASE_URL não é um banco local. Este script APAGA todas as OS.");
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 
 const HOUR = 60 * 60 * 1000;

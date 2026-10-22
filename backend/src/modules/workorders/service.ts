@@ -419,12 +419,14 @@ export function triagem(id: string, input: TriagemInput, user: AuthPayload) {
         };
       }
 
+      // Re-triagem (após override de volta a ABERTA) não pode sobrescrever a
+      // prioridade original com uma que já foi ajustada no ciclo anterior.
       return {
         priority: input.priority,
         targetSectorId: input.targetSectorId,
         trabalhoEmAltura: input.trabalhoEmAltura,
         priorityAdjustedByTech: true,
-        priorityOriginal: workOrder.priority,
+        priorityOriginal: workOrder.priorityOriginal ?? workOrder.priority,
         priorityAdjustedById: user.userId,
         priorityAdjustedAt: new Date(),
       };
@@ -463,19 +465,29 @@ export function planejamento(id: string, input: PlanejamentoInput, user: AuthPay
         rejectIds: [user.userId, workOrder.assignedToId],
       });
 
+      // Re-planejamento (após override) substitui a lista de peças planejadas
+      // em vez de acumular duplicatas. Manutentores de apoio só são somados,
+      // nunca removidos — quem já trabalhou na OS (inclusive coresponsável de
+      // subtask) continua registrado.
+      const existingSupport = await tx.workOrderAssignee.count({
+        where: { workOrderId: workOrder.id, userId: { notIn: assigneeIds } },
+      });
+
       return {
         plan: input.plan,
         estimatedHours: input.estimatedHours,
         tools: input.tools,
         ppe: input.ppe,
-        plannedPartItems: {
-          create: plannedParts.map((p) => ({ partId: p.partId, quantity: p.quantity })),
-        },
+        ...(input.plannedParts !== undefined && {
+          plannedPartItems: {
+            deleteMany: {},
+            create: plannedParts.map((p) => ({ partId: p.partId, quantity: p.quantity })),
+          },
+        }),
         assignees: {
-          deleteMany: {},
-          create: assigneeIds.map((assigneeId) => ({ userId: assigneeId })),
+          createMany: { data: assigneeIds.map((assigneeId) => ({ userId: assigneeId })), skipDuplicates: true },
         },
-        numMaintainers: 1 + assigneeIds.length,
+        numMaintainers: 1 + existingSupport + assigneeIds.length,
       };
     },
   });
@@ -633,13 +645,19 @@ export function iniciar(id: string, input: IniciarInput, user: AuthPayload) {
         excludeIds: [principalId],
       });
 
+      // Apoio é acumulativo: o formulário de início abre vazio, então o antigo
+      // deleteMany apagava o apoio definido na programação e os coresponsáveis
+      // de subtask de ciclos anteriores sempre que ninguém era reselecionado.
+      const existingSupport = await tx.workOrderAssignee.count({
+        where: { workOrderId: id, userId: { notIn: [...assigneeIds, principalId ?? ""] } },
+      });
+
       return {
         ...(isImmediateStart ? { assignedTo: { connect: { id: user.userId } } } : {}),
         assignees: {
-          deleteMany: {},
-          create: assigneeIds.map((assigneeId) => ({ userId: assigneeId })),
+          createMany: { data: assigneeIds.map((assigneeId) => ({ userId: assigneeId })), skipDuplicates: true },
         },
-        numMaintainers: 1 + assigneeIds.length,
+        numMaintainers: 1 + existingSupport + assigneeIds.length,
       };
     },
   });

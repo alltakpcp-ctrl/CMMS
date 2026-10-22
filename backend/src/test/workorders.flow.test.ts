@@ -3,7 +3,7 @@ import request from "supertest";
 import bcrypt from "bcrypt";
 import { app } from "../app";
 import { prisma } from "../config/prisma";
-import { Role, WorkOrderType } from "../domain/enums";
+import { Disciplina, Priority, Role, WorkOrderType } from "../domain/enums";
 
 let operadorToken: string;
 let tecnicoToken: string;
@@ -24,7 +24,7 @@ async function criarOSEmExecucao(title: string): Promise<string> {
   const created = await request(app)
     .post("/workorders")
     .set("Authorization", `Bearer ${operadorToken}`)
-    .send({ type: WorkOrderType.CORRETIVA, title, description: "desc", assetId });
+    .send({ type: WorkOrderType.CORRETIVA, disciplina: Disciplina.ELETRICA, priority: Priority.MEDIA, title, description: "desc", assetId });
   const id = created.body.id;
 
   await request(app)
@@ -74,6 +74,9 @@ beforeAll(async () => {
     data: { code: "TEST-AT-01", name: "Ativo de Teste", sectorId, location: "Bancada de testes", criticality: 3 },
   });
   assetId = asset.id;
+  // createWorkOrder exige o vínculo N:N (AssetSector), não só o sectorId
+  // legado do Asset — sem isso, OPERADOR recebe 403 ASSET_OUT_OF_SECTOR.
+  await prisma.assetSector.create({ data: { assetId: asset.id, sectorId } });
 
   // Operador só abre OS para ativos do próprio setor — mantém o ativo acima no mesmo setor.
   await prisma.user.update({ where: { id: operador.id }, data: { sectorId } });
@@ -97,7 +100,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
     const created = await request(app)
       .post("/workorders")
       .set("Authorization", `Bearer ${operadorToken}`)
-      .send({ type: WorkOrderType.CORRETIVA, title: "Falha de teste", description: "Descrição de teste.", assetId });
+      .send({ type: WorkOrderType.CORRETIVA, disciplina: Disciplina.ELETRICA, priority: Priority.MEDIA, title: "Falha de teste", description: "Descrição de teste.", assetId });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("ABERTA");
     expect(created.body.number).toMatch(/^OS-\d{4}-\d{6}$/);
@@ -134,7 +137,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
       .send({ riskAnalysis: "Análise de risco de teste." });
     expect(iniciar.status).toBe(200);
     expect(iniciar.body.status).toBe("EM_EXECUCAO");
-    expect(iniciar.body.execution.startedAt).toBeTruthy();
+    expect(iniciar.body.executions.at(-1).startedAt).toBeTruthy();
 
     const registrar = await request(app)
       .post(`/workorders/${id}/registrar`)
@@ -158,7 +161,7 @@ describe("fluxo completo da OS (caminho feliz)", () => {
       });
     expect(encerramento.status).toBe(200);
     expect(encerramento.body.status).toBe("AGUARDANDO_VALIDACAO");
-    expect(encerramento.body.execution.finishedAt).toBeTruthy();
+    expect(encerramento.body.executions.at(-1).finishedAt).toBeTruthy();
 
     const partPending = await prisma.part.findUniqueOrThrow({ where: { id: partId } });
     expect(partPending.stockQty).toBe(2);
@@ -210,7 +213,7 @@ describe("caminhos de erro", () => {
     const created = await request(app)
       .post("/workorders")
       .set("Authorization", `Bearer ${operadorToken}`)
-      .send({ type: WorkOrderType.CORRETIVA, title: "Erro de role", description: "desc", assetId });
+      .send({ type: WorkOrderType.CORRETIVA, disciplina: Disciplina.ELETRICA, priority: Priority.MEDIA, title: "Erro de role", description: "desc", assetId });
     const id = created.body.id;
 
     const res = await request(app)
@@ -229,7 +232,7 @@ describe("caminhos de erro", () => {
     const created = await request(app)
       .post("/workorders")
       .set("Authorization", `Bearer ${operadorToken}`)
-      .send({ type: WorkOrderType.CORRETIVA, title: "Erro de transição", description: "desc", assetId });
+      .send({ type: WorkOrderType.CORRETIVA, disciplina: Disciplina.ELETRICA, priority: Priority.MEDIA, title: "Erro de transição", description: "desc", assetId });
     const id = created.body.id;
 
     // ABERTA -> PROGRAMADA pulando etapas obrigatórias.
