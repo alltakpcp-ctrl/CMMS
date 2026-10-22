@@ -85,7 +85,11 @@ export function reconstructStatusHistory(
   wo: ReconstructionWorkOrder,
   history: ReconstructionHistory[],
   executions: ReconstructionExecution[],
-  fallbackUserId: string
+  fallbackUserId: string,
+  // Instante da perda: qualquer transição que de fato faltou aconteceu ANTES
+  // dele (as posteriores sobreviveram). Sem isso, a interpolação ou o
+  // updatedAt (que muda com edições posteriores) jogavam etapas para depois.
+  lostBefore?: Date
 ): ReconstructedEntry[] {
   const sorted = [...history].sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime());
   const execs = executions
@@ -130,7 +134,9 @@ export function reconstructStatusHistory(
     });
   };
 
-  const fillGap = (from: Anchor, to: Anchor, isFinalGap: boolean) => {
+  const fillGap = (from: Anchor, rawTo: Anchor, isFinalGap: boolean) => {
+    const clamp = lostBefore && from.at < lostBefore && rawTo.at > lostBefore;
+    const to: Anchor = clamp ? { status: rawTo.status, at: new Date(lostBefore!.getTime() - 1) } : rawTo;
     const fromIdx = FLOW.indexOf(from.status as WorkOrderStatus);
     const cancelling = to.status === WorkOrderStatus.CANCELADA;
     const windowExecs = execs.filter(
@@ -154,12 +160,13 @@ export function reconstructStatusHistory(
 
     // Retrocesso (override perdido) ou status fora do fluxo: transição direta.
     if (fromIdx < 0 || targetIdx < 0 || (!cancelling && targetIdx < fromIdx)) {
-      emit(from.status, [{ toStatus: to.status, at: to.at, by: null, basis: "aproximada (provável override do supervisor)" }], from.at, to.at);
+      emit(from.status, [{ toStatus: to.status, at: clamp ? null : to.at, by: null, basis: "aproximada (provável override do supervisor)" }], from.at, to.at);
       return;
     }
 
     const steps: Step[] = [];
-    const finalAt = isFinalGap ? to.at : null;
+    // updatedAt só serve de âncora se não foi empurrado para depois da perda.
+    const finalAt = isFinalGap && !clamp ? to.at : null;
     for (let idx = fromIdx + 1; idx <= targetIdx; idx++) {
       const status = FLOW[idx];
       switch (status) {
@@ -251,8 +258,9 @@ export function reconstructStatusHistory(
   }
 
   // Exclusão lógica feita antes do incidente (mesmo dia 17/09) perdeu a linha
-  // de auditoria — os dados dela continuam na própria OS.
-  if (wo.excludedAt && wo.excludedById && !sorted.some((h) => h.note?.startsWith("[EXCLUSÃO]"))) {
+  // de auditoria — os dados dela continuam na própria OS. "[EXCLUSÃO" sem o
+  // colchete final cobre também "[EXCLUSÃO EM CASCATA — PLANO]".
+  if (wo.excludedAt && wo.excludedById && !sorted.some((h) => h.note?.startsWith("[EXCLUSÃO"))) {
     out.push({
       fromStatus: wo.status,
       toStatus: wo.status,

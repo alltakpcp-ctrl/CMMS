@@ -38,6 +38,16 @@ async function main() {
       return;
     }
 
+    // Instante da perda = primeira linha que sobreviveu depois do fim do dump
+    // do cutover (18/08 ~16h UTC). Tudo que faltar aconteceu antes dele.
+    const survivor = await prisma.statusHistory.findFirst({
+      where: { changedAt: { gt: new Date("2026-08-18T18:00:00Z") }, id: { not: { startsWith: "recon_" } } },
+      orderBy: { changedAt: "asc" },
+      select: { changedAt: true },
+    });
+    const lostBefore = survivor?.changedAt;
+    console.log(`Transições reconstruídas limitadas a antes de ${lostBefore?.toISOString() ?? "(sem limite)"}.`);
+
     const workOrders = await prisma.workOrder.findMany({
       orderBy: { number: "asc" },
       include: {
@@ -48,7 +58,7 @@ async function main() {
 
     const rows: Array<{ number: string; data: ReturnType<typeof reconstructStatusHistory>[number] & { id: string; workOrderId: string } }> = [];
     for (const wo of workOrders) {
-      const entries = reconstructStatusHistory(wo, wo.statusHistory, wo.executions, fallback.id);
+      const entries = reconstructStatusHistory(wo, wo.statusHistory, wo.executions, fallback.id, lostBefore);
       entries.forEach((entry, i) =>
         rows.push({ number: wo.number, data: { ...entry, id: `recon_${wo.id}_${i + 1}`, workOrderId: wo.id } })
       );

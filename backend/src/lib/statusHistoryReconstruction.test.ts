@@ -121,6 +121,51 @@ describe("reconstructStatusHistory", () => {
     expect(chain(result)).toBe("∅>ABERTA ABERTA>TRIAGEM TRIAGEM>EM_EXECUCAO EM_EXECUCAO>CANCELADA");
   });
 
+  it("com o instante da perda, nenhuma etapa reconstruída cai depois dele", () => {
+    const lostBefore = t("2026-09-17T13:56:00Z");
+    const history = [
+      { fromStatus: null, toStatus: "ABERTA", changedAt: t("2026-08-10T10:00:00Z"), note: null },
+      { fromStatus: "ABERTA", toStatus: "TRIAGEM", changedAt: t("2026-08-10T11:00:00Z"), note: null },
+      // primeira linha sobrevivente, bem depois da perda
+      { fromStatus: "PLANEJADA", toStatus: "PROGRAMADA", changedAt: t("2026-10-08T11:00:00Z"), note: null },
+    ];
+    const gap = reconstructStatusHistory(wo({ status: "PROGRAMADA" }), history, [], FALLBACK, lostBefore);
+    expect(chain(gap)).toBe("TRIAGEM>PLANEJADA");
+    expect(gap[0].changedAt < lostBefore).toBe(true);
+
+    // updatedAt empurrado por uma edição posterior não vira data do cancelamento
+    const cancelled = reconstructStatusHistory(
+      wo({ status: "CANCELADA", createdAt: t("2026-09-01T10:00:00Z"), updatedAt: t("2026-09-21T12:00:00Z"), plan: null, scheduledStart: null }),
+      [],
+      [],
+      FALLBACK,
+      lostBefore
+    );
+    expect(cancelled.every((e) => e.changedAt < lostBefore)).toBe(true);
+  });
+
+  it("exclusão: recria a auditoria perdida, mas não duplica a da cascata do plano", () => {
+    const excluded = wo({
+      status: "PROGRAMADA",
+      excludedAt: t("2026-09-17T12:30:00Z"),
+      excludedById: "sup",
+      exclusionReason: "duplicada",
+    });
+    const opened = [
+      { fromStatus: null, toStatus: "ABERTA", changedAt: t("2026-09-01T10:00:00Z"), note: null },
+      { fromStatus: "ABERTA", toStatus: "PROGRAMADA", changedAt: t("2026-09-01T10:00:01Z"), note: null },
+    ];
+    const lost = reconstructStatusHistory(excluded, opened, [], FALLBACK);
+    expect(lost).toHaveLength(1);
+    expect(lost[0]).toMatchObject({ changedById: "sup", changedAt: t("2026-09-17T12:30:00Z") });
+
+    const withCascade = [
+      ...opened,
+      { fromStatus: "PROGRAMADA", toStatus: "PROGRAMADA", changedAt: t("2026-09-21T12:00:00Z"), note: "[EXCLUSÃO EM CASCATA — PLANO] Ajuste" },
+    ];
+    expect(reconstructStatusHistory(excluded, withCascade, [], FALLBACK)).toEqual([]);
+  });
+
   it("OS com cadeia íntegra não gera nada", () => {
     const history = [
       { fromStatus: null, toStatus: "ABERTA", changedAt: t("2026-09-20T10:00:00Z"), note: null },
