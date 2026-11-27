@@ -16,6 +16,7 @@ import { Pagination } from "../components/Pagination";
 import { formatDate } from "../lib/format";
 import { getErrorMessage } from "../lib/errors";
 import { useToast } from "../components/ToastProvider";
+import { useTecnicos } from "../hooks/useTecnicos";
 
 const PAGE_SIZE = 50;
 
@@ -37,13 +38,20 @@ export default function ListaOS() {
   const [type, setType] = useState<WorkOrderType | "">("");
   const [assetId, setAssetId] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+  // Filtra pelo responsável principal (assignedToId). Manutentores de apoio
+  // não entram — a API não filtra apoio de outro usuário.
+  const [technicianId, setTechnicianId] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+
+  // A lista de técnicos (GET /users/tecnicos) é só TECNICO/SUPERVISOR.
+  const canFilterByTechnician = user?.role !== "OPERADOR";
+  const { tecnicos } = useTecnicos();
 
   // Filtro novo sempre volta para a 1ª página.
   useEffect(() => {
     setPage(1);
-  }, [status, type, assetId, onlyMine]);
+  }, [status, type, assetId, onlyMine, technicianId]);
 
   useEffect(() => {
     if (!token) return;
@@ -68,6 +76,8 @@ export default function ListaOS() {
     if (onlyMine) {
       if (user.role === "TECNICO") filters.assignedToId = user.id;
       else filters.requesterId = user.id;
+    } else if (technicianId) {
+      filters.assignedToId = technicianId;
     }
 
     // Trocar filtro dispara 2 buscas seguidas (filtro + volta à página 1);
@@ -85,7 +95,7 @@ export default function ListaOS() {
     return () => {
       stale = true;
     };
-  }, [token, user, status, type, assetId, onlyMine, page, showError]);
+  }, [token, user, status, type, assetId, onlyMine, technicianId, page, showError]);
 
   useEffect(() => {
     if (status) {
@@ -141,7 +151,33 @@ export default function ListaOS() {
           />
         </div>
 
-        <Button variant={onlyMine ? "primary" : "secondary"} type="button" onClick={() => setOnlyMine((v) => !v)}>
+        {canFilterByTechnician && (
+          <div className="w-48">
+            <SearchableSelect
+              label="Técnico"
+              value={technicianId}
+              onChange={(value) => {
+                setTechnicianId(value);
+                // Técnico escolhido e "Minhas OS" usam o mesmo filtro
+                // (assignedToId) — um desliga o outro.
+                if (value) setOnlyMine(false);
+              }}
+              options={[
+                { value: "", label: "Todos" },
+                ...tecnicos.map((tecnico) => ({ value: tecnico.id, label: tecnico.name })),
+              ]}
+            />
+          </div>
+        )}
+
+        <Button
+          variant={onlyMine ? "primary" : "secondary"}
+          type="button"
+          onClick={() => {
+            setOnlyMine((v) => !v);
+            setTechnicianId("");
+          }}
+        >
           Minhas OS
         </Button>
       </div>
